@@ -41,12 +41,18 @@ export default function Signup() {
     return "";
   }, [email, touched.email]);
 
-  const passwordError = useMemo(() => {
-    if (!touched.password) return "";
-    if (!password.trim()) return "Password is required.";
-    if (password.length < 6) return "Password must be at least 6 characters.";
-    return "";
-  }, [password, touched.password]);
+ const passwordError = useMemo(() => {
+  if (!touched.password) return "";
+  if (!password.trim()) return "Password is required.";
+  if (password.length < 6)
+    return "Password must be at least 6 characters.";
+
+  const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
+  if (!specialCharRegex.test(password))
+    return "Password must contain at least one special character.";
+
+  return "";
+}, [password, touched.password]);
 
   const confirmError = useMemo(() => {
     if (!touched.confirmPassword) return "";
@@ -81,14 +87,14 @@ export default function Signup() {
     try {
       setIsLoading(true);
 
-      // change endpoint/body to match your backend
+      
       await axios.post("http://localhost:8081/auth/signup", {
         fullName,
         email,
         password,
       });
 
-      // after signup, go to login
+      // redirecting to login on success
       navigate("/login", { replace: true });
     } catch (err) {
       setServerError("Signup failed. Please try again.");
@@ -103,7 +109,7 @@ export default function Signup() {
       <Navbar />
 
       <main className="relative overflow-hidden">
-        {/* subtle background shapes (like screenshot) */}
+
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-[-120px] top-[30%] h-[300px] w-[300px] rotate-12 bg-blue-50" />
           <div className="absolute right-[-150px] bottom-[20%] h-[350px] w-[350px] -rotate-12 bg-blue-50" />
@@ -241,7 +247,7 @@ export default function Signup() {
                 )}
               </div>
 
-              {/* Terms line (like screenshot) */}
+              {/* Terms line*/}
               <p className="text-xs text-gray-500">
                 By creating account means you agree to the{" "}
                 <span className="text-blue-600">Terms and Conditions</span>, and our{" "}
