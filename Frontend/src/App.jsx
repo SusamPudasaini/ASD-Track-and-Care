@@ -3,6 +3,8 @@ import Login from "./auth/Login";
 import Logout from "./auth/Logout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/navbar/Navbar"; 
+import Signup from "./auth/Signup";
+
 
 function Home() {
   return (
@@ -21,6 +23,8 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/logout" element={<Logout />} />
+      <Route path="/signup" element={<Signup />} />
+
 
       {/* protected home */}
       <Route
