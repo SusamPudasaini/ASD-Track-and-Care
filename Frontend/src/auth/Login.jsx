@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
 import Navbar from "../components/navbar/Navbar";
+import api from "../api/axios";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -13,17 +13,19 @@ export default function Login() {
   const [touched, setTouched] = useState({ username: false, password: false });
   const [serverError, setServerError] = useState("");
 
+  // ✅ control resend UI by a boolean, not by message text
+  const [isUnverified, setIsUnverified] = useState(false);
+
+  const [resendMsg, setResendMsg] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
+
   const navigate = useNavigate();
 
-  // ---------- validation ----------
   const usernameError = useMemo(() => {
     if (!touched.username) return "";
     if (!username.trim()) return "Username is required.";
-
-    // Optional: enforce your username rules (3–20, letters/numbers/_)
     const ok = /^[a-zA-Z0-9_]{3,20}$/.test(username.trim());
     if (!ok) return "Username must be 3–20 characters (letters, numbers, underscore).";
-
     return "";
   }, [username, touched.username]);
 
@@ -37,26 +39,69 @@ export default function Login() {
   const canSubmit =
     !usernameError && !passwordError && username.trim() && password.trim();
 
-  // ---------- submit ----------
+  const handleResend = async () => {
+    setResendMsg("");
+
+    if (!username.trim()) {
+      setResendMsg("Please enter your username first.");
+      return;
+    }
+
+    try {
+      setResendLoading(true);
+      const res = await api.post("/auth/resend-verification", {
+        username: username.trim(),
+      });
+      setResendMsg(res.data);
+    } catch (err) {
+      setResendMsg(err?.response?.data || "Could not resend verification email.");
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
-    setServerError("");
-    setTouched({ username: true, password: true });
 
+    // reset state each attempt
+    setServerError("");
+    setResendMsg("");
+    setIsUnverified(false);
+
+    setTouched({ username: true, password: true });
     if (!canSubmit) return;
 
     try {
       setIsLoading(true);
 
-      const res = await axios.post("http://localhost:8081/auth/login", {
+      const res = await api.post("/auth/login", {
         username: username.trim(),
         password,
       });
 
       localStorage.setItem("token", res.data.token);
       navigate("/");
-    } catch {
-      setServerError("Invalid username or password. Please try again.");
+    } catch (err) {
+      const status = err?.response?.status;
+      const msg = err?.response?.data;
+
+      if (status === 401) {
+        setServerError("Invalid username or password. Please try again.");
+        return;
+      }
+
+      if (status === 403) {
+        setIsUnverified(true);
+        // handle either code or text
+        if (msg === "EMAIL_NOT_VERIFIED") {
+          setServerError("Your email has not been verified. Please verify it to login.");
+        } else {
+          setServerError(msg || "Your email has not been verified. Please verify it to login.");
+        }
+        return;
+      }
+
+      setServerError(msg || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -87,8 +132,25 @@ export default function Login() {
               </div>
             )}
 
+            {/* ✅ Resend link shows ONLY if backend returned 403 */}
+            {isUnverified && (
+              <div className="mt-3 text-sm">
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resendLoading}
+                  className="text-blue-600 hover:underline disabled:text-blue-300"
+                >
+                  {resendLoading ? "Resending..." : "Resend verification link"}
+                </button>
+
+                {resendMsg && (
+                  <p className="mt-2 text-xs text-gray-600">{resendMsg}</p>
+                )}
+              </div>
+            )}
+
             <form onSubmit={handleLogin} className="mt-8 space-y-6">
-              {/* Username */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Username
@@ -111,12 +173,10 @@ export default function Login() {
                 )}
               </div>
 
-              {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Password
                 </label>
-
                 <div className="relative mt-2">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -131,33 +191,19 @@ export default function Login() {
                           : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                       }`}
                   />
-
                   <button
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 px-2 text-sm text-gray-500 hover:text-gray-800"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? "🙈" : "👁️"}
                   </button>
                 </div>
-
                 {passwordError && (
                   <p className="mt-2 text-xs text-red-600">{passwordError}</p>
                 )}
               </div>
 
-              {/* forgot password */}
-              <div className="flex justify-end">
-                <Link
-                  to="/forgot-password"
-                  className="text-sm text-blue-600 hover:underline"
-                >
-                  Forgot Password?
-                </Link>
-              </div>
-
-              {/* submit */}
               <button
                 type="submit"
                 disabled={!canSubmit || isLoading}
@@ -168,14 +214,7 @@ export default function Login() {
                       : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
                   }`}
               >
-                {isLoading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                    Signing in...
-                  </span>
-                ) : (
-                  "Sign in"
-                )}
+                {isLoading ? "Signing in..." : "Sign in"}
               </button>
             </form>
 

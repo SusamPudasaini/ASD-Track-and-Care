@@ -1,0 +1,47 @@
+# =====================
+# Backend (Spring Boot)
+# =====================
+
+# Ignore application config (secrets)
+backend/src/main/resources/application.properties
+backend/src/main/resources/application-*.properties
+backend/src/main/resources/*.yml
+backend/src/main/resources/*.yaml
+
+# Maven
+backend/target/
+backend/.mvn/
+backend/mvnw
+backend/mvnw.cmd
+
+# Logs
+*.log
+
+# =====================
+# Frontend (React / Vite)
+# =====================
+
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.*
+
+# =====================
+# OS / IDE
+# =====================
+
+.DS_Store
+Thumbs.db
+
+# IntelliJ / VS Code
+.idea/
+.vscode/
+*.iml
+
+# =====================
+# General
+# =====================
+
+.env
+.env.*

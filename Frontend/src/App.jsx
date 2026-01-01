@@ -4,6 +4,8 @@ import Logout from "./auth/Logout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/navbar/Navbar"; 
 import Signup from "./auth/Signup";
+import VerifyEmail from "./auth/VerifyEmail";
+import CheckEmail from "./auth/CheckEmail";
 
 
 function Home() {
@@ -24,6 +26,10 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/logout" element={<Logout />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/check-email" element={<CheckEmail />} />
+
+
 
 
       {/* protected home */}

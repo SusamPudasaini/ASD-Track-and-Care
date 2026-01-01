@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
 import Navbar from "../components/navbar/Navbar";
+import api from "../api/axios";
 
 export default function Signup() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
 
-  const [username, setUsername] = useState(""); // separate section
+  const [username, setUsername] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
 
   const [email, setEmail] = useState("");
@@ -32,12 +32,9 @@ export default function Signup() {
 
   const navigate = useNavigate();
 
-  // ---- validation helpers ----
+  // helpers
   const emailValid = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-
-  const usernameValid = (value) =>
-    /^[a-zA-Z0-9_]{3,20}$/.test(value.trim()); // 3-20, letters/numbers/underscore
-
+  const usernameValid = (value) => /^[a-zA-Z0-9_]{3,20}$/.test(value.trim());
   const phoneValid = (value) => {
     const digits = value.replace(/\D/g, "");
     return digits.length >= 7 && digits.length <= 15;
@@ -60,8 +57,7 @@ export default function Signup() {
   const usernameError = useMemo(() => {
     if (!touched.username) return "";
     if (!username.trim()) return "Username is required.";
-    if (!usernameValid(username))
-      return "Username must be 3–20 characters (letters, numbers, underscore).";
+    if (!usernameValid(username)) return "Username must be 3–20 characters (letters, numbers, underscore).";
     return "";
   }, [username, touched.username]);
 
@@ -83,11 +79,8 @@ export default function Signup() {
     if (!touched.password) return "";
     if (!password.trim()) return "Password is required.";
     if (password.length < 6) return "Password must be at least 6 characters.";
-
     const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
-    if (!specialCharRegex.test(password))
-      return "Password must contain at least one special character.";
-
+    if (!specialCharRegex.test(password)) return "Password must contain at least one special character.";
     return "";
   }, [password, touched.password]);
 
@@ -133,7 +126,7 @@ export default function Signup() {
     try {
       setIsLoading(true);
 
-      await axios.post("http://localhost:8081/auth/signup", {
+      await api.post("/auth/signup", {
         firstName,
         lastName,
         username,
@@ -142,16 +135,14 @@ export default function Signup() {
         password,
       });
 
-      navigate("/login", { replace: true });
+      // ✅ after signup user should check email (not verify-email directly)
+      navigate("/check-email", { state: { email } });
     } catch (err) {
-      setServerError("Signup failed. Please try again.");
+      setServerError(err?.response?.data || "Signup failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
-
-  const inputBase =
-    "mt-2 w-full rounded border px-4 py-2.5 text-sm outline-none focus:ring-1";
 
   return (
     <div className="min-h-screen bg-white">
@@ -179,230 +170,148 @@ export default function Signup() {
             )}
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-              {/* ===== Personal info section ===== */}
+              {/* Personal Information */}
               <div className="rounded-md border border-gray-100 bg-gray-50/50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Personal Information
                 </p>
 
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {/* First Name */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      First Name
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700">First Name</label>
                     <input
                       type="text"
                       placeholder="Enter first name"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       onBlur={() => setTouched((p) => ({ ...p, firstName: true }))}
-                      className={`${inputBase} ${
-                        firstNameError
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                          : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                      }`}
+                      className={`mt-2 w-full rounded border px-4 py-2.5 text-sm outline-none focus:ring-1
+                        ${firstNameError ? "border-red-300 focus:border-red-500 focus:ring-red-500" : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"}`}
                     />
-                    {firstNameError && (
-                      <p className="mt-2 text-xs text-red-600">{firstNameError}</p>
-                    )}
+                    {firstNameError && <p className="mt-2 text-xs text-red-600">{firstNameError}</p>}
                   </div>
 
-                  {/* Last Name */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Last Name
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700">Last Name</label>
                     <input
                       type="text"
                       placeholder="Enter last name"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       onBlur={() => setTouched((p) => ({ ...p, lastName: true }))}
-                      className={`${inputBase} ${
-                        lastNameError
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                          : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                      }`}
+                      className={`mt-2 w-full rounded border px-4 py-2.5 text-sm outline-none focus:ring-1
+                        ${lastNameError ? "border-red-300 focus:border-red-500 focus:ring-red-500" : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"}`}
                     />
-                    {lastNameError && (
-                      <p className="mt-2 text-xs text-red-600">{lastNameError}</p>
-                    )}
+                    {lastNameError && <p className="mt-2 text-xs text-red-600">{lastNameError}</p>}
                   </div>
                 </div>
 
-                {/* Phone Number */}
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Phone Number
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Phone Number</label>
                   <input
                     type="tel"
                     placeholder="Enter phone number"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
-                    onBlur={() =>
-                      setTouched((p) => ({ ...p, phoneNumber: true }))
-                    }
-                    className={`${inputBase} ${
-                      phoneError
-                        ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                        : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                    }`}
+                    onBlur={() => setTouched((p) => ({ ...p, phoneNumber: true }))}
+                    className={`mt-2 w-full rounded border px-4 py-2.5 text-sm outline-none focus:ring-1
+                      ${phoneError ? "border-red-300 focus:border-red-500 focus:ring-red-500" : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"}`}
                   />
-                  {phoneError && (
-                    <p className="mt-2 text-xs text-red-600">{phoneError}</p>
-                  )}
+                  {phoneError && <p className="mt-2 text-xs text-red-600">{phoneError}</p>}
                 </div>
               </div>
 
-              {/* ===== Username section (separate) ===== */}
+              {/* Username section */}
               <div className="rounded-md border border-gray-100 bg-gray-50/50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Account Username
                 </p>
 
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Username
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Username</label>
                   <input
                     type="text"
                     placeholder="Choose a username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     onBlur={() => setTouched((p) => ({ ...p, username: true }))}
-                    className={`${inputBase} ${
-                      usernameError
-                        ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                        : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                    }`}
+                    className={`mt-2 w-full rounded border px-4 py-2.5 text-sm outline-none focus:ring-1
+                      ${usernameError ? "border-red-300 focus:border-red-500 focus:ring-red-500" : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"}`}
                   />
-                  {usernameError && (
-                    <p className="mt-2 text-xs text-red-600">{usernameError}</p>
-                  )}
-                  <p className="mt-2 text-xs text-gray-500">
-                    Use 3–20 characters. Letters, numbers, and underscore only.
-                  </p>
+                  {usernameError && <p className="mt-2 text-xs text-red-600">{usernameError}</p>}
                 </div>
               </div>
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Your Email
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Email</label>
                 <input
                   type="email"
-                  placeholder="Enter your Email"
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => setTouched((p) => ({ ...p, email: true }))}
-                  className={`${inputBase} ${
-                    emailError
-                      ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                      : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                  }`}
+                  className={`mt-2 w-full rounded border px-4 py-2.5 text-sm outline-none focus:ring-1
+                    ${emailError ? "border-red-300 focus:border-red-500 focus:ring-red-500" : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"}`}
                 />
-                {emailError && (
-                  <p className="mt-2 text-xs text-red-600">{emailError}</p>
-                )}
+                {emailError && <p className="mt-2 text-xs text-red-600">{emailError}</p>}
               </div>
 
               {/* Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Your Password
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Password</label>
                 <div className="relative mt-2">
                   <input
                     type={showPassword ? "text" : "password"}
-                    placeholder="Enter your Password"
+                    placeholder="Enter password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onBlur={() => setTouched((p) => ({ ...p, password: true }))}
                     className={`w-full rounded border px-4 py-2.5 pr-12 text-sm outline-none focus:ring-1
-                      ${
-                        passwordError
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                          : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                      }`}
+                      ${passwordError ? "border-red-300 focus:border-red-500 focus:ring-red-500" : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"}`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 px-2 text-sm text-gray-500 hover:text-gray-800"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? "🙈" : "👁️"}
                   </button>
                 </div>
-                {passwordError && (
-                  <p className="mt-2 text-xs text-red-600">{passwordError}</p>
-                )}
+                {passwordError && <p className="mt-2 text-xs text-red-600">{passwordError}</p>}
               </div>
 
               {/* Confirm Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Confirm Password
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
                 <div className="relative mt-2">
                   <input
                     type={showConfirm ? "text" : "password"}
-                    placeholder="Confirm your Password"
+                    placeholder="Confirm password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    onBlur={() =>
-                      setTouched((p) => ({ ...p, confirmPassword: true }))
-                    }
+                    onBlur={() => setTouched((p) => ({ ...p, confirmPassword: true }))}
                     className={`w-full rounded border px-4 py-2.5 pr-12 text-sm outline-none focus:ring-1
-                      ${
-                        confirmError
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                          : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                      }`}
+                      ${confirmError ? "border-red-300 focus:border-red-500 focus:ring-red-500" : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"}`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirm((s) => !s)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 px-2 text-sm text-gray-500 hover:text-gray-800"
-                    aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"}
                   >
                     {showConfirm ? "🙈" : "👁️"}
                   </button>
                 </div>
-                {confirmError && (
-                  <p className="mt-2 text-xs text-red-600">{confirmError}</p>
-                )}
+                {confirmError && <p className="mt-2 text-xs text-red-600">{confirmError}</p>}
               </div>
 
-              {/* Terms line */}
-              <p className="text-xs text-gray-500">
-                By creating account means you agree to the{" "}
-                <span className="text-blue-600">Terms and Conditions</span>, and our{" "}
-                <span className="text-blue-600">Privacy Policy</span>.
-              </p>
-
-              {/* Submit */}
               <button
                 type="submit"
                 disabled={!canSubmit || isLoading}
                 className={`w-full rounded py-2.5 text-sm font-semibold text-white transition
-                  ${
-                    !canSubmit || isLoading
-                      ? "bg-blue-400 cursor-not-allowed"
-                      : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
-                  }`}
+                  ${!canSubmit || isLoading ? "bg-blue-400 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"}`}
               >
-                {isLoading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                    Creating...
-                  </span>
-                ) : (
-                  "Sign up"
-                )}
+                {isLoading ? "Creating..." : "Sign up"}
               </button>
             </form>
 
