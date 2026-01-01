@@ -7,5 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.ASD_Track_and_Care.backend.model.User;
 
 public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByUserEmail(String userEmail);
     Optional<User> findByUsername(String username);
+
+    boolean existsByUserEmail(String userEmail);
+    boolean existsByUsername(String username);
 }

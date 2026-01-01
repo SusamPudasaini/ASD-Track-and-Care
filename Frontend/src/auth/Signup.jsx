@@ -4,7 +4,12 @@ import axios from "axios";
 import Navbar from "../components/navbar/Navbar";
 
 export default function Signup() {
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+
+  const [username, setUsername] = useState(""); // separate section
+  const [phoneNumber, setPhoneNumber] = useState("");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -13,7 +18,10 @@ export default function Signup() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [touched, setTouched] = useState({
-    fullName: false,
+    firstName: false,
+    lastName: false,
+    username: false,
+    phoneNumber: false,
     email: false,
     password: false,
     confirmPassword: false,
@@ -27,12 +35,42 @@ export default function Signup() {
   // ---- validation helpers ----
   const emailValid = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
-  const fullNameError = useMemo(() => {
-    if (!touched.fullName) return "";
-    if (!fullName.trim()) return "Full name is required.";
-    if (fullName.trim().length < 2) return "Full name must be at least 2 characters.";
+  const usernameValid = (value) =>
+    /^[a-zA-Z0-9_]{3,20}$/.test(value.trim()); // 3-20, letters/numbers/underscore
+
+  const phoneValid = (value) => {
+    const digits = value.replace(/\D/g, "");
+    return digits.length >= 7 && digits.length <= 15;
+  };
+
+  const firstNameError = useMemo(() => {
+    if (!touched.firstName) return "";
+    if (!firstName.trim()) return "First name is required.";
+    if (firstName.trim().length < 2) return "First name must be at least 2 characters.";
     return "";
-  }, [fullName, touched.fullName]);
+  }, [firstName, touched.firstName]);
+
+  const lastNameError = useMemo(() => {
+    if (!touched.lastName) return "";
+    if (!lastName.trim()) return "Last name is required.";
+    if (lastName.trim().length < 2) return "Last name must be at least 2 characters.";
+    return "";
+  }, [lastName, touched.lastName]);
+
+  const usernameError = useMemo(() => {
+    if (!touched.username) return "";
+    if (!username.trim()) return "Username is required.";
+    if (!usernameValid(username))
+      return "Username must be 3–20 characters (letters, numbers, underscore).";
+    return "";
+  }, [username, touched.username]);
+
+  const phoneError = useMemo(() => {
+    if (!touched.phoneNumber) return "";
+    if (!phoneNumber.trim()) return "Phone number is required.";
+    if (!phoneValid(phoneNumber)) return "Enter a valid phone number (7–15 digits).";
+    return "";
+  }, [phoneNumber, touched.phoneNumber]);
 
   const emailError = useMemo(() => {
     if (!touched.email) return "";
@@ -41,18 +79,17 @@ export default function Signup() {
     return "";
   }, [email, touched.email]);
 
- const passwordError = useMemo(() => {
-  if (!touched.password) return "";
-  if (!password.trim()) return "Password is required.";
-  if (password.length < 6)
-    return "Password must be at least 6 characters.";
+  const passwordError = useMemo(() => {
+    if (!touched.password) return "";
+    if (!password.trim()) return "Password is required.";
+    if (password.length < 6) return "Password must be at least 6 characters.";
 
-  const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
-  if (!specialCharRegex.test(password))
-    return "Password must contain at least one special character.";
+    const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
+    if (!specialCharRegex.test(password))
+      return "Password must contain at least one special character.";
 
-  return "";
-}, [password, touched.password]);
+    return "";
+  }, [password, touched.password]);
 
   const confirmError = useMemo(() => {
     if (!touched.confirmPassword) return "";
@@ -62,11 +99,17 @@ export default function Signup() {
   }, [confirmPassword, password, touched.confirmPassword]);
 
   const canSubmit =
-    !fullNameError &&
+    !firstNameError &&
+    !lastNameError &&
+    !usernameError &&
+    !phoneError &&
     !emailError &&
     !passwordError &&
     !confirmError &&
-    fullName.trim() &&
+    firstName.trim() &&
+    lastName.trim() &&
+    username.trim() &&
+    phoneNumber.trim() &&
     email.trim() &&
     password.trim() &&
     confirmPassword.trim();
@@ -76,7 +119,10 @@ export default function Signup() {
     setServerError("");
 
     setTouched({
-      fullName: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+      phoneNumber: true,
       email: true,
       password: true,
       confirmPassword: true,
@@ -87,14 +133,15 @@ export default function Signup() {
     try {
       setIsLoading(true);
 
-      
       await axios.post("http://localhost:8081/auth/signup", {
-        fullName,
+        firstName,
+        lastName,
+        username,
+        phoneNumber,
         email,
         password,
       });
 
-      // redirecting to login on success
       navigate("/login", { replace: true });
     } catch (err) {
       setServerError("Signup failed. Please try again.");
@@ -103,21 +150,21 @@ export default function Signup() {
     }
   };
 
+  const inputBase =
+    "mt-2 w-full rounded border px-4 py-2.5 text-sm outline-none focus:ring-1";
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Navbar */}
       <Navbar />
 
       <main className="relative overflow-hidden">
-
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-[-120px] top-[30%] h-[300px] w-[300px] rotate-12 bg-blue-50" />
           <div className="absolute right-[-150px] bottom-[20%] h-[350px] w-[350px] -rotate-12 bg-blue-50" />
         </div>
 
         <div className="relative z-10 mx-auto flex min-h-[calc(100vh-90px)] max-w-6xl items-center justify-center px-6 py-12">
-          {/* signup card */}
-          <div className="w-full max-w-[420px] rounded-md bg-white px-8 py-10 shadow-md">
+          <div className="w-full max-w-[480px] rounded-md bg-white px-8 py-10 shadow-md">
             <h1 className="text-center text-[22px] font-semibold text-gray-900">
               Create your account
             </h1>
@@ -125,7 +172,6 @@ export default function Signup() {
               Create Your Account to get started
             </p>
 
-            {/* server error */}
             {serverError && (
               <div className="mt-6 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {serverError}
@@ -133,27 +179,112 @@ export default function Signup() {
             )}
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-              {/* Full Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter your full name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  onBlur={() => setTouched((p) => ({ ...p, fullName: true }))}
-                  className={`mt-2 w-full rounded border px-4 py-2.5 text-sm outline-none focus:ring-1
-                    ${
-                      fullNameError
+              {/* ===== Personal info section ===== */}
+              <div className="rounded-md border border-gray-100 bg-gray-50/50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Personal Information
+                </p>
+
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {/* First Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter first name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      onBlur={() => setTouched((p) => ({ ...p, firstName: true }))}
+                      className={`${inputBase} ${
+                        firstNameError
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                          : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                      }`}
+                    />
+                    {firstNameError && (
+                      <p className="mt-2 text-xs text-red-600">{firstNameError}</p>
+                    )}
+                  </div>
+
+                  {/* Last Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Last Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter last name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      onBlur={() => setTouched((p) => ({ ...p, lastName: true }))}
+                      className={`${inputBase} ${
+                        lastNameError
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                          : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                      }`}
+                    />
+                    {lastNameError && (
+                      <p className="mt-2 text-xs text-red-600">{lastNameError}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Phone Number */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="Enter phone number"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onBlur={() =>
+                      setTouched((p) => ({ ...p, phoneNumber: true }))
+                    }
+                    className={`${inputBase} ${
+                      phoneError
                         ? "border-red-300 focus:border-red-500 focus:ring-red-500"
                         : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                     }`}
-                />
-                {fullNameError && (
-                  <p className="mt-2 text-xs text-red-600">{fullNameError}</p>
-                )}
+                  />
+                  {phoneError && (
+                    <p className="mt-2 text-xs text-red-600">{phoneError}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* ===== Username section (separate) ===== */}
+              <div className="rounded-md border border-gray-100 bg-gray-50/50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Account Username
+                </p>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Choose a username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    onBlur={() => setTouched((p) => ({ ...p, username: true }))}
+                    className={`${inputBase} ${
+                      usernameError
+                        ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                        : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                    }`}
+                  />
+                  {usernameError && (
+                    <p className="mt-2 text-xs text-red-600">{usernameError}</p>
+                  )}
+                  <p className="mt-2 text-xs text-gray-500">
+                    Use 3–20 characters. Letters, numbers, and underscore only.
+                  </p>
+                </div>
               </div>
 
               {/* Email */}
@@ -167,12 +298,11 @@ export default function Signup() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => setTouched((p) => ({ ...p, email: true }))}
-                  className={`mt-2 w-full rounded border px-4 py-2.5 text-sm outline-none focus:ring-1
-                    ${
-                      emailError
-                        ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                        : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                    }`}
+                  className={`${inputBase} ${
+                    emailError
+                      ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                      : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                  }`}
                 />
                 {emailError && (
                   <p className="mt-2 text-xs text-red-600">{emailError}</p>
@@ -247,7 +377,7 @@ export default function Signup() {
                 )}
               </div>
 
-              {/* Terms line*/}
+              {/* Terms line */}
               <p className="text-xs text-gray-500">
                 By creating account means you agree to the{" "}
                 <span className="text-blue-600">Terms and Conditions</span>, and our{" "}
@@ -277,7 +407,7 @@ export default function Signup() {
             </form>
 
             <p className="mt-6 text-center text-sm text-gray-600">
-              Already using Startup?{" "}
+              Already have an account?{" "}
               <Link to="/login" className="text-blue-600 hover:underline">
                 Sign in
               </Link>
