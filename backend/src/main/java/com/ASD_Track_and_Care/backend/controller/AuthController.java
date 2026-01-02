@@ -169,5 +169,66 @@ public class AuthController {
         return ResponseEntity.ok("Verification link resent. Please check your email.");
     }
 
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody com.ASD_Track_and_Care.backend.dto.ForgotPasswordRequest req) {
+
+        if (req.getEmail() == null || req.getEmail().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Email is required.");
+        }
+
+        String email = req.getEmail().trim();
+        Optional<User> userOpt = userRepository.findByUserEmail(email);
+
+        // Security: always return OK so attackers can't guess emails
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.ok("If that email exists, a reset link was sent.");
+        }
+
+        User user = userOpt.get();
+
+        String token = java.util.UUID.randomUUID().toString();
+        user.setResetToken(token);
+        user.setResetTokenExpiry(java.time.LocalDateTime.now().plusMinutes(30));
+        userRepository.save(user);
+
+        String resetLink = frontendBaseUrl + "/reset-password?token=" + token;
+        emailService.sendPasswordResetEmail(user.getUserEmail(), resetLink);
+
+        return ResponseEntity.ok("If that email exists, a reset link was sent.");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody com.ASD_Track_and_Care.backend.dto.ResetPasswordRequest req) {
+
+        if (req.getToken() == null || req.getToken().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Reset token is required.");
+        }
+        if (req.getNewPassword() == null || req.getNewPassword().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("New password is required.");
+        }
+        if (req.getNewPassword().length() < 6) {
+            return ResponseEntity.badRequest().body("Password must be at least 6 characters.");
+        }
+
+        Optional<User> userOpt = userRepository.findByResetToken(req.getToken().trim());
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid reset token.");
+        }
+
+        User user = userOpt.get();
+
+        if (user.getResetTokenExpiry() == null ||
+            user.getResetTokenExpiry().isBefore(java.time.LocalDateTime.now())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Reset token expired. Please request again.");
+        }
+
+        user.setPassword(passwordEncoder.encode(req.getNewPassword()));
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Password reset successful. You can login now.");
+    }
+
 
 }

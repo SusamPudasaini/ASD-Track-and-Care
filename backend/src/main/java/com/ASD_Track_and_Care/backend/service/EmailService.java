@@ -25,4 +25,13 @@ public class EmailService {
         );
         mailSender.send(msg);
     }
+    
+    public void sendPasswordResetEmail(String toEmail, String resetLink) {
+        org.springframework.mail.SimpleMailMessage msg = new org.springframework.mail.SimpleMailMessage();
+        msg.setTo(toEmail);
+        msg.setSubject("Reset your password - ASD Track & Care");
+        msg.setText("Click the link to reset your password:\n" + resetLink + "\n\nIf you did not request this, ignore this email.");
+        mailSender.send(msg);
+    }
+
 }
