@@ -13,7 +13,6 @@ export default function Login() {
   const [touched, setTouched] = useState({ username: false, password: false });
   const [serverError, setServerError] = useState("");
 
-  // ✅ control resend UI by a boolean, not by message text
   const [isUnverified, setIsUnverified] = useState(false);
 
   const [resendMsg, setResendMsg] = useState("");

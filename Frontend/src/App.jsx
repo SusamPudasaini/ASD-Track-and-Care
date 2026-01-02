@@ -8,6 +8,7 @@ import VerifyEmail from "./auth/VerifyEmail";
 import CheckEmail from "./auth/CheckEmail";
 import ForgotPassword from "./auth/ForgotPassword";
 import ResetPassword from "./auth/ResetPassword";
+import Questionnaire from "./pages/questionnaire";
 
 
 function Home() {
@@ -32,6 +33,8 @@ export default function App() {
       <Route path="/check-email" element={<CheckEmail />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/questionnaire" element={<Questionnaire />} />
+
 
 
 

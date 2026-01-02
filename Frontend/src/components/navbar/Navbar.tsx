@@ -20,7 +20,7 @@ export default function Navbar() {
           {/* center nav */}
           <nav className="hidden md:flex items-center gap-10 text-base font-medium text-gray-700">
             <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
+            <Link to="/questionnaire">Questionnaire</Link>
             <Link to="/services">Our Services</Link>
           </nav>
 
