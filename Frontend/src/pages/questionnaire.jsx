@@ -1,24 +1,13 @@
-// src/pages/Questionnaire.jsx
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 
-/**
- * Questionnaire page (based on your dataset features)
- * - Parent fills form
- * - Submit -> POST /ml/predict (you can change endpoint)
- * - Shows predicted autism probability
- *
- * NOTE: This file assumes you already have `api` axios instance with baseURL.
- */
 
 export default function Questionnaire() {
   const navigate = useNavigate();
 
-  // ---------------------------
-  // Form state (matches dataset-style features)
-  // ---------------------------
+
   const [form, setForm] = useState({
     age_months: "",
     sex: "", // "Male" | "Female"
@@ -49,13 +38,10 @@ export default function Questionnaire() {
   const [serverError, setServerError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // result
-  const [prediction, setPrediction] = useState(null); // number 0..1
-  const [riskLevel, setRiskLevel] = useState(""); // Low/Moderate/High
 
-  // ---------------------------
-  // Helpers
-  // ---------------------------
+  const [prediction, setPrediction] = useState(null); 
+  const [riskLevel, setRiskLevel] = useState(""); 
+
   const onChange = (key, value) => {
     setForm((p) => ({ ...p, [key]: value }));
   };
@@ -67,12 +53,10 @@ export default function Questionnaire() {
   const yesNoTo01 = (v) => (v === "Yes" ? 1 : 0);
 
   const encodeCategoricals = (payload) => {
-    // You can change these encodings to match your training preprocessing exactly.
-    // Keep them consistent with your model pipeline.
+
     const sex = payload.sex === "Male" ? 1 : 0;
     const residence = payload.residence === "Urban" ? 1 : 0;
 
-    // simple ordinal encoding (example)
     const eduMap = {
       "No formal": 0,
       Primary: 1,
@@ -296,9 +280,7 @@ export default function Questionnaire() {
     </div>
   );
 
-  // ---------------------------
-  // Render
-  // ---------------------------
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -504,10 +486,7 @@ export default function Questionnaire() {
               </button>
             </div>
 
-            {/* tiny note */}
-            <p className="text-xs text-gray-500">
-              Tip: Ensure your backend endpoint exists: <span className="font-mono">POST /ml/predict</span>
-            </p>
+
           </form>
         </div>
       </main>
