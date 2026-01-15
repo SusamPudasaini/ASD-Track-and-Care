@@ -1,20 +1,20 @@
 import { Routes, Route } from "react-router-dom";
 import Login from "./auth/Login";
 import Logout from "./auth/Logout";
-import ProtectedRoute from "./components/ProtectedRoute";
-import Navbar from "./components/navbar/Navbar"; 
 import Signup from "./auth/Signup";
 import VerifyEmail from "./auth/VerifyEmail";
 import CheckEmail from "./auth/CheckEmail";
 import ForgotPassword from "./auth/ForgotPassword";
 import ResetPassword from "./auth/ResetPassword";
-import Questionnaire from "./pages/questionnaire";
 
+import ProtectedRoute from "./components/ProtectedRoute";
+import Navbar from "./components/navbar/Navbar";
+import Questionnaire from "./pages/questionnaire";
 
 function Home() {
   return (
     <>
-      <Navbar />   
+      <Navbar />
       <div className="p-6">
         <h1 className="text-xl font-semibold">Home</h1>
         <p>Welcome to the home page.</p>
@@ -26,6 +26,7 @@ function Home() {
 export default function App() {
   return (
     <Routes>
+      {/* Public routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/logout" element={<Logout />} />
       <Route path="/signup" element={<Signup />} />
@@ -33,21 +34,20 @@ export default function App() {
       <Route path="/check-email" element={<CheckEmail />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/questionnaire" element={<Questionnaire />} />
 
-
-
-
-
-      {/* protected home */}
+      {/* Protected routes */}
       <Route
-        path="/"
         element={
           <ProtectedRoute>
-            <Home />
+            {/* No UI here; ProtectedRoute should render children */}
+            {/* These are nested protected routes */}
+            <></>
           </ProtectedRoute>
         }
-      />
+      >
+        <Route path="/" element={<Home />} />
+        <Route path="/questionnaire" element={<Questionnaire />} />
+      </Route>
     </Routes>
   );
 }

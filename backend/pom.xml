@@ -52,6 +52,14 @@
             <scope>runtime</scope>
         </dependency>
 
+		<!-- Jackson (explicit) -->
+		<dependency>
+		  <groupId>com.fasterxml.jackson.core</groupId>
+		  <artifactId>jackson-databind</artifactId>
+		</dependency>
+
+
+		
         <!-- JWT (Modern & Required for parserBuilder()) -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
@@ -78,6 +86,13 @@
 		  <groupId>org.springframework.boot</groupId>
 		  <artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
+		
+		<!-- Bean Validation (Jakarta Validation / Hibernate Validator) -->
+		<dependency>
+		  <groupId>org.springframework.boot</groupId>
+		  <artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
 
     </dependencies>
 
