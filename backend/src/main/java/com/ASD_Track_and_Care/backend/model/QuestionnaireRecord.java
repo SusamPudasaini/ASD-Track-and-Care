@@ -13,7 +13,11 @@ public class QuestionnaireRecord {
 
     private Instant createdAt = Instant.now();
 
-    // Inputs (same names conceptually as PredictPayload)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    // Inputs
     private Integer age_months;
     private Integer sex;
     private Integer residence;
@@ -47,175 +51,73 @@ public class QuestionnaireRecord {
     @Column(nullable = true)
     private String riskLevel;
 
-    public Long getId() {
-        return id;
-    }
+    // -------- getters/setters --------
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
+    public Long getId() { return id; }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 
-    public Integer getAge_months() {
-        return age_months;
-    }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
-    public void setAge_months(Integer age_months) {
-        this.age_months = age_months;
-    }
+    public Integer getAge_months() { return age_months; }
+    public void setAge_months(Integer age_months) { this.age_months = age_months; }
 
-    public Integer getSex() {
-        return sex;
-    }
+    public Integer getSex() { return sex; }
+    public void setSex(Integer sex) { this.sex = sex; }
 
-    public void setSex(Integer sex) {
-        this.sex = sex;
-    }
+    public Integer getResidence() { return residence; }
+    public void setResidence(Integer residence) { this.residence = residence; }
 
-    public Integer getResidence() {
-        return residence;
-    }
+    public Integer getParental_education() { return parental_education; }
+    public void setParental_education(Integer parental_education) { this.parental_education = parental_education; }
 
-    public void setResidence(Integer residence) {
-        this.residence = residence;
-    }
+    public Integer getFamily_history_asd() { return family_history_asd; }
+    public void setFamily_history_asd(Integer family_history_asd) { this.family_history_asd = family_history_asd; }
 
-    public Integer getParental_education() {
-        return parental_education;
-    }
+    public Integer getPreeclampsia() { return preeclampsia; }
+    public void setPreeclampsia(Integer preeclampsia) { this.preeclampsia = preeclampsia; }
 
-    public void setParental_education(Integer parental_education) {
-        this.parental_education = parental_education;
-    }
+    public Integer getPreterm_birth() { return preterm_birth; }
+    public void setPreterm_birth(Integer preterm_birth) { this.preterm_birth = preterm_birth; }
 
-    public Integer getFamily_history_asd() {
-        return family_history_asd;
-    }
+    public Integer getBirth_asphyxia() { return birth_asphyxia; }
+    public void setBirth_asphyxia(Integer birth_asphyxia) { this.birth_asphyxia = birth_asphyxia; }
 
-    public void setFamily_history_asd(Integer family_history_asd) {
-        this.family_history_asd = family_history_asd;
-    }
+    public Integer getLow_birth_weight() { return low_birth_weight; }
+    public void setLow_birth_weight(Integer low_birth_weight) { this.low_birth_weight = low_birth_weight; }
 
-    public Integer getPreeclampsia() {
-        return preeclampsia;
-    }
+    public Integer getEye_contact_age_months() { return eye_contact_age_months; }
+    public void setEye_contact_age_months(Integer eye_contact_age_months) { this.eye_contact_age_months = eye_contact_age_months; }
 
-    public void setPreeclampsia(Integer preeclampsia) {
-        this.preeclampsia = preeclampsia;
-    }
+    public Integer getSocial_smile_months() { return social_smile_months; }
+    public void setSocial_smile_months(Integer social_smile_months) { this.social_smile_months = social_smile_months; }
 
-    public Integer getPreterm_birth() {
-        return preterm_birth;
-    }
+    public Integer getIntellectual_disability() { return intellectual_disability; }
+    public void setIntellectual_disability(Integer intellectual_disability) { this.intellectual_disability = intellectual_disability; }
 
-    public void setPreterm_birth(Integer preterm_birth) {
-        this.preterm_birth = preterm_birth;
-    }
+    public Integer getEpilepsy() { return epilepsy; }
+    public void setEpilepsy(Integer epilepsy) { this.epilepsy = epilepsy; }
 
-    public Integer getBirth_asphyxia() {
-        return birth_asphyxia;
-    }
+    public Integer getAdhd() { return adhd; }
+    public void setAdhd(Integer adhd) { this.adhd = adhd; }
 
-    public void setBirth_asphyxia(Integer birth_asphyxia) {
-        this.birth_asphyxia = birth_asphyxia;
-    }
+    public Integer getLanguage_disorder() { return language_disorder; }
+    public void setLanguage_disorder(Integer language_disorder) { this.language_disorder = language_disorder; }
 
-    public Integer getLow_birth_weight() {
-        return low_birth_weight;
-    }
+    public Integer getMotor_delay() { return motor_delay; }
+    public void setMotor_delay(Integer motor_delay) { this.motor_delay = motor_delay; }
 
-    public void setLow_birth_weight(Integer low_birth_weight) {
-        this.low_birth_weight = low_birth_weight;
-    }
+    public Integer getScreening_done() { return screening_done; }
+    public void setScreening_done(Integer screening_done) { this.screening_done = screening_done; }
 
-    public Integer getEye_contact_age_months() {
-        return eye_contact_age_months;
-    }
+    public Integer getScreening_result() { return screening_result; }
+    public void setScreening_result(Integer screening_result) { this.screening_result = screening_result; }
 
-    public void setEye_contact_age_months(Integer eye_contact_age_months) {
-        this.eye_contact_age_months = eye_contact_age_months;
-    }
+    public Double getProbability() { return probability; }
+    public void setProbability(Double probability) { this.probability = probability; }
 
-    public Integer getSocial_smile_months() {
-        return social_smile_months;
-    }
-
-    public void setSocial_smile_months(Integer social_smile_months) {
-        this.social_smile_months = social_smile_months;
-    }
-
-    public Integer getIntellectual_disability() {
-        return intellectual_disability;
-    }
-
-    public void setIntellectual_disability(Integer intellectual_disability) {
-        this.intellectual_disability = intellectual_disability;
-    }
-
-    public Integer getEpilepsy() {
-        return epilepsy;
-    }
-
-    public void setEpilepsy(Integer epilepsy) {
-        this.epilepsy = epilepsy;
-    }
-
-    public Integer getAdhd() {
-        return adhd;
-    }
-
-    public void setAdhd(Integer adhd) {
-        this.adhd = adhd;
-    }
-
-    public Integer getLanguage_disorder() {
-        return language_disorder;
-    }
-
-    public void setLanguage_disorder(Integer language_disorder) {
-        this.language_disorder = language_disorder;
-    }
-
-    public Integer getMotor_delay() {
-        return motor_delay;
-    }
-
-    public void setMotor_delay(Integer motor_delay) {
-        this.motor_delay = motor_delay;
-    }
-
-    public Integer getScreening_done() {
-        return screening_done;
-    }
-
-    public void setScreening_done(Integer screening_done) {
-        this.screening_done = screening_done;
-    }
-
-    public Integer getScreening_result() {
-        return screening_result;
-    }
-
-    public void setScreening_result(Integer screening_result) {
-        this.screening_result = screening_result;
-    }
-
-    public Double getProbability() {
-        return probability;
-    }
-
-    public void setProbability(Double probability) {
-        this.probability = probability;
-    }
-
-    public String getRiskLevel() {
-        return riskLevel;
-    }
-
-    public void setRiskLevel(String riskLevel) {
-        this.riskLevel = riskLevel;
-    }
+    public String getRiskLevel() { return riskLevel; }
+    public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
 }
