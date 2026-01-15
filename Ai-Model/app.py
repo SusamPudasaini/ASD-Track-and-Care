@@ -69,4 +69,4 @@ def predict(req: PredictRequest, x_api_key: Optional[str] = Header(default=None)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
 
-    return {"asd_probability_score": pred}
+    return {"probability": pred}

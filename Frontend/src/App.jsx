@@ -28,7 +28,6 @@ function Home() {
 export default function App() {
   return (
     <>
-      {/* Toaster must be OUTSIDE Routes */}
       <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
 
       <Routes>
