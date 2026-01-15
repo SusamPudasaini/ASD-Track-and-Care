@@ -11,6 +11,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/navbar/Navbar";
 import Questionnaire from "./pages/questionnaire";
 
+import { Toaster } from "react-hot-toast";
+
 function Home() {
   return (
     <>
@@ -25,29 +27,26 @@ function Home() {
 
 export default function App() {
   return (
-    <Routes>
-      {/* Public routes */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/logout" element={<Logout />} />
-      <Route path="/signup" element={<Signup />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/check-email" element={<CheckEmail />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+    <>
+      {/* Toaster must be OUTSIDE Routes */}
+      <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
 
-      {/* Protected routes */}
-      <Route
-        element={
-          <ProtectedRoute>
-            {/* No UI here; ProtectedRoute should render children */}
-            {/* These are nested protected routes */}
-            <></>
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/" element={<Home />} />
-        <Route path="/questionnaire" element={<Questionnaire />} />
-      </Route>
-    </Routes>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/logout" element={<Logout />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/check-email" element={<CheckEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+
+        {/* Protected routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/questionnaire" element={<Questionnaire />} />
+        </Route>
+      </Routes>
+    </>
   );
 }
