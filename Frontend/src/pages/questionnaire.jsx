@@ -7,7 +7,6 @@ import toast from "react-hot-toast";
 export default function Questionnaire() {
   const navigate = useNavigate();
 
-  // Refs (uncontrolled inputs) => no onChange needed
   const age_months = useRef(null);
   const sex = useRef(null);
   const residence = useRef(null);

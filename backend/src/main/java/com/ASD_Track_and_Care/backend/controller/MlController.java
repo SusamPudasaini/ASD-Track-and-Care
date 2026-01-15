@@ -2,19 +2,23 @@ package com.ASD_Track_and_Care.backend.controller;
 
 import com.ASD_Track_and_Care.backend.dto.PredictPayload;
 import com.ASD_Track_and_Care.backend.model.QuestionnaireRecord;
+import com.ASD_Track_and_Care.backend.model.User;
 import com.ASD_Track_and_Care.backend.repository.QuestionnaireRecordRepository;
+import com.ASD_Track_and_Care.backend.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/ml")
@@ -25,22 +29,66 @@ public class MlController {
     private final RestTemplate rest = new RestTemplate();
     private final ObjectMapper mapper;
     private final QuestionnaireRecordRepository repo;
+    private final UserRepository userRepo;
 
     private final String fastapiUrl = "http://localhost:8000/predict";
     private final String apiKey = "SusamSecretAndhoMancheleMovieHeryo";
 
-    public MlController(ObjectMapper mapper, QuestionnaireRecordRepository repo) {
+    public MlController(ObjectMapper mapper,
+                        QuestionnaireRecordRepository repo,
+                        UserRepository userRepo) {
         this.mapper = mapper;
         this.repo = repo;
+        this.userRepo = userRepo;
     }
 
     @PostMapping("/predict")
-    public ResponseEntity<?> predict(@Valid @RequestBody PredictPayload payload) {
+    public ResponseEntity<?> predict(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @Valid @RequestBody PredictPayload payload
+    ) {
+
+        // -------------------- 0) GET LOGGED IN USER --------------------
+        User user;
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+            log.info("AUTH DEBUG => name={}, principal={}, authenticated={}, AuthorizationPresent={}",
+                    auth != null ? auth.getName() : null,
+                    auth != null ? auth.getPrincipal() : null,
+                    auth != null && auth.isAuthenticated(),
+                    authorization != null && !authorization.isBlank()
+            );
+
+            if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                        "message", "Please login first"
+                ));
+            }
+
+            // auth.getName() may be username OR email depending on your JWT setup
+            String name = auth.getName();
+
+            Optional<User> byUsername = userRepo.findByUsername(name);
+            Optional<User> byEmail = userRepo.findByUserEmail(name);
+
+            user = byUsername.or(() -> byEmail)
+                    .orElseThrow(() -> new RuntimeException("User not found by username/email: " + name));
+
+        } catch (Exception e) {
+            log.error("Failed to resolve logged-in user", e);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "message", "Authentication error",
+                    "error", e.getClass().getSimpleName() + ": " + e.getMessage()
+            ));
+        }
 
         QuestionnaireRecord record = new QuestionnaireRecord();
 
         // -------------------- 1) SAVE INPUTS --------------------
         try {
+            record.setUser(user);
+
             record.setAge_months(payload.getAge_months());
             record.setSex(payload.getSex());
             record.setResidence(payload.getResidence());
@@ -66,6 +114,7 @@ public class MlController {
             record.setScreening_result(payload.getScreening_result());
 
             record = repo.save(record);
+
         } catch (Exception e) {
             log.error("DB save failed (before FastAPI call). Payload={}", safeToJson(payload), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
@@ -89,9 +138,7 @@ public class MlController {
             resp = rest.postForEntity(fastapiUrl, req, String.class);
 
         } catch (RestClientException e) {
-            // Connection refused / timeout / DNS / etc.
             log.error("FastAPI request failed. recordId={}, url={}", record.getId(), fastapiUrl, e);
-
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
                     "message", "FastAPI is not reachable (request failed)",
                     "recordId", record.getId(),
@@ -100,7 +147,6 @@ public class MlController {
             ));
         } catch (Exception e) {
             log.error("Unexpected error calling FastAPI. recordId={}, url={}", record.getId(), fastapiUrl, e);
-
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                     "message", "Unexpected error while calling FastAPI",
                     "recordId", record.getId(),
@@ -137,8 +183,10 @@ public class MlController {
             JsonNode node = mapper.readTree(body);
 
             Double probability = null;
-
-            if (node.hasNonNull("probability")) {
+            // ✅ FastAPI returns {"asd_probability_score": pred}
+            if (node.hasNonNull("asd_probability_score")) {
+                probability = node.get("asd_probability_score").asDouble();
+            } else if (node.hasNonNull("probability")) {
                 probability = node.get("probability").asDouble();
             } else if (node.hasNonNull("autism_probability")) {
                 probability = node.get("autism_probability").asDouble();
@@ -153,6 +201,7 @@ public class MlController {
                 ));
             }
 
+            // ✅ dataset-based thresholds
             String riskLevel;
             if (probability < 0.04) {
                 riskLevel = "Low";
@@ -162,35 +211,19 @@ public class MlController {
                 riskLevel = "High";
             }
 
-
             record.setProbability(probability);
             record.setRiskLevel(riskLevel);
+            repo.save(record);
 
-            try {
-                repo.save(record);
-            } catch (Exception e) {
-                log.error("DB update failed (saving prediction). recordId={}", record.getId(), e);
-
-                // Still return prediction to frontend even if DB update fails
-                return ResponseEntity.status(HttpStatus.OK).body(Map.of(
-                        "message", "Prediction computed, but failed to update DB with prediction",
-                        "recordId", record.getId(),
-                        "probability", probability,
-                        "riskLevel", riskLevel,
-                        "dbError", e.getClass().getSimpleName() + ": " + e.getMessage()
-                ));
-            }
-
-            // ✅ success response
             return ResponseEntity.ok(Map.of(
                     "recordId", record.getId(),
+                    "userId", user.getId(),
                     "probability", probability,
                     "riskLevel", riskLevel
             ));
 
         } catch (Exception e) {
             log.error("Failed to parse FastAPI response. recordId={}, body={}", record.getId(), resp.getBody(), e);
-
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                     "message", "Could not parse FastAPI response",
                     "recordId", record.getId(),
@@ -200,7 +233,6 @@ public class MlController {
         }
     }
 
-    // Helper so logs don't crash if mapper fails
     private String safeToJson(Object o) {
         try {
             return mapper.writeValueAsString(o);
