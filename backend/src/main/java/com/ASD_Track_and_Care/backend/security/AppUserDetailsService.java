@@ -24,7 +24,7 @@ public class AppUserDetailsService implements UserDetailsService {
         // Adjust if your User entity has roles/authorities
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getUsername())
-                .password(user.getPassword()) // required but not used for JWT requests
+                .password(user.getPassword()) 
                 .authorities("USER")
                 .build();
     }

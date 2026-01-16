@@ -11,6 +11,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/navbar/Navbar";
 import Questionnaire from "./pages/questionnaire";
 
+import Profile from "./pages/Profile";
+import TherapistApply from "./pages/Therapistsapply";
+
 import { Toaster } from "react-hot-toast";
 
 function Home() {
@@ -44,6 +47,8 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<Home />} />
           <Route path="/questionnaire" element={<Questionnaire />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/therapist/apply" element={<TherapistApply />}></Route>
         </Route>
       </Routes>
     </>

@@ -203,12 +203,12 @@ public class MlController {
 
             // ✅ dataset-based thresholds
             String riskLevel;
-            if (probability < 0.04) {
-                riskLevel = "Low";
-            } else if (probability < 0.10) {
-                riskLevel = "Moderate";
+            if (probability < 0.012) {
+                riskLevel = "Low";          // bottom ~5%
+            } else if (probability < 0.060) {
+                riskLevel = "Moderate";     // ~5% to ~50%
             } else {
-                riskLevel = "High";
+                riskLevel = "High";         // top ~50%
             }
 
             record.setProbability(probability);
