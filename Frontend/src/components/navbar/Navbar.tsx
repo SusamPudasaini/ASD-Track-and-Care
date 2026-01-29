@@ -17,7 +17,7 @@ export default function Navbar() {
             />
           </Link>
 
-          {/* center nav */}
+          {/* center nav*/}
           <nav className="hidden md:flex items-center gap-10 text-base font-medium text-gray-700">
             <Link to="/">Home</Link>
             <Link to="/questionnaire">Questionnaire</Link>
