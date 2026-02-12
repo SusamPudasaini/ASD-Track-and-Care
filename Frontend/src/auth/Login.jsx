@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
+import toast from "react-hot-toast";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -62,7 +63,6 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    // reset state each attempt
     setServerError("");
     setResendMsg("");
     setIsUnverified(false);
@@ -78,7 +78,25 @@ export default function Login() {
         password,
       });
 
-      localStorage.setItem("token", res.data.token);
+      // ✅ See what backend returns (keep for now, remove later)
+      console.log("LOGIN RESPONSE:", res.data);
+
+      // ✅ support common token names
+      const token =
+        res.data?.token || res.data?.accessToken || res.data?.jwt || res.data?.jwtToken;
+
+      if (!token) {
+        setServerError("Login succeeded, but token was not returned by the server.");
+        toast.error("No token received. Check backend login response.");
+        return;
+      }
+
+      localStorage.setItem("token", token);
+
+      // Optional: store user info if backend returns it
+      // if (res.data?.user) localStorage.setItem("user", JSON.stringify(res.data.user));
+
+      toast.success("Logged in!");
       navigate("/");
     } catch (err) {
       const status = err?.response?.status;
@@ -91,7 +109,6 @@ export default function Login() {
 
       if (status === 403) {
         setIsUnverified(true);
-        // handle either code or text
         if (msg === "EMAIL_NOT_VERIFIED") {
           setServerError("Your email has not been verified. Please verify it to login.");
         } else {
@@ -131,7 +148,6 @@ export default function Login() {
               </div>
             )}
 
-            {/* ✅ Resend link shows ONLY if backend returned 403 */}
             {isUnverified && (
               <div className="mt-3 text-sm">
                 <button
@@ -201,12 +217,11 @@ export default function Login() {
                 {passwordError && (
                   <p className="mt-2 text-xs text-red-600">{passwordError}</p>
                 )}
-                
               </div>
+
               <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
                 Forgot Password?
               </Link>
-
 
               <button
                 type="submit"

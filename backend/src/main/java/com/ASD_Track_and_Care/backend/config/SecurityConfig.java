@@ -34,12 +34,19 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+
+                // allow preflight
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                // public endpoints
                 .requestMatchers("/auth/**").permitAll()
-                .requestMatchers("/ml/**").authenticated()
+
+                // protect ALL api endpoints
+                .requestMatchers("/api/**").authenticated()
+
+                // everything else must be authenticated
                 .anyRequest().authenticated()
             )
-            // ✅ IMPORTANT
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -48,13 +55,19 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
+
         config.setAllowCredentials(true);
+
+        // Your frontend (Vite)
         config.setAllowedOrigins(List.of("http://localhost:5173"));
+
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
+
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
+
         return source;
     }
 }

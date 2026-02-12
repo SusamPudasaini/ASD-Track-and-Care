@@ -7,10 +7,24 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const url = config.url || "";
 
+  // Skip token only for auth endpoints
   if (url.startsWith("/auth/")) return config;
 
   const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  // ✅ Ensure headers exists and set Authorization safely
+  config.headers = {
+    ...(config.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  // ✅ TEMP DEBUG (remove after confirming)
+  console.log(
+    "REQ:",
+    `${config.baseURL || ""}${url}`,
+    "AUTH SENT?",
+    !!config.headers.Authorization
+  );
 
   return config;
 });

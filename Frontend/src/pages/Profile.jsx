@@ -13,9 +13,9 @@ export default function Profile() {
   const [form, setForm] = useState({
     username: "",
     userEmail: "",
-    fullName: "",
-    phone: "",
-    address: "",
+    firstName: "",
+    lastName: "",
+    phoneNumber: "",
   });
 
   const onChange = (key, value) => setForm((p) => ({ ...p, [key]: value }));
@@ -26,19 +26,21 @@ export default function Profile() {
     async function loadMe() {
       try {
         setLoading(true);
-        // Backend should return current logged-in user details
-        const res = await api.get("/users/me");
+
+        // ✅ IMPORTANT: your controller is /api/users/me
+        const res = await api.get("/api/users/me");
         if (!mounted) return;
 
         const u = res.data || {};
         setForm({
-          username: u.username ?? "",
-          userEmail: u.userEmail ?? "",
-          fullName: u.fullName ?? "",
-          phone: u.phone ?? "",
-          address: u.address ?? "",
+          username: u.username || "",
+          userEmail: u.userEmail || "",
+          firstName: u.firstName || "",
+          lastName: u.lastName || "",
+          phoneNumber: u.phoneNumber || "",
         });
       } catch (err) {
+        console.error("LOAD PROFILE ERROR:", err?.response?.status, err?.response?.data);
         toast.error(err?.response?.data?.message || "Could not load profile.");
       } finally {
         if (mounted) setLoading(false);
@@ -54,19 +56,23 @@ export default function Profile() {
   const handleSave = async (e) => {
     e.preventDefault();
 
-    // Only basic empty checks here (backend validates more)
-    if (!form.fullName.trim()) return toast.error("Full name is required.");
-    if (!form.phone.trim()) return toast.error("Phone is required.");
+    if (!form.firstName.trim()) return toast.error("First name is required.");
+    if (!form.lastName.trim()) return toast.error("Last name is required.");
+    if (!form.phoneNumber.trim()) return toast.error("Phone number is required.");
 
     try {
       setSaving(true);
-      await api.put("/users/me", {
-        fullName: form.fullName,
-        phone: form.phone,
-        address: form.address,
+
+      // ✅ IMPORTANT: PUT is also /api/users/me
+      await api.put("/api/users/me", {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        phoneNumber: form.phoneNumber,
       });
+
       toast.success("Profile updated.");
     } catch (err) {
+      console.error("UPDATE PROFILE ERROR:", err?.response?.status, err?.response?.data);
       toast.error(err?.response?.data?.message || "Update failed.");
     } finally {
       setSaving(false);
@@ -101,36 +107,29 @@ export default function Profile() {
             <div className="text-sm text-gray-600">Loading profile...</div>
           ) : (
             <form onSubmit={handleSave} className="space-y-5">
-              <Field
-                label="Username"
-                value={form.username}
-                disabled
-                hint="Username cannot be changed."
-              />
-              <Field
-                label="Email"
-                value={form.userEmail}
-                disabled
-                hint="Email cannot be changed."
-              />
+              <Field label="Username" value={form.username} disabled hint="Username cannot be changed." />
+              <Field label="Email" value={form.userEmail} disabled hint="Email cannot be changed." />
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="First Name"
+                  value={form.firstName}
+                  onChange={(v) => onChange("firstName", v)}
+                  placeholder="e.g., John"
+                />
+                <Field
+                  label="Last Name"
+                  value={form.lastName}
+                  onChange={(v) => onChange("lastName", v)}
+                  placeholder="e.g., Doe"
+                />
+              </div>
 
               <Field
-                label="Full Name"
-                value={form.fullName}
-                onChange={(v) => onChange("fullName", v)}
-                placeholder="e.g., John Doe"
-              />
-              <Field
-                label="Phone"
-                value={form.phone}
-                onChange={(v) => onChange("phone", v)}
+                label="Phone Number"
+                value={form.phoneNumber}
+                onChange={(v) => onChange("phoneNumber", v)}
                 placeholder="e.g., +97798XXXXXXXX"
-              />
-              <Field
-                label="Address"
-                value={form.address}
-                onChange={(v) => onChange("address", v)}
-                placeholder="City, Country"
               />
 
               <div className="flex gap-3">
