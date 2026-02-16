@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Navbar from "../components/navbar/Navbar";
@@ -8,6 +8,8 @@ export default function TherapistApply() {
   const navigate = useNavigate();
 
   const [saving, setSaving] = useState(false);
+  const [loadingMe, setLoadingMe] = useState(true);
+
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -23,10 +25,54 @@ export default function TherapistApply() {
 
   const onChange = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
+  // ✅ Prefill contact info from logged-in user
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadMe() {
+      try {
+        setLoadingMe(true);
+
+        // ✅ match your Profile.jsx endpoint exactly
+        const res = await api.get("/api/users/me");
+        if (!mounted) return;
+
+        const u = res.data || {};
+
+        // Map from your ProfileResponse fields:
+        const fullName = `${u.firstName || ""} ${u.lastName || ""}`.trim();
+
+        setForm((prev) => ({
+          ...prev,
+          fullName: fullName || prev.fullName,
+          email: u.userEmail || prev.email,
+          phone: u.phoneNumber || prev.phone,
+          city: prev.city, // keep as-is unless you have a city field in backend
+        }));
+      } catch (err) {
+        const status = err?.response?.status;
+        if (status === 401 || status === 403) {
+          toast.error("Please login first.");
+          navigate("/login");
+          return;
+        }
+
+        console.error("LOAD ME ERROR:", err?.response?.status, err?.response?.data);
+        toast.error(err?.response?.data?.message || "Could not load your profile details.");
+      } finally {
+        if (mounted) setLoadingMe(false);
+      }
+    }
+
+    loadMe();
+    return () => {
+      mounted = false;
+    };
+  }, [navigate]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Only minimal empty checks (backend should fully validate)
     if (!form.fullName.trim()) return toast.error("Full name is required.");
     if (!form.email.trim()) return toast.error("Email is required.");
     if (!form.phone.trim()) return toast.error("Phone is required.");
@@ -34,7 +80,9 @@ export default function TherapistApply() {
 
     try {
       setSaving(true);
-      await api.post("/therapists/apply", {
+
+      // ✅ use /api/... because your backend controllers are /api/...
+      await api.post("/api/therapists/apply", {
         ...form,
         yearsExperience: form.yearsExperience ? Number(form.yearsExperience) : null,
       });
@@ -42,7 +90,8 @@ export default function TherapistApply() {
       toast.success("Application submitted!");
       navigate("/profile");
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to submit application.");
+      console.error("APPLY ERROR:", err?.response?.status, err?.response?.data);
+      toast.error(err?.response?.data?.message || err?.response?.data || "Failed to submit application.");
     } finally {
       setSaving(false);
     }
@@ -58,21 +107,41 @@ export default function TherapistApply() {
           <p className="mt-2 text-sm text-gray-600">
             Fill out this form to apply as a therapist. Our team will review and contact you.
           </p>
+
+          {loadingMe && (
+            <p className="mt-3 text-sm text-gray-500">Loading your profile details...</p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-6">
           <Section title="Contact Information">
-            <Field label="Full Name" value={form.fullName} onChange={(v) => onChange("fullName", v)} />
-            <Field label="Email" value={form.email} onChange={(v) => onChange("email", v)} />
-            <Field label="Phone" value={form.phone} onChange={(v) => onChange("phone", v)} />
+            <Field label="Full Name" value={form.fullName} onChange={(v) => onChange("fullName", v)} disabled={loadingMe} />
+            <Field label="Email" value={form.email} onChange={(v) => onChange("email", v)} disabled={loadingMe} />
+            <Field label="Phone" value={form.phone} onChange={(v) => onChange("phone", v)} disabled={loadingMe} />
             <Field label="City" value={form.city} onChange={(v) => onChange("city", v)} />
           </Section>
 
           <Section title="Professional Details">
-            <Field label="Qualification" value={form.qualification} onChange={(v) => onChange("qualification", v)} placeholder="e.g., MSc Clinical Psychology" />
+            <Field
+              label="Qualification"
+              value={form.qualification}
+              onChange={(v) => onChange("qualification", v)}
+              placeholder="e.g., MSc Clinical Psychology"
+            />
             <Field label="License Number (if any)" value={form.licenseNumber} onChange={(v) => onChange("licenseNumber", v)} />
-            <Field label="Years of Experience" type="number" value={form.yearsExperience} onChange={(v) => onChange("yearsExperience", v)} placeholder="e.g., 3" />
-            <Field label="Specialization" value={form.specialization} onChange={(v) => onChange("specialization", v)} placeholder="e.g., ASD, Speech Therapy" />
+            <Field
+              label="Years of Experience"
+              type="number"
+              value={form.yearsExperience}
+              onChange={(v) => onChange("yearsExperience", v)}
+              placeholder="e.g., 3"
+            />
+            <Field
+              label="Specialization"
+              value={form.specialization}
+              onChange={(v) => onChange("specialization", v)}
+              placeholder="e.g., ASD, Speech Therapy"
+            />
             <Field label="Workplace / Clinic" value={form.workplace} onChange={(v) => onChange("workplace", v)} />
           </Section>
 
@@ -100,9 +169,9 @@ export default function TherapistApply() {
 
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || loadingMe}
               className={`rounded px-5 py-2 text-sm font-semibold text-white ${
-                saving ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+                saving || loadingMe ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
               }`}
             >
               {saving ? "Submitting..." : "Submit Application"}
