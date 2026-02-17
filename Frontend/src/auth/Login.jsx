@@ -4,6 +4,22 @@ import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 import toast from "react-hot-toast";
 
+function decodeJwt(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+
+    // base64url -> base64
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
+
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -36,8 +52,7 @@ export default function Login() {
     return "";
   }, [password, touched.password]);
 
-  const canSubmit =
-    !usernameError && !passwordError && username.trim() && password.trim();
+  const canSubmit = !usernameError && !passwordError && username.trim() && password.trim();
 
   const handleResend = async () => {
     setResendMsg("");
@@ -78,10 +93,7 @@ export default function Login() {
         password,
       });
 
-      // ✅ See what backend returns (keep for now, remove later)
-      console.log("LOGIN RESPONSE:", res.data);
-
-      // ✅ support common token names
+      // ✅ token support
       const token =
         res.data?.token || res.data?.accessToken || res.data?.jwt || res.data?.jwtToken;
 
@@ -93,11 +105,20 @@ export default function Login() {
 
       localStorage.setItem("token", token);
 
-      // Optional: store user info if backend returns it
-      // if (res.data?.user) localStorage.setItem("user", JSON.stringify(res.data.user));
+      // ✅ decode role from JWT (claim "role": "ADMIN" | "USER" | "THERAPIST")
+      const payload = decodeJwt(token);
+      const role = payload?.role || "USER";
+      localStorage.setItem("role", role);
 
       toast.success("Logged in!");
-      navigate("/");
+
+      // Optional: redirect admin to admin page
+      if (role === "ADMIN") {
+        navigate("/admin/request");
+      } else {
+        navigate("/");
+      }
+
     } catch (err) {
       const status = err?.response?.status;
       const msg = err?.response?.data;
@@ -159,9 +180,7 @@ export default function Login() {
                   {resendLoading ? "Resending..." : "Resend verification link"}
                 </button>
 
-                {resendMsg && (
-                  <p className="mt-2 text-xs text-gray-600">{resendMsg}</p>
-                )}
+                {resendMsg && <p className="mt-2 text-xs text-gray-600">{resendMsg}</p>}
               </div>
             )}
 

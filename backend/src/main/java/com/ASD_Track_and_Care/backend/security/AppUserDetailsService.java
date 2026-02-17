@@ -18,14 +18,16 @@ public class AppUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+
         User user = userRepo.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
-        // Adjust if your User entity has roles/authorities
+        String roleName = (user.getRole() == null) ? "USER" : user.getRole().name();
+
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getUsername())
-                .password(user.getPassword()) 
-                .authorities("USER")
+                .password(user.getPassword())
+                .roles(roleName) // <-- Spring will store as ROLE_<roleName>
                 .build();
     }
 }

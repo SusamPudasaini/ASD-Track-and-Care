@@ -1,7 +1,6 @@
 package com.ASD_Track_and_Care.backend.model;
 
 import java.time.LocalDateTime;
-
 import jakarta.persistence.*;
 
 @Entity
@@ -39,13 +38,17 @@ public class User {
 
     @Column(name = "verification_token_expiry")
     private LocalDateTime verificationTokenExpiry;
-    
+
     @Column(name = "reset_token")
     private String resetToken;
 
     @Column(name = "reset_token_expiry")
-    private java.time.LocalDateTime resetTokenExpiry;
+    private LocalDateTime resetTokenExpiry;
 
+    // RBAC role
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private Role role = Role.USER;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -78,11 +81,13 @@ public class User {
     public void setVerificationTokenExpiry(LocalDateTime verificationTokenExpiry) {
         this.verificationTokenExpiry = verificationTokenExpiry;
     }
-    
+
     public String getResetToken() { return resetToken; }
     public void setResetToken(String resetToken) { this.resetToken = resetToken; }
 
-    public java.time.LocalDateTime getResetTokenExpiry() { return resetTokenExpiry; }
-    public void setResetTokenExpiry(java.time.LocalDateTime resetTokenExpiry) { this.resetTokenExpiry = resetTokenExpiry; }
+    public LocalDateTime getResetTokenExpiry() { return resetTokenExpiry; }
+    public void setResetTokenExpiry(LocalDateTime resetTokenExpiry) { this.resetTokenExpiry = resetTokenExpiry; }
 
+    public Role getRole() { return role; }
+    public void setRole(Role role) { this.role = role; }
 }

@@ -15,6 +15,7 @@ import com.ASD_Track_and_Care.backend.dto.LoginRequest;
 import com.ASD_Track_and_Care.backend.dto.LoginResponse;
 import com.ASD_Track_and_Care.backend.dto.ResendVerificationRequest;
 import com.ASD_Track_and_Care.backend.dto.SignupRequest;
+import com.ASD_Track_and_Care.backend.model.Role;
 import com.ASD_Track_and_Care.backend.model.User;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
 import com.ASD_Track_and_Care.backend.security.JwtUtil;
@@ -70,6 +71,9 @@ public class AuthController {
         user.setEmailVerified(false);
         user.setVerificationToken(token);
         user.setVerificationTokenExpiry(expiry);
+
+        // ✅ default role for new users
+        user.setRole(Role.USER);
 
         userRepository.save(user);
 
@@ -132,16 +136,17 @@ public class AuthController {
                     .body("EMAIL_NOT_VERIFIED");
         }
 
-        String token = jwtUtil.generateToken(user.getUsername());
+        // ✅ include role in JWT
+        String roleName = (user.getRole() == null) ? "USER" : user.getRole().name();
+        String token = jwtUtil.generateToken(user.getUsername(), roleName);
+
         return ResponseEntity.ok(new LoginResponse(token));
     }
-
-
 
     private boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
     }
-    
+
     @PostMapping("/resend-verification")
     public ResponseEntity<?> resendVerification(@RequestBody ResendVerificationRequest req) {
 
@@ -229,6 +234,4 @@ public class AuthController {
 
         return ResponseEntity.ok("Password reset successful. You can login now.");
     }
-
-
 }

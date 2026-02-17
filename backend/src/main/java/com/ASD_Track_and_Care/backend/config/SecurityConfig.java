@@ -41,7 +41,13 @@ public class SecurityConfig {
                 // public endpoints
                 .requestMatchers("/auth/**").permitAll()
 
-                // protect ALL api endpoints
+                // ADMIN ONLY
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                // THERAPIST ONLY (for therapist actions later)
+                .requestMatchers("/api/therapist/**").hasRole("THERAPIST")
+
+                // Any logged-in user
                 .requestMatchers("/api/**").authenticated()
 
                 // everything else must be authenticated
@@ -57,12 +63,8 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowCredentials(true);
-
-        // Your frontend (Vite)
         config.setAllowedOrigins(List.of("http://localhost:5173"));
-
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

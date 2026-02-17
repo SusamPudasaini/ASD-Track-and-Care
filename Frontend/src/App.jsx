@@ -6,6 +6,7 @@ import VerifyEmail from "./auth/VerifyEmail";
 import CheckEmail from "./auth/CheckEmail";
 import ForgotPassword from "./auth/ForgotPassword";
 import ResetPassword from "./auth/ResetPassword";
+import AdminTherapistApplications from "./pages/AdminApprove";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/navbar/Navbar";
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/questionnaire" element={<Questionnaire />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/therapist/apply" element={<TherapistApply />}></Route>
+          <Route path="/admin/request" element={<AdminTherapistApplications />}></Route>
         </Route>
       </Routes>
     </>

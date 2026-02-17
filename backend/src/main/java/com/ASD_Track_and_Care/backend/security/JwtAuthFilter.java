@@ -34,6 +34,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        // allow preflight
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -50,8 +56,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                // ✅ validate token (username + expiry)
                 if (jwtUtil.isTokenValid(token, userDetails.getUsername())) {
+
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
                                     userDetails,
@@ -61,14 +67,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                } else {
-                    System.out.println("JWT INVALID (expiry/username mismatch) for: " + username);
+
+                    System.out.println("JWT OK => " + username + " AUTH=" + userDetails.getAuthorities());
                 }
             }
-
         } catch (Exception e) {
+            // IMPORTANT: don't just print and continue silently
             System.out.println("JWT AUTH ERROR: " + e.getMessage());
-            // Do NOT throw; just continue. Spring will block protected endpoints.
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
         }
 
         filterChain.doFilter(request, response);
