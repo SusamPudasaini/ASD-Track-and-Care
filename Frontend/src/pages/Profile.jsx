@@ -10,6 +10,10 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Reset password modal
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetSending, setResetSending] = useState(false);
+
   const [form, setForm] = useState({
     username: "",
     userEmail: "",
@@ -79,6 +83,36 @@ export default function Profile() {
     }
   };
 
+  // ✅ Reset password using the same flow as "Forgot Password"
+  // This sends a reset link/OTP to the user's email.
+  const sendResetPasswordLink = async () => {
+    if (!form.userEmail?.trim()) {
+      toast.error("Email not found on your profile.");
+      return;
+    }
+
+    try {
+      setResetSending(true);
+
+      // 🔁 This should match your existing forgot-password endpoint.
+      // Common payloads are: { email } or { userEmail }. We use { email }.
+      await api.post("/auth/forgot-password", {
+        email: form.userEmail.trim(),
+      });
+
+      toast.success("Password reset link sent to your email.");
+      setResetOpen(false);
+
+      // Optional: if you already have a reset page route, you can redirect:
+      // navigate("/reset-password");
+    } catch (err) {
+      console.error("RESET PASSWORD ERROR:", err?.response?.status, err?.response?.data);
+      toast.error(err?.response?.data?.message || err?.response?.data || "Failed to send reset link.");
+    } finally {
+      setResetSending(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -88,18 +122,26 @@ export default function Profile() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h1 className="text-xl font-semibold text-gray-900">My Profile</h1>
 
-            <button
-              type="button"
-              onClick={() => navigate("/therapist/apply")}
-              className="rounded bg-[#4a6cf7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
-            >
-              Become a Therapist
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setResetOpen(true)}
+                className="rounded border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Reset Password
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate("/therapist/apply")}
+                className="rounded bg-[#4a6cf7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
+              >
+                Become a Therapist
+              </button>
+            </div>
           </div>
 
-          <p className="mt-2 text-sm text-gray-600">
-            View and edit your account details.
-          </p>
+          <p className="mt-2 text-sm text-gray-600">View and edit your account details.</p>
         </div>
 
         <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
@@ -155,6 +197,60 @@ export default function Profile() {
           )}
         </div>
       </main>
+
+      {/* Reset Password Modal */}
+      {resetOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Reset Password</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  We will send a password reset link to:
+                  <span className="ml-1 font-semibold">{form.userEmail || "-"}</span>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setResetOpen(false)}
+                className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
+              Check your email for the <span className="font-semibold"> reset  link </span>  and follow the instructions after pressing the button below.
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setResetOpen(false)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={sendResetPasswordLink}
+                disabled={resetSending}
+                className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
+                  resetSending ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+                }`}
+              >
+                {resetSending ? "Sending..." : "Send Reset Link"}
+              </button>
+            </div>
+
+            <div className="mt-3 text-xs text-gray-500">
+              If you don’t see the email, check spam/junk.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

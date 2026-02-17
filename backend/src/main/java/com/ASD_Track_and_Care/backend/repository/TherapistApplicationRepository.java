@@ -11,4 +11,7 @@ public interface TherapistApplicationRepository extends JpaRepository<TherapistA
     Optional<TherapistApplication> findTopByApplicantUsernameOrderByCreatedAtDesc(String applicantUsername);
 
     List<TherapistApplication> findByStatusOrderByCreatedAtDesc(TherapistApplication.Status status);
+    List<TherapistApplication> findByEmailOrderByCreatedAtDesc(String email);
+    List<TherapistApplication> findByApplicantUsernameOrderByCreatedAtDesc(String applicantUsername);
+
 }

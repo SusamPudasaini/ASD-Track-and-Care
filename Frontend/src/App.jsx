@@ -13,7 +13,8 @@ import Navbar from "./components/navbar/Navbar";
 import Questionnaire from "./pages/questionnaire";
 
 import Profile from "./pages/Profile";
-import TherapistApply from "./pages/Therapistsapply";
+import TherapistApply from "./pages/TherapistsapplyHistory";
+import TherapistApplyNew from "./pages/TherapistApplyNew";
 
 import { Toaster } from "react-hot-toast";
 
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/questionnaire" element={<Questionnaire />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/therapist/apply" element={<TherapistApply />}></Route>
+          <Route path="/therapist/apply/new" element={<TherapistApplyNew />}></Route>
           <Route path="/admin/request" element={<AdminTherapistApplications />}></Route>
         </Route>
       </Routes>

@@ -163,10 +163,7 @@ public class TherapistApplicationService {
             m.put("title", d.getTitle());
             m.put("fileType", d.getFileType());
             m.put("uploadedAt", d.getUploadedAt() == null ? null : d.getUploadedAt().toString());
-
-            // ✅ IMPORTANT: this is what frontend uses for Open
             m.put("url", "/api/admin/therapist-documents/" + d.getId() + "/download");
-
             docList.add(m);
         }
 
@@ -224,7 +221,7 @@ public class TherapistApplicationService {
         return saved;
     }
 
-    // ✅ NEW: revert to pending
+    // ✅ Admin: revert to pending
     @Transactional
     public TherapistApplication markPending(Long applicationId, String adminUsername, String adminMessage) {
         TherapistApplication app = repo.findById(applicationId)
@@ -241,10 +238,9 @@ public class TherapistApplicationService {
 
         return repo.save(app);
     }
-    
- // ✅ User: get latest application + docs
-    public Map<String, Object> getLatestForUser(String applicantUsername) {
 
+    // ✅ User: get latest application + docs (your existing method)
+    public Map<String, Object> getLatestForUser(String applicantUsername) {
         TherapistApplication app = repo.findTopByApplicantUsernameOrderByCreatedAtDesc(applicantUsername)
                 .orElse(null);
 
@@ -283,10 +279,7 @@ public class TherapistApplicationService {
             m.put("title", d.getTitle());
             m.put("fileType", d.getFileType());
             m.put("uploadedAt", d.getUploadedAt() == null ? null : d.getUploadedAt().toString());
-
-            // ✅ user should download via USER endpoint (not admin)
-            m.put("url", "/api/therapists/documents/" + d.getId() + "/download");
-
+            m.put("url", "/api/therapists/documents/" + d.getId() + "/download"); // keep if you have this endpoint
             docList.add(m);
         }
 
@@ -298,4 +291,65 @@ public class TherapistApplicationService {
         return out;
     }
 
+    // ✅ User: list application history by applicantUsername (JWT subject)
+    public List<TherapistApplication> listMine(String applicantUsername) {
+        // You may need to add this repo method if missing:
+        // List<TherapistApplication> findByApplicantUsernameOrderByCreatedAtDesc(String applicantUsername);
+        return repo.findByApplicantUsernameOrderByCreatedAtDesc(applicantUsername);
+    }
+
+    // ✅ User: details for ONE application (ownership check)
+    public Map<String, Object> getMyDetails(Long applicationId, String applicantUsername) {
+        TherapistApplication app = repo.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Application not found"));
+
+        if (app.getApplicantUsername() == null || !app.getApplicantUsername().equals(applicantUsername)) {
+            // don't leak existence
+            throw new RuntimeException("Application not found");
+        }
+
+        List<TherapistApplicationDocument> docs =
+                docRepo.findByApplicationIdOrderByUploadedAtAsc(app.getId());
+
+        Map<String, Object> appMap = new LinkedHashMap<>();
+        appMap.put("id", app.getId());
+        appMap.put("applicantUsername", app.getApplicantUsername());
+        appMap.put("fullName", app.getFullName());
+        appMap.put("email", app.getEmail());
+        appMap.put("phone", app.getPhone());
+        appMap.put("qualification", app.getQualification());
+        appMap.put("licenseNumber", app.getLicenseNumber());
+        appMap.put("yearsExperience", app.getYearsExperience());
+        appMap.put("specialization", app.getSpecialization());
+        appMap.put("workplace", app.getWorkplace());
+        appMap.put("city", app.getCity());
+        appMap.put("message", app.getMessage());
+        appMap.put("status", app.getStatus().name());
+        appMap.put("adminMessage", app.getAdminMessage());
+        appMap.put("reviewedBy", app.getReviewedBy());
+        appMap.put("reviewedAt", app.getReviewedAt() == null ? null : app.getReviewedAt().toString());
+        appMap.put("createdAt", app.getCreatedAt() == null ? null : app.getCreatedAt().toString());
+
+        List<Map<String, Object>> docList = new ArrayList<>();
+        for (TherapistApplicationDocument d : docs) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", d.getId());
+            m.put("title", d.getTitle());
+            m.put("fileType", d.getFileType());
+            m.put("uploadedAt", d.getUploadedAt() == null ? null : d.getUploadedAt().toString());
+            // optional: only add user download URL if you have a secure user download endpoint
+            // m.put("url", "/api/therapist-applications/documents/" + d.getId() + "/download");
+            docList.add(m);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("application", appMap);
+        out.put("documents", docList);
+        return out;
+    }
+
+    // (you can keep this, but it's risky if JWT subject is username)
+    public List<TherapistApplication> listByApplicantEmail(String email) {
+        return repo.findByEmailOrderByCreatedAtDesc(email);
+    }
 }
