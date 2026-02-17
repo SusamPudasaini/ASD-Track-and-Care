@@ -5,10 +5,13 @@ import com.ASD_Track_and_Care.backend.model.TherapistApplication;
 import com.ASD_Track_and_Care.backend.service.TherapistApplicationService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -21,11 +24,19 @@ public class TherapistController {
         this.service = service;
     }
 
-    // Authenticated users apply
-    @PostMapping("/apply")
-    public ResponseEntity<?> apply(Authentication authentication, @Valid @RequestBody TherapistApplyRequest request) {
-        String username = authentication.getName(); // comes from JWT subject/userDetails
-        TherapistApplication created = service.submit(username, request);
+    // ✅ Authenticated users apply (multipart: JSON + files)
+    @PostMapping(
+            value = "/apply",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public ResponseEntity<?> apply(
+            Authentication authentication,
+            @Valid @RequestPart("application") TherapistApplyRequest request,
+            @RequestParam(value = "documentTitles", required = false) List<String> documentTitles,
+            @RequestParam(value = "documentFiles", required = false) List<MultipartFile> documentFiles
+    ) {
+        String username = authentication.getName();
+        TherapistApplication created = service.submit(username, request, documentTitles, documentFiles);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 Map.of(
@@ -36,10 +47,10 @@ public class TherapistController {
         );
     }
 
-    // Optional: user checks latest application status
+    // ✅ User checks latest application status + admin message + docs
     @GetMapping("/my-application")
     public ResponseEntity<?> myApplication(Authentication authentication) {
-        // You can implement later if needed
-        return ResponseEntity.ok(Map.of("message", "Not implemented yet"));
+        String username = authentication.getName();
+        return ResponseEntity.ok(service.getLatestForUser(username));
     }
 }

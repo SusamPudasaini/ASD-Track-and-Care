@@ -38,6 +38,9 @@ public class SecurityConfig {
                 // allow preflight
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                // spring default error endpoint
+                .requestMatchers("/error").permitAll()
+
                 // public endpoints
                 .requestMatchers("/auth/**").permitAll()
 
@@ -62,10 +65,22 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
+        // ✅ When allowCredentials=true, don't use "*" in allowedOrigins. Use patterns instead.
         config.setAllowCredentials(true);
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+
+        // ✅ Allow vite dev server from localhost OR 127.0.0.1 on any port (5173/5174/etc)
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*"
+        ));
+
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+
+        // ✅ Allow all headers (important for Authorization + multipart + custom headers)
+        config.setAllowedHeaders(List.of("*"));
+
+        // ✅ Expose headers if you ever need them in frontend
+        config.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

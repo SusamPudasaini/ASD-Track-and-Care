@@ -6,7 +6,7 @@ import VerifyEmail from "./auth/VerifyEmail";
 import CheckEmail from "./auth/CheckEmail";
 import ForgotPassword from "./auth/ForgotPassword";
 import ResetPassword from "./auth/ResetPassword";
-import AdminTherapistApplications from "./pages/AdminApprove";
+import AdminTherapistApplications from "./pages/AdminTherapistApplications";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/navbar/Navbar";

@@ -8,14 +8,14 @@ import java.time.LocalDateTime;
 public class TherapistApplication {
 
     public enum Status {
-        PENDING, APPROVED, REJECTED
+    	PENDING, APPROVED, REJECTED
     }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // who applied (from JWT)
+    // who applied (from JWT subject)
     @Column(nullable = false, length = 120)
     private String applicantUsername;
 
@@ -48,12 +48,30 @@ public class TherapistApplication {
     @Column(length = 1000)
     private String message;
 
+    // ✅ Admin decision message shown to user
+    @Column(length = 2000)
+    private String adminMessage;
+
+    // ✅ who reviewed (admin username)
+    @Column(length = 120)
+    private String reviewedBy;
+
+    private LocalDateTime reviewedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Status status = Status.PENDING;
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(nullable = false)
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 
     public TherapistApplication() {}
 
@@ -92,8 +110,18 @@ public class TherapistApplication {
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
 
+    public String getAdminMessage() { return adminMessage; }
+    public void setAdminMessage(String adminMessage) { this.adminMessage = adminMessage; }
+
+    public String getReviewedBy() { return reviewedBy; }
+    public void setReviewedBy(String reviewedBy) { this.reviewedBy = reviewedBy; }
+
+    public LocalDateTime getReviewedAt() { return reviewedAt; }
+    public void setReviewedAt(LocalDateTime reviewedAt) { this.reviewedAt = reviewedAt; }
+
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 }
