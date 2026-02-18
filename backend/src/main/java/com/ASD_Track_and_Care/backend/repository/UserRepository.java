@@ -1,9 +1,11 @@
 package com.ASD_Track_and_Care.backend.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import com.ASD_Track_and_Care.backend.model.Role;
 import com.ASD_Track_and_Care.backend.model.User;
 
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -17,6 +19,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     
     Optional<User> findByResetToken(String resetToken);
  
+    List<User> findAllByRole(Role role);
+
 
 
 }

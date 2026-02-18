@@ -48,6 +48,9 @@ public class User {
 
     @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
+    
+    @Column(name = "qualification", length = 255)
+    private String qualification;
 
     // RBAC role
     @Enumerated(EnumType.STRING)
@@ -114,6 +117,9 @@ public class User {
 
     public BigDecimal getPricePerSession() { return pricePerSession; }
     public void setPricePerSession(BigDecimal pricePerSession) { this.pricePerSession = pricePerSession; }
+    
+    public String getQualification() { return qualification; }
+    public void setQualification(String qualification) { this.qualification = qualification; }
 
     public Set<AvailabilityDay> getAvailableDays() { return availableDays; }
     public void setAvailableDays(Set<AvailabilityDay> availableDays) {

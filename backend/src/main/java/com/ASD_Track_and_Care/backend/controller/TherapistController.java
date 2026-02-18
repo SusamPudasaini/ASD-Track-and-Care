@@ -1,8 +1,10 @@
 package com.ASD_Track_and_Care.backend.controller;
 
 import com.ASD_Track_and_Care.backend.dto.TherapistApplyRequest;
+import com.ASD_Track_and_Care.backend.dto.TherapistCardResponse;
 import com.ASD_Track_and_Care.backend.model.TherapistApplication;
 import com.ASD_Track_and_Care.backend.service.TherapistApplicationService;
+import com.ASD_Track_and_Care.backend.service.TherapistService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -18,13 +20,33 @@ import java.util.Map;
 @RequestMapping("/api/therapists")
 public class TherapistController {
 
-    private final TherapistApplicationService service;
+    private final TherapistApplicationService applicationService;
+    private final TherapistService therapistService;
 
-    public TherapistController(TherapistApplicationService service) {
-        this.service = service;
+    public TherapistController(
+            TherapistApplicationService applicationService,
+            TherapistService therapistService
+    ) {
+        this.applicationService = applicationService;
+        this.therapistService = therapistService;
     }
 
-    // ✅ Authenticated users apply (multipart: JSON + files)
+    /**
+     * ✅ PUBLIC / PROTECTED (depending on your ProtectedRoute)
+     * Therapist grid listing.
+     * Fetches from users table where role=THERAPIST.
+     *
+     * GET /api/therapists
+     */
+    @GetMapping
+    public ResponseEntity<List<TherapistCardResponse>> listTherapists() {
+        return ResponseEntity.ok(therapistService.listTherapists());
+    }
+
+    /**
+     * ✅ Authenticated users apply (multipart: JSON + files)
+     * POST /api/therapists/apply
+     */
     @PostMapping(
             value = "/apply",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
@@ -36,7 +58,7 @@ public class TherapistController {
             @RequestParam(value = "documentFiles", required = false) List<MultipartFile> documentFiles
     ) {
         String username = authentication.getName();
-        TherapistApplication created = service.submit(username, request, documentTitles, documentFiles);
+        TherapistApplication created = applicationService.submit(username, request, documentTitles, documentFiles);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 Map.of(
@@ -47,10 +69,13 @@ public class TherapistController {
         );
     }
 
-    // ✅ User checks latest application status + admin message + docs
+    /**
+     * ✅ User checks latest application status + admin message + docs
+     * GET /api/therapists/my-application
+     */
     @GetMapping("/my-application")
     public ResponseEntity<?> myApplication(Authentication authentication) {
         String username = authentication.getName();
-        return ResponseEntity.ok(service.getLatestForUser(username));
+        return ResponseEntity.ok(applicationService.getLatestForUser(username));
     }
 }
