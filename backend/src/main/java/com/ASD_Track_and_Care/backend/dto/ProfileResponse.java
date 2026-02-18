@@ -1,28 +1,28 @@
 package com.ASD_Track_and_Care.backend.dto;
 
+import com.ASD_Track_and_Care.backend.model.AvailabilityDay;
+import com.ASD_Track_and_Care.backend.model.Role;
+
+import java.math.BigDecimal;
+import java.util.Set;
+
 public class ProfileResponse {
+
     private String username;
     private String userEmail;
-
     private String firstName;
     private String lastName;
-    private String fullName;
-
     private String phoneNumber;
 
+    private Role role;
+
+    private String profilePictureUrl;
+
+    // Therapist-only (can be null for non-therapists)
+    private BigDecimal pricePerSession;
+    private Set<AvailabilityDay> availableDays;
+
     public ProfileResponse() {}
-
-    public ProfileResponse(String username, String userEmail, String firstName, String lastName, String phoneNumber) {
-        this.username = username;
-        this.userEmail = userEmail;
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.phoneNumber = phoneNumber;
-
-        String fn = firstName == null ? "" : firstName;
-        String ln = lastName == null ? "" : lastName;
-        this.fullName = (fn + " " + ln).trim();
-    }
 
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
@@ -36,9 +36,18 @@ public class ProfileResponse {
     public String getLastName() { return lastName; }
     public void setLastName(String lastName) { this.lastName = lastName; }
 
-    public String getFullName() { return fullName; }
-    public void setFullName(String fullName) { this.fullName = fullName; }
-
     public String getPhoneNumber() { return phoneNumber; }
     public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
+
+    public Role getRole() { return role; }
+    public void setRole(Role role) { this.role = role; }
+
+    public String getProfilePictureUrl() { return profilePictureUrl; }
+    public void setProfilePictureUrl(String profilePictureUrl) { this.profilePictureUrl = profilePictureUrl; }
+
+    public BigDecimal getPricePerSession() { return pricePerSession; }
+    public void setPricePerSession(BigDecimal pricePerSession) { this.pricePerSession = pricePerSession; }
+
+    public Set<AvailabilityDay> getAvailableDays() { return availableDays; }
+    public void setAvailableDays(Set<AvailabilityDay> availableDays) { this.availableDays = availableDays; }
 }

@@ -4,12 +4,9 @@ import toast from "react-hot-toast";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 
-/**
- * 🔧 Change these 2 if your backend routes differ.
- * I’m keeping therapist-specific updates separate from /api/users/me.
- */
-const THERAPIST_UPDATE_ENDPOINT = "/api/therapists/me"; // PUT { pricePerSession, availableDays }
-const THERAPIST_AVATAR_ENDPOINT = "/api/therapists/me/avatar"; // POST multipart/form-data { file }
+// ✅ Backend endpoints (match the Java controller we made)
+const USER_AVATAR_ENDPOINT = "/api/users/me/avatar"; // POST multipart/form-data { file }
+const THERAPIST_UPDATE_ENDPOINT = "/api/users/me/therapist-settings"; // PUT { pricePerSession, availableDays }
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -33,28 +30,29 @@ export default function Profile() {
     phoneNumber: "",
   });
 
-  // Therapist profile states
-  const [therapistSaving, setTherapistSaving] = useState(false);
+  // Avatar (everyone)
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
 
+  // Therapist-only
+  const [therapistSaving, setTherapistSaving] = useState(false);
   const [therapistForm, setTherapistForm] = useState({
     pricePerSession: "",
     availableDays: [],
-    avatarUrl: "", // existing avatar url from backend (if any)
   });
-
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState("");
 
   const onChange = (key, value) => setForm((p) => ({ ...p, [key]: value }));
   const onTherapistChange = (key, value) => setTherapistForm((p) => ({ ...p, [key]: value }));
 
-  // Detect therapist
   const isTherapist = useMemo(() => {
     const role = (me?.role || me?.userRole || me?.accountType || "").toString().toUpperCase();
-    // supports: "THERAPIST", "ROLE_THERAPIST", etc.
     return role.includes("THERAPIST");
   }, [me]);
+
+  // ✅ choose avatar shown:
+  // preview if selected, else backend url from profile
+  const avatarToShow = avatarPreview || me?.profilePictureUrl || me?.avatarUrl || me?.profilePicture || "";
 
   useEffect(() => {
     let mounted = true;
@@ -63,7 +61,6 @@ export default function Profile() {
       try {
         setLoading(true);
 
-        // ✅ IMPORTANT: your controller is /api/users/me
         const res = await api.get("/api/users/me");
         if (!mounted) return;
 
@@ -78,27 +75,11 @@ export default function Profile() {
           phoneNumber: u.phoneNumber || "",
         });
 
-        /**
-         * 🧩 Therapist fields:
-         * Your backend might return these as:
-         * - u.pricePerSession / u.availableDays / u.avatarUrl
-         * OR nested:
-         * - u.therapistProfile.pricePerSession, etc.
-         *
-         * This supports both.
-         */
-        const tp = u.therapistProfile || u.therapist || u.profile || {};
-        const price =
-          tp.pricePerSession ?? tp.sessionPrice ?? u.pricePerSession ?? u.sessionPrice ?? "";
-        const days =
-          tp.availableDays ?? tp.daysAvailable ?? u.availableDays ?? u.daysAvailable ?? [];
-        const avatar =
-          tp.avatarUrl ?? tp.profilePictureUrl ?? u.avatarUrl ?? u.profilePictureUrl ?? "";
-
+        // therapist info comes from the same /me now (if therapist)
         setTherapistForm({
-          pricePerSession: price === null || price === undefined ? "" : String(price),
-          availableDays: Array.isArray(days) ? days : [],
-          avatarUrl: avatar || "",
+          pricePerSession:
+            u.pricePerSession === null || u.pricePerSession === undefined ? "" : String(u.pricePerSession),
+          availableDays: Array.isArray(u.availableDays) ? u.availableDays : [],
         });
       } catch (err) {
         console.error("LOAD PROFILE ERROR:", err?.response?.status, err?.response?.data);
@@ -131,7 +112,6 @@ export default function Profile() {
     try {
       setSaving(true);
 
-      // ✅ IMPORTANT: PUT is also /api/users/me
       await api.put("/api/users/me", {
         firstName: form.firstName,
         lastName: form.lastName,
@@ -139,6 +119,10 @@ export default function Profile() {
       });
 
       toast.success("Profile updated.");
+
+      // optional: refresh user data to show any updated fields
+      const res = await api.get("/api/users/me");
+      setMe(res.data || {});
     } catch (err) {
       console.error("UPDATE PROFILE ERROR:", err?.response?.status, err?.response?.data);
       toast.error(err?.response?.data?.message || "Update failed.");
@@ -147,6 +131,57 @@ export default function Profile() {
     }
   };
 
+  // -------- Avatar (everyone) --------
+  const onPickAvatar = (file) => {
+    if (!file) return;
+
+    const isImage = file.type?.startsWith("image/");
+    if (!isImage) return toast.error("Please select an image file.");
+
+    if (file.size > 5 * 1024 * 1024) {
+      return toast.error("Image must be under 5 MB.");
+    }
+
+    setAvatarFile(file);
+
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const uploadAvatar = async () => {
+    if (!avatarFile) return toast.error("Choose an image first.");
+
+    try {
+      setAvatarUploading(true);
+
+      const fd = new FormData();
+      fd.append("file", avatarFile);
+
+      // ✅ Everyone uses /api/users/me/avatar
+      const res = await api.post(USER_AVATAR_ENDPOINT, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      // backend returns ProfileResponse
+      const updated = res?.data || {};
+      setMe(updated);
+
+      toast.success("Profile picture updated.");
+
+      setAvatarFile(null);
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview);
+        setAvatarPreview("");
+      }
+    } catch (err) {
+      console.error("UPLOAD AVATAR ERROR:", err?.response?.status, err?.response?.data);
+      toast.error(err?.response?.data?.message || err?.response?.data || "Avatar upload failed.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  // -------- Therapist-only --------
   const toggleDay = (day) => {
     setTherapistForm((p) => {
       const set = new Set(p.availableDays || []);
@@ -162,20 +197,21 @@ export default function Profile() {
     if (!price) return toast.error("Price per session is required.");
     const priceNum = Number(price);
     if (Number.isNaN(priceNum) || priceNum <= 0) return toast.error("Enter a valid price.");
-
-    if (!therapistForm.availableDays?.length) {
-      return toast.error("Select at least one available day.");
-    }
+    if (!therapistForm.availableDays?.length) return toast.error("Select at least one available day.");
 
     try {
       setTherapistSaving(true);
 
-      await api.put(THERAPIST_UPDATE_ENDPOINT, {
+      const res = await api.put(THERAPIST_UPDATE_ENDPOINT, {
         pricePerSession: priceNum,
         availableDays: therapistForm.availableDays,
       });
 
-      toast.success("Therapist profile updated.");
+      toast.success("Therapist settings updated.");
+
+      // backend returns ProfileResponse
+      const updated = res?.data || {};
+      setMe(updated);
     } catch (err) {
       console.error("UPDATE THERAPIST ERROR:", err?.response?.status, err?.response?.data);
       toast.error(err?.response?.data?.message || err?.response?.data || "Therapist update failed.");
@@ -184,62 +220,7 @@ export default function Profile() {
     }
   };
 
-  const onPickAvatar = (file) => {
-    if (!file) return;
-
-    // basic validation
-    const isImage = file.type?.startsWith("image/");
-    if (!isImage) return toast.error("Please select an image file.");
-
-    if (file.size > 5 * 1024 * 1024) {
-      return toast.error("Image must be under 5 MB.");
-    }
-
-    setAvatarFile(file);
-
-    // preview
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-    const url = URL.createObjectURL(file);
-    setAvatarPreview(url);
-  };
-
-  const uploadAvatar = async () => {
-    if (!avatarFile) return toast.error("Choose an image first.");
-
-    try {
-      setAvatarUploading(true);
-
-      const fd = new FormData();
-      fd.append("file", avatarFile);
-
-      const res = await api.post(THERAPIST_AVATAR_ENDPOINT, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      // backend might return { avatarUrl } or the full object
-      const newUrl =
-        res?.data?.avatarUrl || res?.data?.profilePictureUrl || res?.data?.url || "";
-
-      if (newUrl) {
-        setTherapistForm((p) => ({ ...p, avatarUrl: newUrl }));
-      }
-
-      setAvatarFile(null);
-      if (avatarPreview) {
-        URL.revokeObjectURL(avatarPreview);
-        setAvatarPreview("");
-      }
-
-      toast.success("Profile picture updated.");
-    } catch (err) {
-      console.error("UPLOAD AVATAR ERROR:", err?.response?.status, err?.response?.data);
-      toast.error(err?.response?.data?.message || err?.response?.data || "Avatar upload failed.");
-    } finally {
-      setAvatarUploading(false);
-    }
-  };
-
-  // ✅ Reset password using the same flow as "Forgot Password"
+  // Reset password (unchanged)
   const sendResetPasswordLink = async () => {
     if (!form.userEmail?.trim()) {
       toast.error("Email not found on your profile.");
@@ -262,8 +243,6 @@ export default function Profile() {
       setResetSending(false);
     }
   };
-
-  const avatarToShow = avatarPreview || therapistForm.avatarUrl || "";
 
   return (
     <div className="min-h-screen bg-white">
@@ -296,6 +275,59 @@ export default function Profile() {
           <p className="mt-2 text-sm text-gray-600">View and edit your account details.</p>
         </div>
 
+        {/* ✅ Avatar section (everyone) */}
+        <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold text-gray-900">Profile Picture</h2>
+            <p className="text-sm text-gray-600">Upload a new profile photo (PNG/JPG up to 5MB).</p>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-16 w-16 overflow-hidden rounded-full border border-gray-200 bg-white">
+                {avatarToShow ? (
+                  <img src={avatarToShow} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                    No photo
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="text-sm font-semibold text-gray-800">Change photo</div>
+                <div className="text-xs text-gray-500">This is visible on your account.</div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <label className="cursor-pointer rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                Choose Image
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => onPickAvatar(e.target.files?.[0])}
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={uploadAvatar}
+                disabled={avatarUploading || !avatarFile}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                  avatarUploading || !avatarFile
+                    ? "bg-blue-300 cursor-not-allowed"
+                    : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+                }`}
+              >
+                {avatarUploading ? "Uploading..." : "Upload"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Basic profile */}
         <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
           {loading ? (
             <div className="text-sm text-gray-600">Loading profile...</div>
@@ -349,64 +381,14 @@ export default function Profile() {
           )}
         </div>
 
-        {/* ✅ Therapist-only section */}
+        {/* Therapist-only settings */}
         {!loading && isTherapist && (
           <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-1">
               <h2 className="text-lg font-semibold text-gray-900">Therapist Settings</h2>
-              <p className="text-sm text-gray-600">
-                Update your therapist profile details (photo, pricing, availability).
-              </p>
+              <p className="text-sm text-gray-600">Set your pricing and available days.</p>
             </div>
 
-            {/* Avatar */}
-            <div className="mt-5 rounded-lg border border-gray-100 bg-gray-50 p-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 overflow-hidden rounded-full border border-gray-200 bg-white">
-                    {avatarToShow ? (
-                      <img src={avatarToShow} alt="Profile" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
-                        No photo
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <div className="text-sm font-semibold text-gray-800">Profile Picture</div>
-                    <div className="text-xs text-gray-500">PNG/JPG up to 5MB.</div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <label className="cursor-pointer rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-                    Choose Image
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => onPickAvatar(e.target.files?.[0])}
-                    />
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={uploadAvatar}
-                    disabled={avatarUploading || !avatarFile}
-                    className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                      avatarUploading || !avatarFile
-                        ? "bg-blue-300 cursor-not-allowed"
-                        : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
-                    }`}
-                  >
-                    {avatarUploading ? "Uploading..." : "Upload"}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Price + Days */}
             <div className="mt-5 grid gap-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Price per session</label>
@@ -420,7 +402,6 @@ export default function Profile() {
                   />
                   <span className="text-sm font-semibold text-gray-500">/ session</span>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">Use a number only (currency handled on UI/backend).</p>
               </div>
 
               <div>
@@ -443,18 +424,12 @@ export default function Profile() {
                             : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                         }`}
                       >
-                        <span className="mr-2 inline-block align-middle">
-                          {checked ? "✅" : "⬜"}
-                        </span>
+                        <span className="mr-2 inline-block align-middle">{checked ? "✅" : "⬜"}</span>
                         <span className="align-middle">{d}</span>
                       </button>
                     );
                   })}
                 </div>
-
-                <p className="mt-2 text-xs text-gray-500">
-                  Tip: pick the days you typically accept bookings (you can still manage time slots elsewhere).
-                </p>
               </div>
 
               <div className="flex justify-end">

@@ -1,6 +1,10 @@
 package com.ASD_Track_and_Care.backend.model;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
 import jakarta.persistence.*;
 
 @Entity
@@ -50,6 +54,20 @@ public class User {
     @Column(name = "role", nullable = false, length = 20)
     private Role role = Role.USER;
 
+    // ✅ Everyone can have a profile picture URL
+    @Column(name = "profile_picture_url")
+    private String profilePictureUrl;
+
+    // ✅ Therapist-only fields (safe to exist for all users; only therapist can update)
+    @Column(name = "price_per_session", precision = 10, scale = 2)
+    private BigDecimal pricePerSession;
+
+    @ElementCollection(fetch = FetchType.EAGER, targetClass = AvailabilityDay.class)
+    @CollectionTable(name = "user_available_days", joinColumns = @JoinColumn(name = "user_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "day", length = 15)
+    private Set<AvailabilityDay> availableDays = new HashSet<>();
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -90,4 +108,15 @@ public class User {
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
+
+    public String getProfilePictureUrl() { return profilePictureUrl; }
+    public void setProfilePictureUrl(String profilePictureUrl) { this.profilePictureUrl = profilePictureUrl; }
+
+    public BigDecimal getPricePerSession() { return pricePerSession; }
+    public void setPricePerSession(BigDecimal pricePerSession) { this.pricePerSession = pricePerSession; }
+
+    public Set<AvailabilityDay> getAvailableDays() { return availableDays; }
+    public void setAvailableDays(Set<AvailabilityDay> availableDays) {
+        this.availableDays = (availableDays == null) ? new HashSet<>() : availableDays;
+    }
 }

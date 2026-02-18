@@ -67,7 +67,7 @@ export default function Login() {
       const res = await api.post("/auth/resend-verification", {
         username: username.trim(),
       });
-      setResendMsg(res.data);
+      setResendMsg(typeof res.data === "string" ? res.data : "Verification email sent.");
     } catch (err) {
       setResendMsg(err?.response?.data || "Could not resend verification email.");
     } finally {
@@ -107,18 +107,34 @@ export default function Login() {
 
       // ✅ decode role from JWT (claim "role": "ADMIN" | "USER" | "THERAPIST")
       const payload = decodeJwt(token);
-      const role = payload?.role || "USER";
+
+      const rawRole = (payload?.role || payload?.authorities?.[0] || "USER").toString();
+      const role = rawRole.replace("ROLE_", "").toUpperCase();
       localStorage.setItem("role", role);
+
+      // ✅ also fetch /api/users/me so Navbar has profilePictureUrl immediately
+      try {
+        const meRes = await api.get("/api/users/me");
+        const me = meRes.data || {};
+        localStorage.setItem("me", JSON.stringify(me));
+        if (me.role) localStorage.setItem("role", me.role); // prefer backend truth
+        if (me.profilePictureUrl) localStorage.setItem("profilePictureUrl", me.profilePictureUrl);
+      } catch {
+        // Not fatal (token+role still set)
+      }
 
       toast.success("Logged in!");
 
-      // Optional: redirect admin to admin page
-      if (role === "ADMIN") {
+      // ✅ role-based redirect
+      const finalRole = (localStorage.getItem("role") || role).toUpperCase();
+
+      if (finalRole === "ADMIN") {
         navigate("/admin/request");
+      } else if (finalRole === "THERAPIST") {
+        navigate("/therapist/dashboard");
       } else {
         navigate("/");
       }
-
     } catch (err) {
       const status = err?.response?.status;
       const msg = err?.response?.data;
@@ -186,9 +202,7 @@ export default function Login() {
 
             <form onSubmit={handleLogin} className="mt-8 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Username
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Username</label>
                 <input
                   type="text"
                   placeholder="Enter your username"
@@ -202,15 +216,11 @@ export default function Login() {
                         : "border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                     }`}
                 />
-                {usernameError && (
-                  <p className="mt-2 text-xs text-red-600">{usernameError}</p>
-                )}
+                {usernameError && <p className="mt-2 text-xs text-red-600">{usernameError}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Password
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Password</label>
                 <div className="relative mt-2">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -233,9 +243,7 @@ export default function Login() {
                     {showPassword ? "🙈" : "👁️"}
                   </button>
                 </div>
-                {passwordError && (
-                  <p className="mt-2 text-xs text-red-600">{passwordError}</p>
-                )}
+                {passwordError && <p className="mt-2 text-xs text-red-600">{passwordError}</p>}
               </div>
 
               <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
