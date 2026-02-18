@@ -50,6 +50,19 @@ export default function TherapistApply() {
   const [details, setDetails] = useState(null); // { application, documents } OR application object
   const [detailsRow, setDetailsRow] = useState(null);
 
+  // ✅ Latest application logic (assumes apps are sorted newest first from backend)
+  const latestApp = apps?.length ? apps[0] : null;
+  const latestStatus = (latestApp?.status || "").toUpperCase();
+
+  // ✅ only enable submit if no apps OR latest is REJECTED
+  const canSubmitNew = !latestApp || latestStatus === "REJECTED";
+
+  const submitDisabledReason = !latestApp
+    ? ""
+    : latestStatus === "REJECTED"
+    ? ""
+    : `Submit disabled because your latest application is ${latestStatus}.`;
+
   // ✅ Load user's application history
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -65,7 +78,6 @@ export default function TherapistApply() {
       try {
         setLoading(true);
 
-
         const res = await api.get("/api/therapist-applications/my", {
           signal: controller.signal,
         });
@@ -75,10 +87,8 @@ export default function TherapistApply() {
         if (Array.isArray(data)) {
           setApps(data);
         } else if (data?.id) {
-          // fallback: backend returned single latest application
           setApps([data]);
         } else if (data?.application?.id) {
-          // fallback: backend returned wrapper
           setApps([data.application]);
         } else {
           setApps([]);
@@ -115,8 +125,6 @@ export default function TherapistApply() {
     try {
       setDetailsLoading(true);
 
-      // ✅ Recommended endpoint for user:
-      // GET /api/therapist-applications/{id} -> { application: {...}, documents: [...] }
       const res = await api.get(`/api/therapist-applications/my/${row.id}`);
       const data = res.data;
 
@@ -155,13 +163,21 @@ export default function TherapistApply() {
               <p className="mt-2 text-sm text-gray-600">
                 Track your previous applications and submit a new one when you’re ready.
               </p>
+
+              {!canSubmitNew && (
+                <p className="mt-2 text-sm text-gray-500">{submitDisabledReason}</p>
+              )}
             </div>
 
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => navigate("/therapist/apply/new")}
-                className="rounded bg-[#4a6cf7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
+                disabled={!canSubmitNew}
+                title={!canSubmitNew ? submitDisabledReason : ""}
+                className={`rounded px-4 py-2 text-sm font-semibold text-white ${
+                  canSubmitNew ? "bg-[#4a6cf7] hover:bg-[#3f5ee0]" : "bg-gray-300 cursor-not-allowed"
+                }`}
               >
                 Submit New Application
               </button>
@@ -187,9 +203,7 @@ export default function TherapistApply() {
           {loading ? (
             <div className="text-sm text-gray-600">Loading your applications...</div>
           ) : apps.length === 0 ? (
-            <div className="text-sm text-gray-600">
-              You haven’t submitted any therapist applications yet.
-            </div>
+            <div className="text-sm text-gray-600">You haven’t submitted any therapist applications yet.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px] border-collapse">
@@ -226,15 +240,15 @@ export default function TherapistApply() {
               </table>
 
               <p className="mt-4 text-xs text-gray-500">
-                Tip: If your latest application is <span className="font-semibold">PENDING</span>, you can still submit a new
-                one if you want to update your documents (your admins will review the newest).
+                Note: You can only submit a new application if your latest application is{" "}
+                <span className="font-semibold">REJECTED</span> (or you have no applications yet).
               </p>
             </div>
           )}
         </div>
       </main>
 
-      {/* DETAILS MODAL */}
+      {/* ✅ DETAILS MODAL (THIS WAS MISSING) */}
       {detailsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-lg">
@@ -313,7 +327,6 @@ export default function TherapistApply() {
                             </div>
                           </div>
 
-                          {/* For user-side, you can add download/preview later if you have an endpoint */}
                           <span className="shrink-0 text-xs text-gray-400"></span>
                         </div>
                       ))}
