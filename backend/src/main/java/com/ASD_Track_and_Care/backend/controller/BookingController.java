@@ -21,7 +21,7 @@ public class BookingController {
         this.bookingService = bookingService;
     }
 
-    // ✅ Create booking (payment optional for now)
+    // ✅ Create booking -> PENDING
     @PostMapping
     public ResponseEntity<BookingResponse> create(
             Authentication authentication,
@@ -36,7 +36,31 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.myBookings(authentication));
     }
 
-    // ✅ Reschedule
+    // ✅ Therapist dashboard bookings (includes user details)
+    @GetMapping("/therapist/me")
+    public ResponseEntity<List<BookingResponse>> therapistBookings(Authentication authentication) {
+        return ResponseEntity.ok(bookingService.therapistBookings(authentication));
+    }
+
+    // ✅ Therapist approves -> CONFIRMED (returns user details too)
+    @PutMapping("/{id}/approve")
+    public ResponseEntity<BookingResponse> approve(Authentication authentication, @PathVariable("id") Long id) {
+        return ResponseEntity.ok(bookingService.approve(authentication, id));
+    }
+
+    // ✅ Therapist declines/cancels -> CANCELLED (returns user details too)
+    @PutMapping("/{id}/decline")
+    public ResponseEntity<BookingResponse> decline(Authentication authentication, @PathVariable("id") Long id) {
+        return ResponseEntity.ok(bookingService.decline(authentication, id));
+    }
+
+    // ✅ Therapist can revert CONFIRMED/CANCELLED back to PENDING
+    @PutMapping("/{id}/mark-pending")
+    public ResponseEntity<BookingResponse> markPending(Authentication authentication, @PathVariable("id") Long id) {
+        return ResponseEntity.ok(bookingService.markPending(authentication, id));
+    }
+
+    // ✅ Reschedule (user)
     @PutMapping("/{id}/reschedule")
     public ResponseEntity<BookingResponse> reschedule(
             Authentication authentication,
@@ -46,7 +70,7 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.reschedule(authentication, id, req));
     }
 
-    // ✅ Cancel
+    // ✅ Cancel (user)
     @DeleteMapping("/{id}")
     public ResponseEntity<?> cancel(Authentication authentication, @PathVariable("id") Long id) {
         bookingService.cancel(authentication, id);

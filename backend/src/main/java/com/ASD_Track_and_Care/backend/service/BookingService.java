@@ -46,19 +46,15 @@ public class BookingService {
         LocalDate date = parseDate(req.getDate());
         String time = normalizeTime(req.getTime());
 
-        // ✅ Block past bookings
         validateNotPast(date, time);
 
-        // ✅ Validate time format + range
         if (!isValidTime(time)) {
             throw new RuntimeException("Invalid time. Allowed: 09:00 to 18:00 (30-min steps).");
         }
 
-        // ✅ Must exist in therapist availability for that weekday
         ensureTherapistHasSlot(therapist.getId(), date, time);
 
-        // ✅ Prevent double booking same therapist same date/time
-        if (bookingRepository.existsByTherapistIdAndDateAndTime(therapist.getId(), date, time)) {
+        if (existsActiveBookingForTherapistSlot(therapist.getId(), date, time)) {
             throw new RuntimeException("This time slot is already booked. Please choose another time.");
         }
 
@@ -67,15 +63,17 @@ public class BookingService {
         b.setTherapistId(therapist.getId());
         b.setDate(date);
         b.setTime(time);
-        b.setStatus(BookingStatus.CONFIRMED);
 
-        // Khalti optional for now
+        // ✅ NEW FLOW
+        b.setStatus(BookingStatus.PENDING);
+
         if (req.getPidx() != null && !req.getPidx().isBlank()) {
             b.setKhaltiPidx(req.getPidx().trim());
         }
 
         bookingRepository.save(b);
-        return toResponse(b, therapist);
+
+        return toResponseForUserView(b, therapist);
     }
 
     public List<BookingResponse> myBookings(Authentication auth) {
@@ -85,8 +83,123 @@ public class BookingService {
 
         return list.stream().map(b -> {
             User therapist = userRepository.findById(b.getTherapistId()).orElse(null);
-            return toResponse(b, therapist);
+            return toResponseForUserView(b, therapist);
         }).collect(Collectors.toList());
+    }
+
+    // ✅ Therapist dashboard list -> include user details
+    public List<BookingResponse> therapistBookings(Authentication auth) {
+        User therapist = getUserFromAuth(auth);
+
+        if (therapist.getRole() != Role.THERAPIST) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        List<Booking> list = bookingRepository.findAllByTherapistIdOrderByCreatedAtDesc(therapist.getId());
+
+        return list.stream().map(b -> {
+            User booker = userRepository.findById(b.getUserId()).orElse(null);
+            return toResponseForTherapistView(b, therapist, booker);
+        }).collect(Collectors.toList());
+    }
+
+    // ✅ Therapist approves PENDING -> CONFIRMED
+    public BookingResponse approve(Authentication auth, Long bookingId) {
+        User therapist = getUserFromAuth(auth);
+
+        if (therapist.getRole() != Role.THERAPIST) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        Booking b = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!b.getTherapistId().equals(therapist.getId())) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        if (b.getStatus() == BookingStatus.CANCELLED) {
+            throw new RuntimeException("Booking already cancelled");
+        }
+
+        if (b.getStatus() != BookingStatus.PENDING && b.getStatus() != BookingStatus.CONFIRMED) {
+            throw new RuntimeException("Booking is not pending");
+        }
+
+        // Idempotent
+        if (b.getStatus() == BookingStatus.CONFIRMED) {
+            User booker = userRepository.findById(b.getUserId()).orElse(null);
+            return toResponseForTherapistView(b, therapist, booker);
+        }
+
+        if (existsOtherActiveBookingForTherapistSlot(b.getId(), b.getTherapistId(), b.getDate(), b.getTime())) {
+            throw new RuntimeException("This time slot is no longer available.");
+        }
+
+        b.setStatus(BookingStatus.CONFIRMED);
+        bookingRepository.save(b);
+
+        User booker = userRepository.findById(b.getUserId()).orElse(null);
+        return toResponseForTherapistView(b, therapist, booker);
+    }
+
+    // ✅ Therapist declines/cancels -> CANCELLED
+    public BookingResponse decline(Authentication auth, Long bookingId) {
+        User therapist = getUserFromAuth(auth);
+
+        if (therapist.getRole() != Role.THERAPIST) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        Booking b = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!b.getTherapistId().equals(therapist.getId())) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        if (b.getStatus() == BookingStatus.CANCELLED) {
+            User booker = userRepository.findById(b.getUserId()).orElse(null);
+            return toResponseForTherapistView(b, therapist, booker);
+        }
+
+        b.setStatus(BookingStatus.CANCELLED);
+        bookingRepository.save(b);
+
+        User booker = userRepository.findById(b.getUserId()).orElse(null);
+        return toResponseForTherapistView(b, therapist, booker);
+    }
+
+    // ✅ NEW: Therapist can revert CONFIRMED/CANCELLED -> PENDING
+    public BookingResponse markPending(Authentication auth, Long bookingId) {
+        User therapist = getUserFromAuth(auth);
+
+        if (therapist.getRole() != Role.THERAPIST) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        Booking b = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!b.getTherapistId().equals(therapist.getId())) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        if (b.getStatus() == BookingStatus.PENDING) {
+            User booker = userRepository.findById(b.getUserId()).orElse(null);
+            return toResponseForTherapistView(b, therapist, booker);
+        }
+
+        // ✅ safety: if you mark pending, make sure slot isn't already taken by another active booking
+        if (existsOtherActiveBookingForTherapistSlot(b.getId(), b.getTherapistId(), b.getDate(), b.getTime())) {
+            throw new RuntimeException("Cannot mark pending because another booking already occupies this time slot.");
+        }
+
+        b.setStatus(BookingStatus.PENDING);
+        bookingRepository.save(b);
+
+        User booker = userRepository.findById(b.getUserId()).orElse(null);
+        return toResponseForTherapistView(b, therapist, booker);
     }
 
     public BookingResponse reschedule(Authentication auth, Long bookingId, RescheduleBookingRequest req) {
@@ -106,30 +219,30 @@ public class BookingService {
         LocalDate newDate = parseDate(req.getDate());
         String newTime = normalizeTime(req.getTime());
 
-        // ✅ Block past reschedules
         validateNotPast(newDate, newTime);
 
         if (!isValidTime(newTime)) {
             throw new RuntimeException("Invalid time. Allowed: 09:00 to 18:00 (30-min steps).");
         }
 
-        // ✅ Must exist in therapist availability for that weekday
         ensureTherapistHasSlot(b.getTherapistId(), newDate, newTime);
 
-        // ✅ If user picks same current slot, allow it
         boolean sameAsCurrent = b.getDate().equals(newDate) && b.getTime().equals(newTime);
 
-        // ✅ Prevent therapist conflict (only if changing)
-        if (!sameAsCurrent && bookingRepository.existsByTherapistIdAndDateAndTime(b.getTherapistId(), newDate, newTime)) {
+        if (!sameAsCurrent && existsActiveBookingForTherapistSlot(b.getTherapistId(), newDate, newTime)) {
             throw new RuntimeException("This time slot is already booked. Please choose another time.");
         }
 
         b.setDate(newDate);
         b.setTime(newTime);
+
+        // ✅ reschedule should require therapist approval again
+        b.setStatus(BookingStatus.PENDING);
+
         bookingRepository.save(b);
 
         User therapist = userRepository.findById(b.getTherapistId()).orElse(null);
-        return toResponse(b, therapist);
+        return toResponseForUserView(b, therapist);
     }
 
     public void cancel(Authentication auth, Long bookingId) {
@@ -148,10 +261,19 @@ public class BookingService {
 
     // ---------------- helpers ----------------
 
+    private boolean existsActiveBookingForTherapistSlot(Long therapistId, LocalDate date, String time) {
+        List<Booking> list = bookingRepository.findAllByTherapistIdAndDateAndTime(therapistId, date, time);
+        return list.stream().anyMatch(b -> b.getStatus() != BookingStatus.CANCELLED);
+    }
+
+    private boolean existsOtherActiveBookingForTherapistSlot(Long bookingId, Long therapistId, LocalDate date, String time) {
+        List<Booking> list = bookingRepository.findAllByTherapistIdAndDateAndTime(therapistId, date, time);
+        return list.stream().anyMatch(b -> !b.getId().equals(bookingId) && b.getStatus() != BookingStatus.CANCELLED);
+    }
+
     private void ensureTherapistHasSlot(Long therapistId, LocalDate date, String time) {
         AvailabilityDay day = toAvailabilityDay(date);
 
-        // therapist slots for weekday
         List<String> slots = timeSlotRepository.findAllByTherapistIdAndDayOrderByTimeAsc(therapistId, day)
                 .stream()
                 .map(TherapistTimeSlot::getTime)
@@ -186,19 +308,14 @@ public class BookingService {
             throw new RuntimeException("You cannot book a session in the past.");
         }
 
-        // If booking is for today, ensure time is not in the past
         if (date.equals(today)) {
             try {
                 LocalTime t = LocalTime.parse(time);
                 LocalTime now = LocalTime.now();
-
-                // allow booking if time is after now
                 if (t.isBefore(now)) {
                     throw new RuntimeException("Please choose a future time.");
                 }
-            } catch (Exception ignored) {
-                // time format already validated elsewhere
-            }
+            } catch (Exception ignored) {}
         }
     }
 
@@ -215,7 +332,7 @@ public class BookingService {
         return time.trim();
     }
 
-    private BookingResponse toResponse(Booking b, User therapist) {
+    private BookingResponse toResponseForUserView(Booking b, User therapist) {
         BookingResponse r = new BookingResponse();
         r.setId(b.getId());
         r.setDate(b.getDate().toString());
@@ -223,7 +340,6 @@ public class BookingService {
         r.setStatus(b.getStatus().name());
 
         r.setTherapistId(b.getTherapistId());
-
         if (therapist != null) {
             String name = (therapist.getFirstName() + " " + therapist.getLastName()).trim();
             r.setTherapistName(name);
@@ -232,6 +348,37 @@ public class BookingService {
             r.setTherapistProfilePictureUrl(therapist.getProfilePictureUrl());
         } else {
             r.setTherapistName("Therapist");
+        }
+
+        r.setUserId(b.getUserId());
+        return r;
+    }
+
+    private BookingResponse toResponseForTherapistView(Booking b, User therapist, User booker) {
+        BookingResponse r = new BookingResponse();
+        r.setId(b.getId());
+        r.setDate(b.getDate().toString());
+        r.setTime(b.getTime());
+        r.setStatus(b.getStatus().name());
+
+        r.setTherapistId(b.getTherapistId());
+        if (therapist != null) {
+            String tName = (therapist.getFirstName() + " " + therapist.getLastName()).trim();
+            r.setTherapistName(tName);
+            r.setTherapistEmail(therapist.getUserEmail());
+            r.setTherapistPhone(therapist.getPhoneNumber());
+            r.setTherapistProfilePictureUrl(therapist.getProfilePictureUrl());
+        }
+
+        r.setUserId(b.getUserId());
+        if (booker != null) {
+            String uName = (booker.getFirstName() + " " + booker.getLastName()).trim();
+            r.setUserName(uName);
+            r.setUserEmail(booker.getUserEmail());
+            r.setUserPhone(booker.getPhoneNumber());
+            r.setUserProfilePictureUrl(booker.getProfilePictureUrl());
+        } else {
+            r.setUserName("User");
         }
 
         return r;
@@ -247,7 +394,6 @@ public class BookingService {
     }
 
     private boolean isValidTime(String time) {
-        // Accept HH:mm from 09:00 to 18:00
         try {
             String[] parts = time.split(":");
             if (parts.length != 2) return false;

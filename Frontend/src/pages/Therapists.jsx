@@ -33,28 +33,37 @@ function todayISO() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// 🔎 Detect "unavailable" therapists from the list payload.
-// Supports a few possible backend shapes without breaking.
+/**
+ * ✅ SAFER: Only label "Unavailable" when backend gives a strong signal.
+ * This prevents false "Unavailable" when backend returns availability: {} by default.
+ */
 function isTherapistUnavailable(t) {
-  // If backend explicitly sends a boolean
+  // Strongest signals: explicit boolean
   if (typeof t?.available === "boolean") return !t.available;
   if (typeof t?.isAvailable === "boolean") return !t.isAvailable;
 
-  // If backend sends availability map or availableDays
-  const availMap = t?.availability;
-  if (availMap && typeof availMap === "object") {
-    const total = Object.values(availMap).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0);
-    return total === 0;
-  }
-
-  const days = t?.availableDays;
-  if (Array.isArray(days)) return days.length === 0;
-
-  // If backend sends slotCount
+  // Strong signal: explicit slot count
   if (typeof t?.totalSlots === "number") return t.totalSlots === 0;
   if (typeof t?.slotCount === "number") return t.slotCount === 0;
 
-  // fallback: unknown => treat as available (don’t block UI for missing field)
+  // Medium signal: availableDays array (only if field exists and is array)
+  if (Array.isArray(t?.availableDays)) return t.availableDays.length === 0;
+
+  // Medium signal: availability map
+  const availMap = t?.availability;
+  if (availMap && typeof availMap === "object" && !Array.isArray(availMap)) {
+    const keys = Object.keys(availMap);
+
+    // ✅ IMPORTANT: empty object means "unknown" (don’t block UI)
+    if (keys.length === 0) return false;
+
+    const total = Object.values(availMap).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0);
+
+    // If it has keys but zero slots => truly unavailable
+    return total === 0;
+  }
+
+  // fallback: unknown => treat as available
   return false;
 }
 
@@ -84,6 +93,10 @@ export default function Therapists() {
         if (!mounted) return;
 
         const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+
+        // ✅ debug: check what backend returns (keep for now)
+        // console.log("THERAPISTS PAYLOAD SAMPLE:", list?.[0]);
+
         setTherapists(list);
       } catch (err) {
         console.error("LOAD THERAPISTS ERROR:", err?.response?.status, err?.response?.data);
@@ -98,7 +111,7 @@ export default function Therapists() {
   }, []);
 
   const openBook = (t) => {
-    // ✅ prevent opening modal if therapist is unavailable
+    // ✅ prevent opening modal if therapist is truly unavailable
     if (isTherapistUnavailable(t)) {
       toast.error("This therapist is currently unavailable.");
       return;
@@ -164,7 +177,6 @@ export default function Therapists() {
           params: { date },
         });
 
-        // ✅ backend returns List<String>, not {times:[]}
         const list = Array.isArray(res.data) ? res.data : [];
         if (!mounted) return;
 
@@ -190,7 +202,6 @@ export default function Therapists() {
     if (!time) return toast.error("Select a time.");
     if (!therapistId) return toast.error("Therapist id missing.");
 
-    // frontend guard: must be one of available
     if (!availableTimes.includes(time)) {
       return toast.error("Selected time is not available.");
     }
@@ -357,8 +368,7 @@ function BookModal({
 
         {unavailable ? (
           <div className="mt-5 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
-            This therapist is currently <span className="font-semibold">unavailable</span>. Please choose another
-            therapist.
+            This therapist is currently <span className="font-semibold">unavailable</span>. Please choose another therapist.
           </div>
         ) : (
           <>

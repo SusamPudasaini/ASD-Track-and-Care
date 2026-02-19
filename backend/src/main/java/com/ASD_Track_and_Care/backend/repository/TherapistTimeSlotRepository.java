@@ -22,4 +22,7 @@ public interface TherapistTimeSlotRepository extends JpaRepository<TherapistTime
     List<TherapistTimeSlot> findAllByTherapistIdAndDayOrderByTimeAsc(Long therapistId, AvailabilityDay day);
 
     List<TherapistTimeSlot> findAllByTherapistId(Long therapistId);
+    
+    long countByTherapistId(Long therapistId);
+
 }

@@ -6,11 +6,19 @@ public class BookingResponse {
     private String time;
     private String status;
 
+    // therapist details
     private Long therapistId;
     private String therapistName;
     private String therapistEmail;
     private String therapistPhone;
     private String therapistProfilePictureUrl;
+
+    // ✅ NEW: user/patient details (booker)
+    private Long userId;
+    private String userName;
+    private String userEmail;
+    private String userPhone;
+    private String userProfilePictureUrl;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -38,4 +46,20 @@ public class BookingResponse {
 
     public String getTherapistProfilePictureUrl() { return therapistProfilePictureUrl; }
     public void setTherapistProfilePictureUrl(String therapistProfilePictureUrl) { this.therapistProfilePictureUrl = therapistProfilePictureUrl; }
+
+    // ✅ NEW getters/setters
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public String getUserName() { return userName; }
+    public void setUserName(String userName) { this.userName = userName; }
+
+    public String getUserEmail() { return userEmail; }
+    public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
+
+    public String getUserPhone() { return userPhone; }
+    public void setUserPhone(String userPhone) { this.userPhone = userPhone; }
+
+    public String getUserProfilePictureUrl() { return userProfilePictureUrl; }
+    public void setUserProfilePictureUrl(String userProfilePictureUrl) { this.userProfilePictureUrl = userProfilePictureUrl; }
 }

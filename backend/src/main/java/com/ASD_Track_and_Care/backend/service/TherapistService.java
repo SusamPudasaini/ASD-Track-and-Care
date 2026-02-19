@@ -40,12 +40,18 @@ public class TherapistService {
             String qualification = (u.getQualification() == null || u.getQualification().isBlank())
                     ? "—" : u.getQualification();
 
+            // ✅ REAL availability from slot table
+            long slotCount = timeSlotRepository.countByTherapistId(u.getId());
+            boolean available = slotCount > 0;
+
             return new TherapistCardResponse(
                     u.getId(),
                     name,
                     qualification,
                     u.getPricePerSession(),
-                    u.getProfilePictureUrl()
+                    u.getProfilePictureUrl(),
+                    slotCount,
+                    available
             );
         }).collect(Collectors.toList());
     }
@@ -62,18 +68,13 @@ public class TherapistService {
             throw new RuntimeException("pricePerSession must be greater than 0.");
         }
 
-        // ✅ normalize Map<String,List<String>> -> Map<AvailabilityDay,List<String>>
         Map<AvailabilityDay, List<String>> normalized = normalizeAvailability(req.getAvailability());
-
-        // ✅ allow empty totalSlots: means "therapist not available"
         int totalSlots = normalized.values().stream().mapToInt(List::size).sum();
 
         me.setPricePerSession(req.getPricePerSession());
 
-        // ✅ always clear existing
         timeSlotRepository.deleteAllByTherapistId(me.getId());
 
-        // ✅ hard dedupe on insert list (prevents duplicate key in same request)
         if (totalSlots > 0) {
             Set<String> seen = new HashSet<>();
             List<TherapistTimeSlot> toSave = new ArrayList<>();
@@ -102,7 +103,6 @@ public class TherapistService {
 
             me.setAvailableDays(daysWithAnySlots);
         } else {
-            // no slots => not available
             me.setAvailableDays(Collections.emptySet());
         }
 
@@ -133,7 +133,10 @@ public class TherapistService {
         if (baseSlots.isEmpty()) return List.of();
 
         List<Booking> bookings = bookingRepository.findAllByTherapistIdAndDate(therapistId, date);
+
+        // ✅ IMPORTANT: only block slots if booking is NOT cancelled
         Set<String> bookedTimes = bookings.stream()
+                .filter(b -> b.getStatus() != BookingStatus.CANCELLED)
                 .map(Booking::getTime)
                 .filter(Objects::nonNull)
                 .map(String::trim)

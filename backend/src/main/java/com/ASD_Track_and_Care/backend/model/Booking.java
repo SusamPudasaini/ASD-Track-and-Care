@@ -30,7 +30,7 @@ public class Booking {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private BookingStatus status = BookingStatus.CONFIRMED;
+    private BookingStatus status = BookingStatus.PENDING;
 
     // Khalti reference (optional for now)
     @Column(name = "khalti_pidx", length = 80)

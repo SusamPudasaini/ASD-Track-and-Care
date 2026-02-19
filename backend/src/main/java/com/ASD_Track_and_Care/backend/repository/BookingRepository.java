@@ -15,4 +15,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     // ✅ NEW: used to filter booked times from slots
     List<Booking> findAllByTherapistIdAndDate(Long therapistId, LocalDate date);
     
+    List<Booking> findAllByTherapistIdOrderByCreatedAtDesc(Long therapistId);
+    List<Booking> findAllByTherapistIdAndDateAndTime(Long therapistId, LocalDate date, String time);
+
+    
 }

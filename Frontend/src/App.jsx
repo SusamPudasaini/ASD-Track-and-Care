@@ -21,19 +21,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import Therapists from "./pages/Therapists";
 
 import { Toaster } from "react-hot-toast";
-
-// ✅ Optional placeholder pages (create later)
-function TherapistDashboard() {
-  return (
-    <>
-      <Navbar />
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">Therapist Dashboard</h1>
-        <p>Coming next (therapist-side flow).</p>
-      </div>
-    </>
-  );
-}
+import TherapistDashboardBookings from "./pages/TherapistsBookingApplcations";
 
 function Home() {
   return (
@@ -124,7 +112,7 @@ export default function App() {
             path="/therapist/dashboard"
             element={
               <RoleRoute allow={["THERAPIST"]}>
-                <TherapistDashboard />
+                <TherapistDashboardBookings />
               </RoleRoute>
             }
           />
