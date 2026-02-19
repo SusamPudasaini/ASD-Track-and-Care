@@ -33,6 +33,31 @@ function todayISO() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// 🔎 Detect "unavailable" therapists from the list payload.
+// Supports a few possible backend shapes without breaking.
+function isTherapistUnavailable(t) {
+  // If backend explicitly sends a boolean
+  if (typeof t?.available === "boolean") return !t.available;
+  if (typeof t?.isAvailable === "boolean") return !t.isAvailable;
+
+  // If backend sends availability map or availableDays
+  const availMap = t?.availability;
+  if (availMap && typeof availMap === "object") {
+    const total = Object.values(availMap).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0);
+    return total === 0;
+  }
+
+  const days = t?.availableDays;
+  if (Array.isArray(days)) return days.length === 0;
+
+  // If backend sends slotCount
+  if (typeof t?.totalSlots === "number") return t.totalSlots === 0;
+  if (typeof t?.slotCount === "number") return t.slotCount === 0;
+
+  // fallback: unknown => treat as available (don’t block UI for missing field)
+  return false;
+}
+
 export default function Therapists() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -73,6 +98,12 @@ export default function Therapists() {
   }, []);
 
   const openBook = (t) => {
+    // ✅ prevent opening modal if therapist is unavailable
+    if (isTherapistUnavailable(t)) {
+      toast.error("This therapist is currently unavailable.");
+      return;
+    }
+
     setSelectedTherapist(t);
     setDate("");
     setTime("");
@@ -98,6 +129,11 @@ export default function Therapists() {
     return selectedTherapist.id || selectedTherapist.therapistId || null;
   }, [selectedTherapist]);
 
+  const selectedTherapistUnavailable = useMemo(() => {
+    if (!selectedTherapist) return false;
+    return isTherapistUnavailable(selectedTherapist);
+  }, [selectedTherapist]);
+
   // ✅ load available slots when date changes
   useEffect(() => {
     let mounted = true;
@@ -105,6 +141,13 @@ export default function Therapists() {
     async function loadSlots() {
       if (!open) return;
       if (!therapistId) return;
+
+      // ✅ if therapist is marked unavailable, don’t even fetch
+      if (selectedTherapistUnavailable) {
+        setAvailableTimes([]);
+        setTime("");
+        return;
+      }
 
       if (!date) {
         setAvailableTimes([]);
@@ -138,10 +181,11 @@ export default function Therapists() {
 
     loadSlots();
     return () => (mounted = false);
-  }, [open, therapistId, date]);
+  }, [open, therapistId, date, selectedTherapistUnavailable]);
 
   const createBooking = async () => {
     if (!selectedTherapist) return toast.error("Pick a therapist first.");
+    if (selectedTherapistUnavailable) return toast.error("This therapist is currently unavailable.");
     if (!date) return toast.error("Select a date.");
     if (!time) return toast.error("Select a time.");
     if (!therapistId) return toast.error("Therapist id missing.");
@@ -200,7 +244,12 @@ export default function Therapists() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {therapists.map((t) => (
-                <TherapistCard key={t.id || t.therapistId} t={t} onBook={() => openBook(t)} />
+                <TherapistCard
+                  key={t.id || t.therapistId}
+                  t={t}
+                  onBook={() => openBook(t)}
+                  unavailable={isTherapistUnavailable(t)}
+                />
               ))}
             </div>
           )}
@@ -210,6 +259,7 @@ export default function Therapists() {
       {open && (
         <BookModal
           therapistName={therapistName}
+          unavailable={selectedTherapistUnavailable}
           date={date}
           time={time}
           setDate={setDate}
@@ -225,7 +275,7 @@ export default function Therapists() {
   );
 }
 
-function TherapistCard({ t, onBook }) {
+function TherapistCard({ t, onBook, unavailable }) {
   const name = t.name || t.fullName || `${t.firstName || ""} ${t.lastName || ""}`.trim() || "Therapist";
   const qualification = t.qualification || t.degree || t.title || "—";
   const price = t.pricePerSession ?? t.sessionPrice ?? "—";
@@ -242,20 +292,29 @@ function TherapistCard({ t, onBook }) {
           )}
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="truncate text-base font-semibold text-gray-900">{name}</div>
           <div className="truncate text-sm text-gray-600">Qualification: {qualification}</div>
           <div className="mt-1 text-sm font-semibold text-gray-800">
             Price per session: <span className="text-gray-700">{price}</span>
           </div>
+
+          {unavailable && (
+            <div className="mt-2 inline-flex items-center rounded-full border border-yellow-200 bg-yellow-50 px-2.5 py-1 text-xs font-semibold text-yellow-700">
+              Unavailable
+            </div>
+          )}
         </div>
       </div>
 
       <button
         onClick={onBook}
-        className="mt-4 w-full rounded bg-[#4a6cf7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
+        disabled={unavailable}
+        className={`mt-4 w-full rounded px-4 py-2 text-sm font-semibold text-white ${
+          unavailable ? "cursor-not-allowed bg-gray-300" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+        }`}
       >
-        Book Now
+        {unavailable ? "Unavailable" : "Book Now"}
       </button>
     </div>
   );
@@ -263,6 +322,7 @@ function TherapistCard({ t, onBook }) {
 
 function BookModal({
   therapistName,
+  unavailable,
   date,
   time,
   setDate,
@@ -295,82 +355,89 @@ function BookModal({
           </button>
         </div>
 
-        <div className="mt-5 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Select date</label>
-            <input
-              type="date"
-              value={date}
-              min={todayISO()}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-2 w-full rounded border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            />
+        {unavailable ? (
+          <div className="mt-5 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
+            This therapist is currently <span className="font-semibold">unavailable</span>. Please choose another
+            therapist.
           </div>
+        ) : (
+          <>
+            <div className="mt-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Select date</label>
+                <input
+                  type="date"
+                  value={date}
+                  min={todayISO()}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="mt-2 w-full rounded border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
 
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">Select time</label>
-              <span className="text-xs text-gray-500">Only available slots are shown</span>
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-700">Select time</label>
+                  <span className="text-xs text-gray-500">Only available slots are shown</span>
+                </div>
+
+                {!date ? (
+                  <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+                    Pick a date to see available time slots.
+                  </div>
+                ) : slotsLoading ? (
+                  <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+                    Loading availability...
+                  </div>
+                ) : noSlots ? (
+                  <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+                    No available time slots for this date.
+                  </div>
+                ) : (
+                  <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {availableTimes.map((t) => {
+                      const active = t === time;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setTime(t)}
+                          className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+                            active
+                              ? "border-blue-200 bg-blue-50 text-blue-700"
+                              : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {!date ? (
-              <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
-                Pick a date to see available time slots.
-              </div>
-            ) : slotsLoading ? (
-              <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
-                Loading availability...
-              </div>
-            ) : noSlots ? (
-              <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
-                No available time slots for this date.
-              </div>
-            ) : (
-              <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {availableTimes.map((t) => {
-                  const active = t === time;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setTime(t)}
-                      className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
-                        active
-                          ? "border-blue-200 bg-blue-50 text-blue-700"
-                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
 
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="button"
-            onClick={onBook}
-            disabled={booking || !date || !time}
-            className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
-              booking || !date || !time
-                ? "bg-blue-300 cursor-not-allowed"
-                : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
-            }`}
-          >
-            {booking ? "Booking..." : "Confirm Booking"}
-          </button>
-        </div>
+              <button
+                type="button"
+                onClick={onBook}
+                disabled={booking || !date || !time}
+                className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
+                  booking || !date || !time ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+                }`}
+              >
+                {booking ? "Booking..." : "Confirm Booking"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

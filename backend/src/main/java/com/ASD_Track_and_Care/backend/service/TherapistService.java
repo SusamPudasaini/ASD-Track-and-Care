@@ -2,16 +2,13 @@ package com.ASD_Track_and_Care.backend.service;
 
 import com.ASD_Track_and_Care.backend.dto.TherapistCardResponse;
 import com.ASD_Track_and_Care.backend.dto.UpdateTherapistSettingsRequest;
-import com.ASD_Track_and_Care.backend.model.AvailabilityDay;
-import com.ASD_Track_and_Care.backend.model.Booking;
-import com.ASD_Track_and_Care.backend.model.Role;
-import com.ASD_Track_and_Care.backend.model.TherapistTimeSlot;
-import com.ASD_Track_and_Care.backend.model.User;
+import com.ASD_Track_and_Care.backend.model.*;
 import com.ASD_Track_and_Care.backend.repository.BookingRepository;
 import com.ASD_Track_and_Care.backend.repository.TherapistTimeSlotRepository;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -53,17 +50,7 @@ public class TherapistService {
         }).collect(Collectors.toList());
     }
 
-    /**
-     * ✅ Therapist saves price + time slots (day -> times)
-     * Expected request body:
-     * {
-     *   "pricePerSession": 20,
-     *   "availability": {
-     *      "Sunday": ["09:00","09:30"],
-     *      "Monday": ["10:00"]
-     *   }
-     * }
-     */
+    @Transactional
     public User updateMyTherapistSettings(Authentication authentication, UpdateTherapistSettingsRequest req) {
         User me = requireAuth(authentication);
 
@@ -75,45 +62,53 @@ public class TherapistService {
             throw new RuntimeException("pricePerSession must be greater than 0.");
         }
 
-        // ✅ DTO provides Map<String, List<String>>
+        // ✅ normalize Map<String,List<String>> -> Map<AvailabilityDay,List<String>>
         Map<AvailabilityDay, List<String>> normalized = normalizeAvailability(req.getAvailability());
-        int totalSlots = normalized.values().stream().mapToInt(List::size).sum();
-        if (totalSlots == 0) {
-            throw new RuntimeException("Select at least one valid time slot.");
-        }
 
-        // Save price
+        // ✅ allow empty totalSlots: means "therapist not available"
+        int totalSlots = normalized.values().stream().mapToInt(List::size).sum();
+
         me.setPricePerSession(req.getPricePerSession());
 
-        // Replace all existing slots
+        // ✅ always clear existing
         timeSlotRepository.deleteAllByTherapistId(me.getId());
 
-        List<TherapistTimeSlot> toSave = new ArrayList<>();
-        Set<AvailabilityDay> daysWithAnySlots = new HashSet<>();
+        // ✅ hard dedupe on insert list (prevents duplicate key in same request)
+        if (totalSlots > 0) {
+            Set<String> seen = new HashSet<>();
+            List<TherapistTimeSlot> toSave = new ArrayList<>();
+            Set<AvailabilityDay> daysWithAnySlots = new HashSet<>();
 
-        for (Map.Entry<AvailabilityDay, List<String>> e : normalized.entrySet()) {
-            AvailabilityDay day = e.getKey();
-            List<String> times = e.getValue();
+            for (Map.Entry<AvailabilityDay, List<String>> e : normalized.entrySet()) {
+                AvailabilityDay day = e.getKey();
+                List<String> times = (e.getValue() == null) ? List.of() : e.getValue();
 
-            for (String t : times) {
-                toSave.add(new TherapistTimeSlot(me.getId(), day, t));
+                for (String t : times) {
+                    if (t == null) continue;
+                    String time = t.trim();
+                    if (time.isBlank()) continue;
+
+                    String key = me.getId() + "|" + day.name() + "|" + time;
+                    if (seen.add(key)) {
+                        toSave.add(new TherapistTimeSlot(me.getId(), day, time));
+                        daysWithAnySlots.add(day);
+                    }
+                }
             }
-            if (!times.isEmpty()) {
-                daysWithAnySlots.add(day);
+
+            if (!toSave.isEmpty()) {
+                timeSlotRepository.saveAll(toSave);
             }
+
+            me.setAvailableDays(daysWithAnySlots);
+        } else {
+            // no slots => not available
+            me.setAvailableDays(Collections.emptySet());
         }
-
-        timeSlotRepository.saveAll(toSave);
-
-        // Keep User.availableDays synced (derived from slots)
-        me.setAvailableDays(daysWithAnySlots);
 
         return userRepository.save(me);
     }
 
-    /**
-     * ✅ User picks a date -> return therapist slots for that weekday minus already booked times
-     */
     public List<String> getAvailableSlotsForDate(Long therapistId, LocalDate date) {
         User t = userRepository.findById(therapistId)
                 .orElseThrow(() -> new RuntimeException("Therapist not found"));
@@ -137,7 +132,6 @@ public class TherapistService {
 
         if (baseSlots.isEmpty()) return List.of();
 
-        // Remove already booked times
         List<Booking> bookings = bookingRepository.findAllByTherapistIdAndDate(therapistId, date);
         Set<String> bookedTimes = bookings.stream()
                 .map(Booking::getTime)
@@ -160,10 +154,6 @@ public class TherapistService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
-    /**
-     * ✅ Converts Map<String, List<String>> (JSON keys)
-     * -> Map<AvailabilityDay, List<String>> (strongly typed)
-     */
     private Map<AvailabilityDay, List<String>> normalizeAvailability(Map<String, List<String>> in) {
         Map<AvailabilityDay, List<String>> out = new EnumMap<>(AvailabilityDay.class);
         if (in == null) return out;
@@ -186,17 +176,20 @@ public class TherapistService {
                     .sorted()
                     .collect(Collectors.toList());
 
-            if (!cleaned.isEmpty()) out.put(day, cleaned);
+            if (!cleaned.isEmpty()) {
+                out.merge(day, cleaned, (a, b) -> {
+                    Set<String> merged = new LinkedHashSet<>(a);
+                    merged.addAll(b);
+                    return merged.stream().sorted().collect(Collectors.toList());
+                });
+            }
         }
 
         return out;
     }
 
     private AvailabilityDay parseDay(String s) {
-        try {
-            return AvailabilityDay.valueOf(s);
-        } catch (Exception ignored) { }
-
+        try { return AvailabilityDay.valueOf(s); } catch (Exception ignored) {}
         String k = s.toLowerCase();
         return switch (k) {
             case "sunday" -> AvailabilityDay.Sunday;
@@ -223,7 +216,6 @@ public class TherapistService {
     }
 
     private boolean isValidSlotTime(String time) {
-        // HH:mm, 09:00–18:00, step 30 min
         try {
             String[] p = time.split(":");
             if (p.length != 2) return false;

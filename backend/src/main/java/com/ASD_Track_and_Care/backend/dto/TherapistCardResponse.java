@@ -18,6 +18,11 @@ public class TherapistCardResponse {
         this.pricePerSession = pricePerSession;
         this.profilePictureUrl = profilePictureUrl;
     }
+    
+    private boolean available;
+    public boolean isAvailable(){ return available; }
+    public void setAvailable(boolean available){ this.available = available; }
+
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

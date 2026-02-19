@@ -25,6 +25,22 @@ function buildTimeSlots() {
 }
 const TIME_SLOTS = buildTimeSlots();
 
+function isValidSlotTime(time) {
+  try {
+    const [hh, mm] = String(time).split(":");
+    const h = Number(hh);
+    const m = Number(mm);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
+    if (!(m === 0 || m === 30)) return false;
+    if (h < 9) return false;
+    if (h > 18) return false;
+    if (h === 18 && m !== 0) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function normalizeAvailability(inMap) {
   // backend returns map keys as strings "Sunday" etc.
   if (!inMap || typeof inMap !== "object") return {};
@@ -41,22 +57,6 @@ function normalizeAvailability(inMap) {
     if (clean.length) out[day] = clean;
   }
   return out;
-}
-
-function isValidSlotTime(time) {
-  try {
-    const [hh, mm] = String(time).split(":");
-    const h = Number(hh);
-    const m = Number(mm);
-    if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
-    if (!(m === 0 || m === 30)) return false;
-    if (h < 9) return false;
-    if (h > 18) return false;
-    if (h === 18 && m !== 0) return false;
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export default function Profile() {
@@ -128,7 +128,7 @@ export default function Profile() {
           phoneNumber: u.phoneNumber || "",
         });
 
-        // ✅ keep therapist fields in sync from backend
+        // ✅ keep therapist fields in sync from backend (if backend sends it)
         const avail = normalizeAvailability(u.availability);
         setTherapistForm({
           pricePerSession:
@@ -280,16 +280,19 @@ export default function Profile() {
     });
   };
 
+  // ✅ UPDATED: allow saving even if totalSlots === 0
   const saveTherapistProfile = async () => {
-    const price = therapistForm.pricePerSession?.toString().trim();
+    if (therapistSaving) return; // prevents double submit
 
+    const price = therapistForm.pricePerSession?.toString().trim();
     if (!price) return toast.error("Price per session is required.");
+
     const priceNum = Number(price);
     if (Number.isNaN(priceNum) || priceNum <= 0) return toast.error("Enter a valid price.");
 
     const availability = therapistForm.availability || {};
+    // totalSlots may be 0 => backend should interpret as "not available"
     const totalSlots = Object.values(availability).reduce((acc, arr) => acc + (arr?.length || 0), 0);
-    if (totalSlots === 0) return toast.error("Select at least one available time slot.");
 
     try {
       setTherapistSaving(true);
@@ -299,7 +302,7 @@ export default function Profile() {
         availability,
       });
 
-      toast.success("Therapist settings updated.");
+      toast.success(totalSlots === 0 ? "Saved. You are marked as not available." : "Therapist settings updated.");
 
       // backend returns ProfileResponse
       const updated = res?.data || {};
@@ -309,11 +312,10 @@ export default function Profile() {
       const avail = normalizeAvailability(updated.availability);
       setTherapistForm({
         pricePerSession:
-          updated.pricePerSession === null || updated.pricePerSession === undefined
-            ? ""
-            : String(updated.pricePerSession),
+          updated.pricePerSession === null || updated.pricePerSession === undefined ? "" : String(updated.pricePerSession),
         availability: avail,
       });
+
       const firstDayWithSlots = DAYS.find((d) => (avail?.[d] || []).length > 0);
       setSelectedDay(firstDayWithSlots || selectedDay);
     } catch (err) {
@@ -324,7 +326,7 @@ export default function Profile() {
     }
   };
 
-  // Reset password (unchanged)
+  // Reset password
   const sendResetPasswordLink = async () => {
     if (!form.userEmail?.trim()) {
       toast.error("Email not found on your profile.");
@@ -437,26 +439,11 @@ export default function Profile() {
               <Field label="Email" value={form.userEmail} disabled hint="Email cannot be changed." />
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field
-                  label="First Name"
-                  value={form.firstName}
-                  onChange={(v) => onChange("firstName", v)}
-                  placeholder="e.g., John"
-                />
-                <Field
-                  label="Last Name"
-                  value={form.lastName}
-                  onChange={(v) => onChange("lastName", v)}
-                  placeholder="e.g., Doe"
-                />
+                <Field label="First Name" value={form.firstName} onChange={(v) => onChange("firstName", v)} placeholder="e.g., John" />
+                <Field label="Last Name" value={form.lastName} onChange={(v) => onChange("lastName", v)} placeholder="e.g., Doe" />
               </div>
 
-              <Field
-                label="Phone Number"
-                value={form.phoneNumber}
-                onChange={(v) => onChange("phoneNumber", v)}
-                placeholder="e.g., +97798XXXXXXXX"
-              />
+              <Field label="Phone Number" value={form.phoneNumber} onChange={(v) => onChange("phoneNumber", v)} placeholder="e.g., +97798XXXXXXXX" />
 
               <div className="flex gap-3">
                 <button
@@ -485,7 +472,17 @@ export default function Profile() {
         {!loading && isTherapist && (
           <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-semibold text-gray-900">Therapist Settings</h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-gray-900">Therapist Settings</h2>
+
+                {/* ✅ Not available badge if 0 slots */}
+                {totalSlotsSelected === 0 && (
+                  <span className="rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700">
+                    Not available
+                  </span>
+                )}
+              </div>
+
               <p className="text-sm text-gray-600">Pick a day → edit its slots. Saved slots stay green.</p>
             </div>
 
@@ -549,14 +546,14 @@ export default function Profile() {
                     <div className="mt-2 text-sm text-gray-600">No times selected for this day.</div>
                   ) : (
                     <div className="mt-2 flex flex-wrap gap-2">
-                  {selectedTimesForDay.map((t) => (
-                    <span
-                      key={t}
-                      className="rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700"
-                    >
-                      {t}
-                    </span>
-                  ))}
+                      {selectedTimesForDay.map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700"
+                        >
+                          {t}
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -616,8 +613,7 @@ export default function Profile() {
             </div>
 
             <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
-              Check your email for the <span className="font-semibold">reset link</span> and follow the instructions
-              after pressing the button below.
+              Check your email for the <span className="font-semibold">reset link</span> and follow the instructions after pressing the button below.
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
@@ -657,8 +653,7 @@ function SlotsModal({ day, selectedTimes, onClose, onToggle, onSelectAll, onClea
           <div>
             <h2 className="text-base font-semibold text-gray-900">Edit availability</h2>
             <p className="mt-1 text-sm text-gray-600">
-              Day: <span className="font-semibold">{day}</span> ·{" "}
-              <span className="font-semibold">{selectedTimes.size}</span> selected
+              Day: <span className="font-semibold">{day}</span> · <span className="font-semibold">{selectedTimes.size}</span> selected
             </p>
           </div>
 
@@ -698,9 +693,7 @@ function SlotsModal({ day, selectedTimes, onClose, onToggle, onSelectAll, onClea
                 type="button"
                 onClick={() => onToggle(t)}
                 className={`rounded-lg border px-3 py-2 text-center text-xs font-semibold ${
-                  active
-                    ? "border-green-200 bg-green-50 text-green-700"
-                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  active ? "border-green-200 bg-green-50 text-green-700" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                 }`}
               >
                 {t}
@@ -733,7 +726,9 @@ function Field({ label, value, onChange, placeholder, disabled, hint }) {
         onChange={(e) => onChange?.(e.target.value)}
         placeholder={placeholder}
         className={`mt-2 w-full rounded border px-4 py-2.5 text-sm outline-none focus:ring-1 ${
-          disabled ? "border-gray-200 bg-gray-50 text-gray-500" : "border-gray-200 bg-white focus:border-blue-500 focus:ring-blue-500"
+          disabled
+            ? "border-gray-200 bg-gray-50 text-gray-500"
+            : "border-gray-200 bg-white focus:border-blue-500 focus:ring-blue-500"
         }`}
       />
       {!!hint && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
