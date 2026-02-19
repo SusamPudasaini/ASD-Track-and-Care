@@ -8,15 +8,13 @@ public class CreateBookingRequest {
     @NotNull(message = "therapistId is required")
     private Long therapistId;
 
-    // "YYYY-MM-DD"
-    @NotBlank(message = "date is required")
+    @NotBlank(message = "date is required") // YYYY-MM-DD
     private String date;
 
-    // "HH:mm"
-    @NotBlank(message = "time is required")
+    @NotBlank(message = "time is required") // HH:mm
     private String time;
 
-    // optional for now
+    // for future Khalti integration
     private String pidx;
 
     public Long getTherapistId() { return therapistId; }

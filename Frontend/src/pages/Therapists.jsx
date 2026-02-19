@@ -4,11 +4,8 @@ import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 
-// ✅ endpoints (adjust if needed)
-const THERAPISTS_ENDPOINT = "/api/therapists"; // GET list
-const KHALTI_INITIATE_ENDPOINT = "/api/payments/khalti/initiate"; // POST { amount, bookingMeta }
-const KHALTI_VERIFY_ENDPOINT = "/api/payments/khalti/verify"; // POST { pidx }
-const CREATE_BOOKING_ENDPOINT = "/api/bookings"; // POST { therapistId, date, time, pidx }
+const THERAPISTS_ENDPOINT = "/api/therapists"; // GET
+const CREATE_BOOKING_ENDPOINT = "/api/bookings"; // POST { therapistId, date, time }
 
 const TIMES = [
   "09:00", "09:30",
@@ -23,6 +20,24 @@ const TIMES = [
   "18:00",
 ];
 
+function getErrorMessage(err) {
+  const data = err?.response?.data;
+  if (!data) return "Something went wrong.";
+  if (typeof data === "string") return data;
+  if (typeof data === "object") {
+    if (data.message) return data.message;
+    if (data.error) return data.error;
+    if (data.title) return data.title;
+    if (data.status && data.path) return `${data.error || "Request failed"} (${data.status})`;
+    try {
+      return JSON.stringify(data);
+    } catch {
+      return "Something went wrong.";
+    }
+  }
+  return String(data);
+}
+
 export default function Therapists() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -33,7 +48,7 @@ export default function Therapists() {
   const [selectedTherapist, setSelectedTherapist] = useState(null);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [paying, setPaying] = useState(false);
+  const [booking, setBooking] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -44,12 +59,11 @@ export default function Therapists() {
         const res = await api.get(THERAPISTS_ENDPOINT);
         if (!mounted) return;
 
-        // Expecting array. If your backend wraps it {data: []}, adjust here.
         const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
         setTherapists(list);
       } catch (err) {
         console.error("LOAD THERAPISTS ERROR:", err?.response?.status, err?.response?.data);
-        toast.error(err?.response?.data?.message || "Could not load therapists.");
+        toast.error(getErrorMessage(err) || "Could not load therapists.");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -71,86 +85,36 @@ export default function Therapists() {
     setSelectedTherapist(null);
   };
 
-  const selectedAmountPaisa = useMemo(() => {
-    // Khalti amount is in paisa (NPR * 100).
-    // If your backend uses USD or another currency, change this.
-    const price = Number(selectedTherapist?.pricePerSession ?? selectedTherapist?.sessionPrice ?? 0);
-    return Math.round(price * 100);
+  const therapistName = useMemo(() => {
+    if (!selectedTherapist) return "";
+    return selectedTherapist.name || selectedTherapist.fullName || "Therapist";
   }, [selectedTherapist]);
 
-  const validateBooking = () => {
-    if (!selectedTherapist) return toast.error("Select a therapist first.");
+  const createBooking = async () => {
+    if (!selectedTherapist) return toast.error("Pick a therapist first.");
     if (!date) return toast.error("Select a date.");
     if (!time) return toast.error("Select a time.");
-    return true;
-  };
 
-  /**
-   * ✅ Khalti web flow:
-   * 1) POST initiate => returns { payment_url, pidx }
-   * 2) redirect user to payment_url (Khalti)
-   * 3) Khalti redirects back to your frontend (return_url) with pidx
-   * 4) verify pidx on backend
-   * 5) create booking
-   *
-   * Here we do the simplest UX:
-   * - initiate payment
-   * - open Khalti payment_url in same tab
-   * - save "pending booking" in localStorage
-   * - after redirect back, user lands on /payment/success which verifies & creates booking
-   */
-  const payAndBook = async () => {
-    if (!validateBooking()) return;
+    const therapistId = selectedTherapist.id || selectedTherapist.therapistId;
+    if (!therapistId) return toast.error("Therapist id missing.");
 
     try {
-      setPaying(true);
+      setBooking(true);
 
-      const therapistId = selectedTherapist.id || selectedTherapist.therapistId;
-      const therapistName = selectedTherapist.name || selectedTherapist.fullName || "Therapist";
-
-      if (!therapistId) {
-        toast.error("Therapist ID missing from API response.");
-        return;
-      }
-      if (!selectedAmountPaisa || selectedAmountPaisa <= 0) {
-        toast.error("Invalid price for session.");
-        return;
-      }
-
-      // save booking draft so we can finish after khalti redirect
-      const draft = {
+      await api.post(CREATE_BOOKING_ENDPOINT, {
         therapistId,
-        therapistName,
         date,
         time,
-        amountPaisa: selectedAmountPaisa,
-      };
-
-      // 1) initiate payment
-      const initRes = await api.post(KHALTI_INITIATE_ENDPOINT, {
-        amount: selectedAmountPaisa,
-        bookingMeta: draft,
-        // backend should set return_url to something like:
-        // http://localhost:5173/payment/success
       });
 
-      const paymentUrl = initRes?.data?.payment_url || initRes?.data?.paymentUrl;
-      const pidx = initRes?.data?.pidx;
-
-      if (!paymentUrl || !pidx) {
-        toast.error("Payment initiation failed (missing payment_url/pidx).");
-        return;
-      }
-
-      localStorage.setItem("pending_booking", JSON.stringify({ ...draft, pidx }));
-
-      // 2) redirect to Khalti
-      window.location.href = paymentUrl;
+      toast.success("Booking placed!");
+      closeBook();
+      navigate("/bookings");
     } catch (err) {
-      console.error("PAY INIT ERROR:", err?.response?.status, err?.response?.data);
-      toast.error(err?.response?.data?.message || err?.response?.data || "Failed to start payment.");
+      console.error("CREATE BOOKING ERROR:", err?.response?.status, err?.response?.data);
+      toast.error(getErrorMessage(err) || "Booking failed.");
     } finally {
-      setPaying(false);
+      setBooking(false);
     }
   };
 
@@ -192,17 +156,16 @@ export default function Therapists() {
         </div>
       </main>
 
-      {/* Book Modal */}
       {open && (
         <BookModal
-          therapist={selectedTherapist}
+          therapistName={therapistName}
           date={date}
           time={time}
           setDate={setDate}
           setTime={setTime}
           onClose={closeBook}
-          onPay={payAndBook}
-          paying={paying}
+          onBook={createBooking}
+          booking={booking}
         />
       )}
     </div>
@@ -247,13 +210,7 @@ function TherapistCard({ t, onBook }) {
   );
 }
 
-function BookModal({ therapist, date, time, setDate, setTime, onClose, onPay, paying }) {
-  const name =
-    therapist?.name ||
-    therapist?.fullName ||
-    `${therapist?.firstName || ""} ${therapist?.lastName || ""}`.trim() ||
-    "Therapist";
-
+function BookModal({ therapistName, date, time, setDate, setTime, onClose, onBook, booking }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg">
@@ -261,7 +218,7 @@ function BookModal({ therapist, date, time, setDate, setTime, onClose, onPay, pa
           <div>
             <h2 className="text-base font-semibold text-gray-900">Book a session</h2>
             <p className="mt-1 text-sm text-gray-600">
-              Therapist: <span className="font-semibold">{name}</span>
+              Therapist: <span className="font-semibold">{therapistName}</span>
             </p>
           </div>
 
@@ -283,7 +240,6 @@ function BookModal({ therapist, date, time, setDate, setTime, onClose, onPay, pa
               onChange={(e) => setDate(e.target.value)}
               className="mt-2 w-full rounded border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
-            <p className="mt-1 text-xs text-gray-500">Pick your preferred session date.</p>
           </div>
 
           <div>
@@ -325,18 +281,14 @@ function BookModal({ therapist, date, time, setDate, setTime, onClose, onPay, pa
 
           <button
             type="button"
-            onClick={onPay}
-            disabled={paying}
+            onClick={onBook}
+            disabled={booking}
             className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
-              paying ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+              booking ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
             }`}
           >
-            {paying ? "Redirecting..." : "Pay with Khalti & Book"}
+            {booking ? "Booking..." : "Confirm Booking"}
           </button>
-        </div>
-
-        <div className="mt-3 text-xs text-gray-500">
-          You’ll be redirected to Khalti to complete payment.
         </div>
       </div>
     </div>
