@@ -10,7 +10,6 @@ const TABS = [
   { key: "CANCELLED", label: "Cancelled" },
 ];
 
-// ✅ Always convert backend errors to a string (prevents React object render crash)
 function getErrorMessage(err) {
   const data = err?.response?.data;
 
@@ -21,10 +20,7 @@ function getErrorMessage(err) {
     if (data.message) return data.message;
     if (data.error) return data.error;
     if (data.title) return data.title;
-
-    // Spring default error keys: timestamp/status/error/path
     if (data.status && data.path) return `${data.error || "Request failed"} (${data.status})`;
-
     try {
       return JSON.stringify(data);
     } catch {
@@ -60,11 +56,9 @@ function toTitle(s = "") {
 
 function statusPill(status) {
   const s = String(status || "").toUpperCase();
-
   if (s === "PENDING") return "bg-amber-50 text-amber-700 border-amber-200";
   if (s === "CONFIRMED") return "bg-green-50 text-green-700 border-green-200";
   if (s === "CANCELLED") return "bg-red-50 text-red-700 border-red-200";
-
   return "bg-gray-50 text-gray-700 border-gray-200";
 }
 
@@ -80,6 +74,11 @@ export default function TherapistDashboardBookings() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsRow, setDetailsRow] = useState(null);
 
+  // ✅ Cancel reason modal
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelBooking, setCancelBooking] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+
   const tabLabel = useMemo(
     () => TABS.find((t) => t.key === activeStatus)?.label || activeStatus,
     [activeStatus]
@@ -91,23 +90,19 @@ export default function TherapistDashboardBookings() {
 
       // GET /api/bookings/therapist/me
       const res = await api.get("/api/bookings/therapist/me", { signal });
-
       const arr = Array.isArray(res.data) ? res.data : [];
 
-      // Filter client-side by tab status
       const filtered = arr.filter((b) => String(b?.status || "").toUpperCase() === activeStatus);
       setItems(filtered);
     } catch (err) {
       if (err?.name === "CanceledError") return;
 
       const code = err?.response?.status;
-
       if (code === 401) {
         toast.error("Session expired. Please login again.");
         navigate("/logout", { replace: true });
         return;
       }
-
       if (code === 403) {
         toast.error("Access denied (Therapists only).");
         navigate("/", { replace: true });
@@ -159,6 +154,19 @@ export default function TherapistDashboardBookings() {
     setDetailsRow(null);
   };
 
+  // ---------------- Cancel Modal ----------------
+  const openCancel = (booking) => {
+    setCancelBooking(booking);
+    setCancelReason("");
+    setCancelOpen(true);
+  };
+
+  const closeCancel = () => {
+    setCancelOpen(false);
+    setCancelBooking(null);
+    setCancelReason("");
+  };
+
   // ---------------- Actions ----------------
   const approveBooking = async (booking) => {
     if (!booking?.id) return;
@@ -168,12 +176,9 @@ export default function TherapistDashboardBookings() {
       await api.put(`/api/bookings/${booking.id}/approve`);
       toast.success("Booking approved.");
       await refresh();
-
-      // if modal is open, close it (optional)
       if (detailsOpen) closeDetails();
     } catch (err) {
       const code = err?.response?.status;
-
       if (code === 401) {
         toast.error("Session expired. Please login again.");
         navigate("/logout", { replace: true });
@@ -184,7 +189,6 @@ export default function TherapistDashboardBookings() {
         navigate("/", { replace: true });
         return;
       }
-
       console.error("APPROVE ERROR:", code, err?.response?.data);
       toast.error(getErrorMessage(err));
     } finally {
@@ -192,19 +196,23 @@ export default function TherapistDashboardBookings() {
     }
   };
 
-  const declineBooking = async (booking) => {
-    if (!booking?.id) return;
+  // ✅ Confirm cancel (send reason)
+  const confirmCancel = async () => {
+    if (!cancelBooking?.id) return;
 
     try {
-      setActionId(booking.id);
-      await api.put(`/api/bookings/${booking.id}/decline`);
-      toast.success("Booking cancelled.");
-      await refresh();
+      setActionId(cancelBooking.id);
 
+      await api.put(`/api/bookings/${cancelBooking.id}/decline`, {
+        message: cancelReason.trim() || null,
+      });
+
+      toast.success("Booking cancelled.");
+      closeCancel();
+      await refresh();
       if (detailsOpen) closeDetails();
     } catch (err) {
       const code = err?.response?.status;
-
       if (code === 401) {
         toast.error("Session expired. Please login again.");
         navigate("/logout", { replace: true });
@@ -215,16 +223,14 @@ export default function TherapistDashboardBookings() {
         navigate("/", { replace: true });
         return;
       }
-
-      console.error("DECLINE ERROR:", code, err?.response?.data);
+      console.error("CANCEL ERROR:", code, err?.response?.data);
       toast.error(getErrorMessage(err));
     } finally {
       setActionId(null);
     }
   };
 
-  // ✅ NEW: Mark as Pending (for confirmed/cancelled mistakes)
-  // Requires backend endpoint: PUT /api/bookings/{id}/mark-pending
+  // ✅ Mark as Pending (for confirmed/cancelled mistakes)
   const markPending = async (booking) => {
     if (!booking?.id) return;
 
@@ -233,7 +239,6 @@ export default function TherapistDashboardBookings() {
       await api.put(`/api/bookings/${booking.id}/mark-pending`);
       toast.success("Marked as pending.");
       await refresh();
-
       if (detailsOpen) closeDetails();
     } catch (err) {
       const code = err?.response?.status;
@@ -270,7 +275,7 @@ export default function TherapistDashboardBookings() {
             <div>
               <h1 className="text-xl font-semibold text-gray-900">Therapist — Booking Requests</h1>
               <p className="mt-2 text-sm text-gray-600">
-                Review booking requests. Approve pending requests to confirm sessions, or cancel requests if needed.
+                Review booking requests. Approve pending requests to confirm sessions, cancel with a reason, or revert using Mark Pending.
               </p>
             </div>
 
@@ -408,7 +413,7 @@ export default function TherapistDashboardBookings() {
 
                                 <button
                                   type="button"
-                                  onClick={() => declineBooking(b)}
+                                  onClick={() => openCancel(b)}
                                   disabled={actionId === b.id}
                                   className={`rounded px-3 py-2 text-xs font-semibold text-white ${
                                     actionId === b.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
@@ -421,7 +426,7 @@ export default function TherapistDashboardBookings() {
                               <>
                                 <button
                                   type="button"
-                                  onClick={() => declineBooking(b)}
+                                  onClick={() => openCancel(b)}
                                   disabled={actionId === b.id}
                                   className={`rounded px-3 py-2 text-xs font-semibold text-white ${
                                     actionId === b.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
@@ -467,12 +472,11 @@ export default function TherapistDashboardBookings() {
 
               {activeStatus === "PENDING" ? (
                 <p className="mt-4 text-xs text-gray-500">
-                  Tip: Approving will confirm the session. Cancelling will move it to{" "}
-                  <span className="font-semibold">Cancelled</span>.
+                  Tip: Approving confirms the session. Cancelling emails the user your reason.
                 </p>
               ) : (
                 <p className="mt-4 text-xs text-gray-500">
-                  Tip: If an action was done by mistake, use <span className="font-semibold">Mark Pending</span> to revert.
+                  Tip: Use <span className="font-semibold">Mark Pending</span> to revert mistakes.
                 </p>
               )}
             </div>
@@ -546,7 +550,7 @@ export default function TherapistDashboardBookings() {
 
                   <button
                     type="button"
-                    onClick={() => declineBooking(d)}
+                    onClick={() => openCancel(d)}
                     disabled={actionId === d?.id}
                     className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
                       actionId === d?.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
@@ -571,7 +575,7 @@ export default function TherapistDashboardBookings() {
                   {String(d?.status || "").toUpperCase() === "CONFIRMED" ? (
                     <button
                       type="button"
-                      onClick={() => declineBooking(d)}
+                      onClick={() => openCancel(d)}
                       disabled={actionId === d?.id}
                       className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
                         actionId === d?.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
@@ -589,6 +593,61 @@ export default function TherapistDashboardBookings() {
                 className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ CANCEL MODAL */}
+      {cancelOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Cancel Booking</h2>
+                <p className="mt-1 text-sm text-gray-600">This will cancel the booking and email the user your reason.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeCancel}
+                className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">Reason (optional but recommended)</label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={5}
+                className="mt-2 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                placeholder="Example: I’m unavailable due to an emergency. Please reschedule for another day."
+              />
+              <p className="mt-2 text-xs text-gray-500">Keep it short and clear.</p>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeCancel}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Back
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmCancel}
+                disabled={actionId === cancelBooking?.id}
+                className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
+                  actionId === cancelBooking?.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+                }`}
+              >
+                {actionId === cancelBooking?.id ? "Working..." : "Confirm Cancel"}
               </button>
             </div>
           </div>

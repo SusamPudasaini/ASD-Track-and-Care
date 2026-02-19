@@ -22,15 +22,18 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final TherapistTimeSlotRepository timeSlotRepository;
+    private final EmailService emailService;
 
     public BookingService(
             BookingRepository bookingRepository,
             UserRepository userRepository,
-            TherapistTimeSlotRepository timeSlotRepository
+            TherapistTimeSlotRepository timeSlotRepository,
+            EmailService emailService
     ) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.timeSlotRepository = timeSlotRepository;
+        this.emailService = emailService;
     }
 
     public BookingResponse createBooking(Authentication auth, CreateBookingRequest req) {
@@ -64,12 +67,14 @@ public class BookingService {
         b.setDate(date);
         b.setTime(time);
 
-        // ✅ NEW FLOW
         b.setStatus(BookingStatus.PENDING);
 
         if (req.getPidx() != null && !req.getPidx().isBlank()) {
             b.setKhaltiPidx(req.getPidx().trim());
         }
+
+        // new booking => clear any message
+        b.setTherapistMessage(null);
 
         bookingRepository.save(b);
 
@@ -87,7 +92,6 @@ public class BookingService {
         }).collect(Collectors.toList());
     }
 
-    // ✅ Therapist dashboard list -> include user details
     public List<BookingResponse> therapistBookings(Authentication auth) {
         User therapist = getUserFromAuth(auth);
 
@@ -137,14 +141,21 @@ public class BookingService {
         }
 
         b.setStatus(BookingStatus.CONFIRMED);
+
+        // ✅ optional: clear previous cancel reason when confirming again
+        b.setTherapistMessage(null);
+
         bookingRepository.save(b);
 
         User booker = userRepository.findById(b.getUserId()).orElse(null);
         return toResponseForTherapistView(b, therapist, booker);
     }
 
-    // ✅ Therapist declines/cancels -> CANCELLED
-    public BookingResponse decline(Authentication auth, Long bookingId) {
+    /**
+     * ✅ Therapist declines/cancels -> CANCELLED (WITH MESSAGE)
+     * message is optional, but will be stored and emailed.
+     */
+    public BookingResponse decline(Authentication auth, Long bookingId, String therapistMessage) {
         User therapist = getUserFromAuth(auth);
 
         if (therapist.getRole() != Role.THERAPIST) {
@@ -158,19 +169,42 @@ public class BookingService {
             throw new RuntimeException("Not allowed");
         }
 
-        if (b.getStatus() == BookingStatus.CANCELLED) {
-            User booker = userRepository.findById(b.getUserId()).orElse(null);
-            return toResponseForTherapistView(b, therapist, booker);
+        String msg = (therapistMessage == null || therapistMessage.trim().isEmpty())
+                ? null
+                : therapistMessage.trim();
+
+        // store message (even if already cancelled, allow updating message)
+        b.setTherapistMessage(msg);
+
+        if (b.getStatus() != BookingStatus.CANCELLED) {
+            b.setStatus(BookingStatus.CANCELLED);
         }
 
-        b.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(b);
 
         User booker = userRepository.findById(b.getUserId()).orElse(null);
+
+        // ✅ email user if we can
+        if (booker != null && booker.getUserEmail() != null && !booker.getUserEmail().isBlank()) {
+            String therapistName = (therapist.getFirstName() + " " + therapist.getLastName()).trim();
+            emailService.sendBookingCancelledEmail(
+                    booker.getUserEmail(),
+                    therapistName,
+                    b.getDate() == null ? null : b.getDate().toString(),
+                    b.getTime(),
+                    msg
+            );
+        }
+
         return toResponseForTherapistView(b, therapist, booker);
     }
 
-    // ✅ NEW: Therapist can revert CONFIRMED/CANCELLED -> PENDING
+    // ✅ keep your old signature too (optional safety if something still calls it)
+    public BookingResponse decline(Authentication auth, Long bookingId) {
+        return decline(auth, bookingId, null);
+    }
+
+    // ✅ Therapist can revert CONFIRMED/CANCELLED -> PENDING
     public BookingResponse markPending(Authentication auth, Long bookingId) {
         User therapist = getUserFromAuth(auth);
 
@@ -190,12 +224,15 @@ public class BookingService {
             return toResponseForTherapistView(b, therapist, booker);
         }
 
-        // ✅ safety: if you mark pending, make sure slot isn't already taken by another active booking
         if (existsOtherActiveBookingForTherapistSlot(b.getId(), b.getTherapistId(), b.getDate(), b.getTime())) {
             throw new RuntimeException("Cannot mark pending because another booking already occupies this time slot.");
         }
 
         b.setStatus(BookingStatus.PENDING);
+
+        // ✅ optional: keep message or clear it. I recommend clearing so old cancel reason doesn’t linger.
+        b.setTherapistMessage(null);
+
         bookingRepository.save(b);
 
         User booker = userRepository.findById(b.getUserId()).orElse(null);
@@ -236,8 +273,10 @@ public class BookingService {
         b.setDate(newDate);
         b.setTime(newTime);
 
-        // ✅ reschedule should require therapist approval again
         b.setStatus(BookingStatus.PENDING);
+
+        // reschedule => clear old message
+        b.setTherapistMessage(null);
 
         bookingRepository.save(b);
 
@@ -256,6 +295,10 @@ public class BookingService {
         }
 
         b.setStatus(BookingStatus.CANCELLED);
+
+        // user-cancel => clear therapist message
+        b.setTherapistMessage(null);
+
         bookingRepository.save(b);
     }
 
@@ -351,6 +394,10 @@ public class BookingService {
         }
 
         r.setUserId(b.getUserId());
+
+        // ✅ NEW: expose therapist cancel message to user
+        r.setTherapistMessage(b.getTherapistMessage());
+
         return r;
     }
 
@@ -380,6 +427,9 @@ public class BookingService {
         } else {
             r.setUserName("User");
         }
+
+        // ✅ NEW: include message in therapist view too
+        r.setTherapistMessage(b.getTherapistMessage());
 
         return r;
     }

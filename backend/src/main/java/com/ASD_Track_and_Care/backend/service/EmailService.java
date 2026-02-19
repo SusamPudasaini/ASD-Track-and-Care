@@ -34,7 +34,7 @@ public class EmailService {
         mailSender.send(msg);
     }
 
-    // ✅ NEW: Therapist application decision email
+    // ✅ Therapist application decision email
     public void sendTherapistApplicationDecisionEmail(String toEmail, String status, String adminMessage) {
         SimpleMailMessage msg = new SimpleMailMessage();
         msg.setTo(toEmail);
@@ -50,6 +50,38 @@ public class EmailService {
         }
 
         body.append("You can also view the decision inside your account.\n");
+        body.append("\nASD Track & Care Team");
+
+        msg.setText(body.toString());
+        mailSender.send(msg);
+    }
+
+    // ✅ NEW: Booking cancelled by therapist (with reason)
+    public void sendBookingCancelledEmail(
+            String toEmail,
+            String therapistName,
+            String date,
+            String time,
+            String reason
+    ) {
+        SimpleMailMessage msg = new SimpleMailMessage();
+        msg.setTo(toEmail);
+        msg.setSubject("Your booking was cancelled - ASD Track & Care");
+
+        StringBuilder body = new StringBuilder();
+        body.append("Your booking has been cancelled by your therapist.\n\n");
+        body.append("Therapist: ").append(therapistName == null ? "Therapist" : therapistName).append("\n");
+        body.append("Date: ").append(date == null ? "-" : date).append("\n");
+        body.append("Time: ").append(time == null ? "-" : time).append("\n\n");
+
+        if (reason != null && !reason.trim().isEmpty()) {
+            body.append("Reason:\n");
+            body.append(reason.trim()).append("\n\n");
+        } else {
+            body.append("Reason: (not provided)\n\n");
+        }
+
+        body.append("You can book another session anytime from your account.\n");
         body.append("\nASD Track & Care Team");
 
         msg.setText(body.toString());

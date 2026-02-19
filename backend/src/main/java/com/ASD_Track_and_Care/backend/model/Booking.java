@@ -36,6 +36,10 @@ public class Booking {
     @Column(name = "khalti_pidx", length = 80)
     private String khaltiPidx;
 
+    // ✅ NEW: therapist message / cancel reason (optional)
+    @Column(name = "therapist_message", length = 1000)
+    private String therapistMessage;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -61,6 +65,9 @@ public class Booking {
 
     public String getKhaltiPidx() { return khaltiPidx; }
     public void setKhaltiPidx(String khaltiPidx) { this.khaltiPidx = khaltiPidx; }
+
+    public String getTherapistMessage() { return therapistMessage; }
+    public void setTherapistMessage(String therapistMessage) { this.therapistMessage = therapistMessage; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

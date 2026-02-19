@@ -13,12 +13,15 @@ public class BookingResponse {
     private String therapistPhone;
     private String therapistProfilePictureUrl;
 
-    // ✅ NEW: user/patient details (booker)
+    // user/patient details (booker)
     private Long userId;
     private String userName;
     private String userEmail;
     private String userPhone;
     private String userProfilePictureUrl;
+
+    // ✅ NEW: therapist message (cancel reason / note)
+    private String therapistMessage;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -47,7 +50,6 @@ public class BookingResponse {
     public String getTherapistProfilePictureUrl() { return therapistProfilePictureUrl; }
     public void setTherapistProfilePictureUrl(String therapistProfilePictureUrl) { this.therapistProfilePictureUrl = therapistProfilePictureUrl; }
 
-    // ✅ NEW getters/setters
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
 
@@ -62,4 +64,8 @@ public class BookingResponse {
 
     public String getUserProfilePictureUrl() { return userProfilePictureUrl; }
     public void setUserProfilePictureUrl(String userProfilePictureUrl) { this.userProfilePictureUrl = userProfilePictureUrl; }
+
+    // ✅ NEW getter/setter
+    public String getTherapistMessage() { return therapistMessage; }
+    public void setTherapistMessage(String therapistMessage) { this.therapistMessage = therapistMessage; }
 }
