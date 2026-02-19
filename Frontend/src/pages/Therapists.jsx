@@ -7,6 +7,20 @@ import { useNavigate } from "react-router-dom";
 const THERAPISTS_ENDPOINT = "/api/therapists"; // GET
 const CREATE_BOOKING_ENDPOINT = "/api/bookings"; // POST { therapistId, date, time }
 
+function backendBase() {
+  return (import.meta.env.VITE_API_BASE_URL || "http://localhost:8081").replace(/\/api\/?$/, "");
+}
+
+function resolveImageUrl(raw) {
+  if (!raw) return "";
+  const s = String(raw);
+  if (s.startsWith("blob:")) return s;
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+  if (s.startsWith("/")) return `${backendBase()}${s}`;
+  return `${backendBase()}/${s}`;
+}
+
+
 function getErrorMessage(err) {
   const data = err?.response?.data;
   if (!data) return "Something went wrong.";
@@ -290,7 +304,9 @@ function TherapistCard({ t, onBook, unavailable }) {
   const name = t.name || t.fullName || `${t.firstName || ""} ${t.lastName || ""}`.trim() || "Therapist";
   const qualification = t.qualification || t.degree || t.title || "—";
   const price = t.pricePerSession ?? t.sessionPrice ?? "—";
-  const image = t.profilePictureUrl || t.avatarUrl || t.imageUrl || "";
+  const imageRaw = t.profilePictureUrl || t.avatarUrl || t.imageUrl || "";
+  const image = resolveImageUrl(imageRaw);
+
 
   return (
     <div className="rounded-md border border-gray-100 bg-white p-5 shadow-sm">
@@ -345,6 +361,8 @@ function BookModal({
   availableTimes,
 }) {
   const noSlots = !!date && !slotsLoading && availableTimes.length === 0;
+
+  
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">

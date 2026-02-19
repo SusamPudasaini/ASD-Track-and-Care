@@ -10,6 +10,28 @@ const THERAPIST_UPDATE_ENDPOINT = "/api/users/me/therapist-settings"; // PUT { p
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+// ✅ Build backend base (strip /api if present)
+function backendBase() {
+  return (import.meta.env.VITE_API_BASE_URL || "http://localhost:8081").replace(/\/api\/?$/, "");
+}
+
+// ✅ Resolve image URLs correctly everywhere
+function resolveImageUrl(raw) {
+  if (!raw) return "";
+  const s = String(raw);
+
+  // blob preview
+  if (s.startsWith("blob:")) return s;
+
+  // already absolute
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+
+  // relative path from backend
+  if (s.startsWith("/")) return `${backendBase()}${s}`;
+
+  return `${backendBase()}/${s}`;
+}
+
 // 09:00 -> 18:00, every 30 mins
 function buildTimeSlots() {
   const slots = [];
@@ -42,7 +64,6 @@ function isValidSlotTime(time) {
 }
 
 function normalizeAvailability(inMap) {
-  // backend returns map keys as strings "Sunday" etc.
   if (!inMap || typeof inMap !== "object") return {};
   const out = {};
   for (const [day, times] of Object.entries(inMap)) {
@@ -87,13 +108,12 @@ export default function Profile() {
   // Therapist-only
   const [therapistSaving, setTherapistSaving] = useState(false);
 
-  // availability map { Sunday: ["09:00"], Monday: ["10:30"] }
   const [therapistForm, setTherapistForm] = useState({
     pricePerSession: "",
-    availability: {}, // day -> times[]
+    availability: {},
   });
 
-  // NEW UI state (dropdown + modal)
+  // UI state (dropdown + modal)
   const [selectedDay, setSelectedDay] = useState("Sunday");
   const [slotsModalOpen, setSlotsModalOpen] = useState(false);
 
@@ -104,8 +124,17 @@ export default function Profile() {
     return role.includes("THERAPIST");
   }, [me]);
 
-  // ✅ choose avatar shown:
-  const avatarToShow = avatarPreview || me?.profilePictureUrl || me?.avatarUrl || me?.profilePicture || "";
+  // ✅ choose avatar shown (preview > saved url)
+  const avatarToShow = useMemo(() => {
+    const raw =
+      avatarPreview ||
+      me?.profilePictureUrl ||
+      me?.avatarUrl ||
+      me?.profilePicture ||
+      "";
+
+    return resolveImageUrl(raw);
+  }, [avatarPreview, me]);
 
   useEffect(() => {
     let mounted = true;
@@ -128,7 +157,6 @@ export default function Profile() {
           phoneNumber: u.phoneNumber || "",
         });
 
-        // ✅ keep therapist fields in sync from backend (if backend sends it)
         const avail = normalizeAvailability(u.availability);
         setTherapistForm({
           pricePerSession:
@@ -136,7 +164,6 @@ export default function Profile() {
           availability: avail,
         });
 
-        // nice UX: auto-select first day that has availability
         const firstDayWithSlots = DAYS.find((d) => (avail?.[d] || []).length > 0);
         setSelectedDay(firstDayWithSlots || "Sunday");
       } catch (err) {
@@ -153,7 +180,6 @@ export default function Profile() {
     };
   }, []);
 
-  // cleanup preview url
   useEffect(() => {
     return () => {
       if (avatarPreview) URL.revokeObjectURL(avatarPreview);
@@ -223,6 +249,10 @@ export default function Profile() {
 
       toast.success("Profile picture updated.");
 
+      // ✅ update cache so navbar + other pages refresh instantly
+      localStorage.setItem("me", JSON.stringify(updated));
+      if (updated?.profilePictureUrl) localStorage.setItem("profilePictureUrl", updated.profilePictureUrl);
+
       setAvatarFile(null);
       if (avatarPreview) {
         URL.revokeObjectURL(avatarPreview);
@@ -280,9 +310,8 @@ export default function Profile() {
     });
   };
 
-  // ✅ UPDATED: allow saving even if totalSlots === 0
   const saveTherapistProfile = async () => {
-    if (therapistSaving) return; // prevents double submit
+    if (therapistSaving) return;
 
     const price = therapistForm.pricePerSession?.toString().trim();
     if (!price) return toast.error("Price per session is required.");
@@ -291,7 +320,6 @@ export default function Profile() {
     if (Number.isNaN(priceNum) || priceNum <= 0) return toast.error("Enter a valid price.");
 
     const availability = therapistForm.availability || {};
-    // totalSlots may be 0 => backend should interpret as "not available"
     const totalSlots = Object.values(availability).reduce((acc, arr) => acc + (arr?.length || 0), 0);
 
     try {
@@ -304,11 +332,14 @@ export default function Profile() {
 
       toast.success(totalSlots === 0 ? "Saved. You are marked as not available." : "Therapist settings updated.");
 
-      // backend returns ProfileResponse
       const updated = res?.data || {};
       setMe(updated);
 
-      // ✅ re-sync local form from backend response so greens persist even if backend normalizes
+      // ✅ cache
+      localStorage.setItem("me", JSON.stringify(updated));
+      if (updated?.role) localStorage.setItem("role", updated.role);
+      if (updated?.profilePictureUrl) localStorage.setItem("profilePictureUrl", updated.profilePictureUrl);
+
       const avail = normalizeAvailability(updated.availability);
       setTherapistForm({
         pricePerSession:
@@ -381,7 +412,7 @@ export default function Profile() {
           <p className="mt-2 text-sm text-gray-600">View and edit your account details.</p>
         </div>
 
-        {/* ✅ Avatar section (everyone) */}
+        {/* Avatar section */}
         <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-semibold text-gray-900">Profile Picture</h2>
@@ -475,7 +506,6 @@ export default function Profile() {
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-gray-900">Therapist Settings</h2>
 
-                {/* ✅ Not available badge if 0 slots */}
                 {totalSlotsSelected === 0 && (
                   <span className="rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700">
                     Not available
@@ -487,7 +517,6 @@ export default function Profile() {
             </div>
 
             <div className="mt-5 grid gap-6">
-              {/* Price */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Price per session</label>
                 <div className="mt-2 flex items-center gap-2">
@@ -502,7 +531,6 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Availability (dropdown + modal) */}
               <div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -535,7 +563,6 @@ export default function Profile() {
                   </div>
                 </div>
 
-                {/* Quick preview chips */}
                 <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-semibold text-gray-900">{selectedDay}</div>
@@ -653,7 +680,8 @@ function SlotsModal({ day, selectedTimes, onClose, onToggle, onSelectAll, onClea
           <div>
             <h2 className="text-base font-semibold text-gray-900">Edit availability</h2>
             <p className="mt-1 text-sm text-gray-600">
-              Day: <span className="font-semibold">{day}</span> · <span className="font-semibold">{selectedTimes.size}</span> selected
+              Day: <span className="font-semibold">{day}</span> ·{" "}
+              <span className="font-semibold">{selectedTimes.size}</span> selected
             </p>
           </div>
 

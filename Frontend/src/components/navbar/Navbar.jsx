@@ -31,15 +31,35 @@ export default function Navbar() {
     return r;
   }, [me]);
 
+  // ✅ Backend base (strip trailing "/api" if present)
+  const backendBase = useMemo(() => {
+    const raw = (import.meta.env.VITE_API_BASE_URL || "").trim();
+    if (!raw) return "http://localhost:8081";
+    return raw.replace(/\/api\/?$/i, "");
+  }, []);
+
   const avatarUrl = useMemo(() => {
     // backend ProfileResponse uses profilePictureUrl
-    return (
+    const raw =
       me?.profilePictureUrl ||
       me?.avatarUrl ||
       localStorage.getItem("profilePictureUrl") ||
-      ""
-    );
-  }, [me]);
+      "";
+
+    if (!raw) return "";
+
+    // ✅ keep blob preview working
+    if (raw.startsWith("blob:")) return raw;
+
+    // ✅ already absolute
+    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+
+    // ✅ relative -> serve from backend (NOT frontend)
+    if (raw.startsWith("/")) return `${backendBase}${raw}`;
+
+    // fallback
+    return `${backendBase}/${raw}`;
+  }, [me, backendBase]);
 
   // refresh user info (optional, but nice)
   useEffect(() => {
@@ -50,11 +70,17 @@ export default function Navbar() {
       try {
         const res = await api.get("/api/users/me");
         if (!mounted) return;
+
         setMe(res.data || null);
         localStorage.setItem("me", JSON.stringify(res.data || {}));
+
         if (res?.data?.role) localStorage.setItem("role", res.data.role);
-        if (res?.data?.profilePictureUrl)
+
+        if (res?.data?.profilePictureUrl) {
           localStorage.setItem("profilePictureUrl", res.data.profilePictureUrl);
+        } else {
+          localStorage.removeItem("profilePictureUrl");
+        }
       } catch {
         // ignore: navbar still uses cached values
       }
@@ -121,16 +147,25 @@ export default function Navbar() {
                 >
                   <div className="h-9 w-9 overflow-hidden rounded-full bg-gray-100">
                     {avatarUrl ? (
-                      <img src={avatarUrl} alt="Me" className="h-full w-full object-cover" />
+                      <img
+                        src={avatarUrl}
+                        alt="Me"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          // fallback if url broken
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-gray-500">
                         ME
                       </div>
                     )}
                   </div>
-                  <span className="hidden sm:block text-sm font-semibold text-gray-700">
-                    {role || "USER"}
-                  </span>
+            <span className="hidden sm:block text-sm font-semibold text-gray-700">
+              {me?.username || "User"}
+            </span>
+
                   <span className="hidden sm:block text-gray-400">▾</span>
                 </button>
 
