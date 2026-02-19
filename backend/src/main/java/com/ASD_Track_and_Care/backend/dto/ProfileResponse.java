@@ -4,7 +4,8 @@ import com.ASD_Track_and_Care.backend.model.AvailabilityDay;
 import com.ASD_Track_and_Care.backend.model.Role;
 
 import java.math.BigDecimal;
-import java.util.Set;
+import java.util.List;
+import java.util.Map;
 
 public class ProfileResponse {
 
@@ -15,14 +16,17 @@ public class ProfileResponse {
     private String phoneNumber;
 
     private Role role;
-
     private String profilePictureUrl;
 
-    // Therapist-only (can be null for non-therapists)
+    // therapist-only (null for normal users)
     private BigDecimal pricePerSession;
-    private Set<AvailabilityDay> availableDays;
 
-    public ProfileResponse() {}
+    // ✅ keep if you still want it
+    // but now availability is the real one
+    // (you can remove availableDays later if not needed)
+    // private java.util.Set<AvailabilityDay> availableDays;
+
+    private Map<AvailabilityDay, List<String>> availability;
 
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
@@ -48,6 +52,6 @@ public class ProfileResponse {
     public BigDecimal getPricePerSession() { return pricePerSession; }
     public void setPricePerSession(BigDecimal pricePerSession) { this.pricePerSession = pricePerSession; }
 
-    public Set<AvailabilityDay> getAvailableDays() { return availableDays; }
-    public void setAvailableDays(Set<AvailabilityDay> availableDays) { this.availableDays = availableDays; }
+    public Map<AvailabilityDay, List<String>> getAvailability() { return availability; }
+    public void setAvailability(Map<AvailabilityDay, List<String>> availability) { this.availability = availability; }
 }

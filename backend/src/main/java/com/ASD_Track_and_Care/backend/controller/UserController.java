@@ -3,6 +3,7 @@ package com.ASD_Track_and_Care.backend.controller;
 import com.ASD_Track_and_Care.backend.dto.ProfileResponse;
 import com.ASD_Track_and_Care.backend.dto.UpdateProfileRequest;
 import com.ASD_Track_and_Care.backend.dto.UpdateTherapistSettingsRequest;
+import com.ASD_Track_and_Care.backend.service.TherapistService;
 import com.ASD_Track_and_Care.backend.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -16,18 +17,18 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
 
     private final UserService userService;
+    private final TherapistService therapistService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, TherapistService therapistService) {
         this.userService = userService;
+        this.therapistService = therapistService;
     }
 
-    // GET /api/users/me
     @GetMapping("/me")
     public ResponseEntity<ProfileResponse> getMe(Authentication authentication) {
         return ResponseEntity.ok(userService.getMyProfile(authentication));
     }
 
-    // PUT /api/users/me (basic profile: first/last/phone)
     @PutMapping("/me")
     public ResponseEntity<ProfileResponse> updateMe(
             Authentication authentication,
@@ -36,8 +37,6 @@ public class UserController {
         return ResponseEntity.ok(userService.updateMyProfile(authentication, req));
     }
 
-    // ✅ Everyone can change profile picture
-    // POST /api/users/me/avatar (multipart/form-data file=<image>)
     @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ProfileResponse> uploadAvatar(
             Authentication authentication,
@@ -46,13 +45,24 @@ public class UserController {
         return ResponseEntity.ok(userService.updateMyAvatar(authentication, file));
     }
 
-    // ✅ Only THERAPIST can change price + available days
-    // PUT /api/users/me/therapist-settings
+    /**
+     * ✅ Therapist: price + availability (day -> times)
+     * PUT /api/users/me/therapist-settings
+     * Body:
+     * {
+     *   "pricePerSession": 20,
+     *   "availability": { "Sunday": ["09:00","09:30"] }
+     * }
+     */
     @PutMapping("/me/therapist-settings")
     public ResponseEntity<ProfileResponse> updateTherapistSettings(
             Authentication authentication,
             @Valid @RequestBody UpdateTherapistSettingsRequest req
     ) {
-        return ResponseEntity.ok(userService.updateTherapistSettings(authentication, req));
+        // Update therapist slots + price
+        therapistService.updateMyTherapistSettings(authentication, req);
+
+        // Return fresh profile (includes price + availability)
+        return ResponseEntity.ok(userService.getMyProfile(authentication));
     }
 }

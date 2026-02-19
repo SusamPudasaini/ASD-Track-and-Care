@@ -1,26 +1,37 @@
 package com.ASD_Track_and_Care.backend.dto;
 
-import com.ASD_Track_and_Care.backend.model.AvailabilityDay;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
-import java.util.Set;
+import java.util.List;
+import java.util.Map;
 
 public class UpdateTherapistSettingsRequest {
 
     @NotNull(message = "pricePerSession is required")
-    @Positive(message = "pricePerSession must be > 0")
+    @DecimalMin(value = "0.01", message = "pricePerSession must be greater than 0")
     private BigDecimal pricePerSession;
 
-    @NotNull(message = "availableDays is required")
-    private Set<AvailabilityDay> availableDays;
+    /**
+     * availability: { "Sunday": ["09:00","09:30"], "Monday": ["10:00"] }
+     */
+    @NotNull(message = "availability is required")
+    private Map<String, List<String>> availability;
 
-    public UpdateTherapistSettingsRequest() {}
+    public BigDecimal getPricePerSession() {
+        return pricePerSession;
+    }
 
-    public BigDecimal getPricePerSession() { return pricePerSession; }
-    public void setPricePerSession(BigDecimal pricePerSession) { this.pricePerSession = pricePerSession; }
+    public void setPricePerSession(BigDecimal pricePerSession) {
+        this.pricePerSession = pricePerSession;
+    }
 
-    public Set<AvailabilityDay> getAvailableDays() { return availableDays; }
-    public void setAvailableDays(Set<AvailabilityDay> availableDays) { this.availableDays = availableDays; }
+    public Map<String, List<String>> getAvailability() {
+        return availability;
+    }
+
+    public void setAvailability(Map<String, List<String>> availability) {
+        this.availability = availability;
+    }
 }

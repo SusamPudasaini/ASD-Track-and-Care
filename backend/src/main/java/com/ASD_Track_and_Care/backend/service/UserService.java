@@ -3,8 +3,11 @@ package com.ASD_Track_and_Care.backend.service;
 import com.ASD_Track_and_Care.backend.dto.ProfileResponse;
 import com.ASD_Track_and_Care.backend.dto.UpdateProfileRequest;
 import com.ASD_Track_and_Care.backend.dto.UpdateTherapistSettingsRequest;
+import com.ASD_Track_and_Care.backend.model.AvailabilityDay;
 import com.ASD_Track_and_Care.backend.model.Role;
+import com.ASD_Track_and_Care.backend.model.TherapistTimeSlot;
 import com.ASD_Track_and_Care.backend.model.User;
+import com.ASD_Track_and_Care.backend.repository.TherapistTimeSlotRepository;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -12,19 +15,20 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.*;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
+    private final TherapistTimeSlotRepository therapistTimeSlotRepository;
 
-    // upload folder (served via WebConfig below)
     private static final String UPLOAD_DIR = "uploads/profile-pics";
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, TherapistTimeSlotRepository therapistTimeSlotRepository) {
         this.userRepository = userRepository;
+        this.therapistTimeSlotRepository = therapistTimeSlotRepository;
     }
 
     public ProfileResponse getMyProfile(Authentication authentication) {
@@ -43,7 +47,6 @@ public class UserService {
         return toProfileResponse(user);
     }
 
-    // ✅ Everyone can update avatar
     public ProfileResponse updateMyAvatar(Authentication authentication, MultipartFile file) {
         User user = getUserFromAuth(authentication);
 
@@ -74,18 +77,28 @@ public class UserService {
 
             Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
 
-            // This URL works with the WebConfig mapping below:
             String url = "/uploads/profile-pics/" + filename;
             user.setProfilePictureUrl(url);
 
             userRepository.save(user);
             return toProfileResponse(user);
+
         } catch (IOException e) {
             throw new RuntimeException("Failed to upload avatar.");
         }
     }
 
-    // ✅ Therapist-only
+    /**
+     * ✅ Therapist-only: price + day->times
+     * Expects JSON:
+     * {
+     *   "pricePerSession": 20,
+     *   "availability": {
+     *      "Sunday": ["09:00","09:30"],
+     *      "Monday": ["10:00"]
+     *   }
+     * }
+     */
     public ProfileResponse updateTherapistSettings(Authentication authentication, UpdateTherapistSettingsRequest req) {
         User user = getUserFromAuth(authentication);
 
@@ -93,10 +106,44 @@ public class UserService {
             throw new RuntimeException("Only therapists can update therapist settings.");
         }
 
+        if (req.getPricePerSession() == null || req.getPricePerSession().doubleValue() <= 0) {
+            throw new RuntimeException("pricePerSession must be greater than 0.");
+        }
+
+        // ✅ DTO provides Map<String, List<String>>
+        Map<AvailabilityDay, List<String>> normalized = normalizeAvailability(req.getAvailability());
+
+        int totalSlots = normalized.values().stream().mapToInt(List::size).sum();
+        if (totalSlots == 0) {
+            throw new RuntimeException("Select at least one valid time slot.");
+        }
+
+        // Save price
         user.setPricePerSession(req.getPricePerSession());
-        user.setAvailableDays(req.getAvailableDays());
+
+        // Overwrite therapist_time_slots
+        therapistTimeSlotRepository.deleteAllByTherapistId(user.getId());
+
+        List<TherapistTimeSlot> toSave = new ArrayList<>();
+        Set<AvailabilityDay> daysWithAnySlots = new HashSet<>();
+
+        for (Map.Entry<AvailabilityDay, List<String>> e : normalized.entrySet()) {
+            AvailabilityDay day = e.getKey();
+            List<String> times = e.getValue();
+
+            for (String t : times) {
+                toSave.add(new TherapistTimeSlot(user.getId(), day, t));
+            }
+            if (!times.isEmpty()) daysWithAnySlots.add(day);
+        }
+
+        therapistTimeSlotRepository.saveAll(toSave);
+
+        // keep user_available_days synced (optional but useful)
+        user.setAvailableDays(daysWithAnySlots);
 
         userRepository.save(user);
+
         return toProfileResponse(user);
     }
 
@@ -119,15 +166,109 @@ public class UserService {
         res.setRole(user.getRole());
         res.setProfilePictureUrl(user.getProfilePictureUrl());
 
-        // Only include therapist fields if therapist (optional, but clean)
         if (user.getRole() == Role.THERAPIST) {
             res.setPricePerSession(user.getPricePerSession());
-            res.setAvailableDays(user.getAvailableDays());
+
+            // availability map from therapist_time_slots
+            List<TherapistTimeSlot> slots = therapistTimeSlotRepository.findAllByTherapistId(user.getId());
+            Map<AvailabilityDay, List<String>> map = new EnumMap<>(AvailabilityDay.class);
+
+            for (TherapistTimeSlot s : slots) {
+                if (s.getDay() == null || s.getTime() == null) continue;
+                map.computeIfAbsent(s.getDay(), k -> new ArrayList<>()).add(s.getTime().trim());
+            }
+
+            // unique + sort
+            for (Map.Entry<AvailabilityDay, List<String>> e : map.entrySet()) {
+                List<String> cleaned = e.getValue().stream()
+                        .filter(Objects::nonNull)
+                        .map(String::trim)
+                        .filter(v -> !v.isBlank())
+                        .distinct()
+                        .sorted()
+                        .collect(Collectors.toList());
+                e.setValue(cleaned);
+            }
+
+            res.setAvailability(map);
         } else {
             res.setPricePerSession(null);
-            res.setAvailableDays(null);
+            res.setAvailability(null);
         }
 
         return res;
+    }
+
+    /**
+     * ✅ Converts Map<String, List<String>> (JSON keys)
+     * -> Map<AvailabilityDay, List<String>> (strongly typed)
+     */
+    private Map<AvailabilityDay, List<String>> normalizeAvailability(Map<String, List<String>> in) {
+        Map<AvailabilityDay, List<String>> out = new EnumMap<>(AvailabilityDay.class);
+        if (in == null) return out;
+
+        for (Map.Entry<String, List<String>> e : in.entrySet()) {
+            String rawDay = e.getKey();
+            if (rawDay == null || rawDay.isBlank()) continue;
+
+            AvailabilityDay day = parseDay(rawDay.trim());
+            if (day == null) continue;
+
+            List<String> times = (e.getValue() == null) ? List.of() : e.getValue();
+
+            List<String> cleaned = times.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .filter(this::isValidSlotTime)
+                    .distinct()
+                    .sorted()
+                    .collect(Collectors.toList());
+
+            if (!cleaned.isEmpty()) {
+                out.put(day, cleaned);
+            }
+        }
+
+        return out;
+    }
+
+    private AvailabilityDay parseDay(String s) {
+        // Supports: "Sunday" (exact enum), or case-insensitive day
+        try {
+            return AvailabilityDay.valueOf(s);
+        } catch (Exception ignored) { }
+
+        String k = s.toLowerCase();
+        return switch (k) {
+            case "sunday" -> AvailabilityDay.Sunday;
+            case "monday" -> AvailabilityDay.Monday;
+            case "tuesday" -> AvailabilityDay.Tuesday;
+            case "wednesday" -> AvailabilityDay.Wednesday;
+            case "thursday" -> AvailabilityDay.Thursday;
+            case "friday" -> AvailabilityDay.Friday;
+            case "saturday" -> AvailabilityDay.Saturday;
+            default -> null;
+        };
+    }
+
+    private boolean isValidSlotTime(String time) {
+        // HH:mm, 09:00–18:00, step 30 min
+        try {
+            String[] p = time.split(":");
+            if (p.length != 2) return false;
+
+            int h = Integer.parseInt(p[0]);
+            int m = Integer.parseInt(p[1]);
+
+            if (!(m == 0 || m == 30)) return false;
+            if (h < 9) return false;
+            if (h > 18) return false;
+            if (h == 18 && m != 0) return false;
+
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

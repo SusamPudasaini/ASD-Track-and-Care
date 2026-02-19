@@ -6,6 +6,7 @@ import com.ASD_Track_and_Care.backend.model.TherapistApplication;
 import com.ASD_Track_and_Care.backend.service.TherapistApplicationService;
 import com.ASD_Track_and_Care.backend.service.TherapistService;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -32,15 +34,26 @@ public class TherapistController {
     }
 
     /**
-     * ✅ PUBLIC / PROTECTED (depending on your ProtectedRoute)
-     * Therapist grid listing.
-     * Fetches from users table where role=THERAPIST.
-     *
+     * ✅ Therapist grid listing.
      * GET /api/therapists
      */
     @GetMapping
     public ResponseEntity<List<TherapistCardResponse>> listTherapists() {
         return ResponseEntity.ok(therapistService.listTherapists());
+    }
+
+    /**
+     * ✅ Date -> available times (based on therapist slot table)
+     * GET /api/therapists/{id}/available-slots?date=YYYY-MM-DD
+     */
+    @GetMapping("/{id}/available-slots")
+    public ResponseEntity<List<String>> getAvailableSlots(
+            @PathVariable("id") Long therapistId,
+            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        return ResponseEntity.ok(
+                therapistService.getAvailableSlotsForDate(therapistId, date)
+        );
     }
 
     /**

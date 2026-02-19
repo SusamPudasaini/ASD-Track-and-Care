@@ -21,7 +21,7 @@ public class BookingController {
         this.bookingService = bookingService;
     }
 
-    // ✅ Create booking (after payment success)
+    // ✅ Create booking (payment optional for now)
     @PostMapping
     public ResponseEntity<BookingResponse> create(
             Authentication authentication,

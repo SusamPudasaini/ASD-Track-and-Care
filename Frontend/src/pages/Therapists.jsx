@@ -7,19 +7,6 @@ import { useNavigate } from "react-router-dom";
 const THERAPISTS_ENDPOINT = "/api/therapists"; // GET
 const CREATE_BOOKING_ENDPOINT = "/api/bookings"; // POST { therapistId, date, time }
 
-const TIMES = [
-  "09:00", "09:30",
-  "10:00", "10:30",
-  "11:00", "11:30",
-  "12:00", "12:30",
-  "13:00", "13:30",
-  "14:00", "14:30",
-  "15:00", "15:30",
-  "16:00", "16:30",
-  "17:00", "17:30",
-  "18:00",
-];
-
 function getErrorMessage(err) {
   const data = err?.response?.data;
   if (!data) return "Something went wrong.";
@@ -38,6 +25,14 @@ function getErrorMessage(err) {
   return String(data);
 }
 
+function todayISO() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function Therapists() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -49,6 +44,10 @@ export default function Therapists() {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [booking, setBooking] = useState(false);
+
+  // availability from backend
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [availableTimes, setAvailableTimes] = useState([]); // ["09:00","09:30"]
 
   useEffect(() => {
     let mounted = true;
@@ -77,12 +76,16 @@ export default function Therapists() {
     setSelectedTherapist(t);
     setDate("");
     setTime("");
+    setAvailableTimes([]);
     setOpen(true);
   };
 
   const closeBook = () => {
     setOpen(false);
     setSelectedTherapist(null);
+    setDate("");
+    setTime("");
+    setAvailableTimes([]);
   };
 
   const therapistName = useMemo(() => {
@@ -90,13 +93,63 @@ export default function Therapists() {
     return selectedTherapist.name || selectedTherapist.fullName || "Therapist";
   }, [selectedTherapist]);
 
+  const therapistId = useMemo(() => {
+    if (!selectedTherapist) return null;
+    return selectedTherapist.id || selectedTherapist.therapistId || null;
+  }, [selectedTherapist]);
+
+  // ✅ load available slots when date changes
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSlots() {
+      if (!open) return;
+      if (!therapistId) return;
+
+      if (!date) {
+        setAvailableTimes([]);
+        setTime("");
+        return;
+      }
+
+      try {
+        setSlotsLoading(true);
+        setAvailableTimes([]);
+        setTime("");
+
+        const res = await api.get(`/api/therapists/${therapistId}/available-slots`, {
+          params: { date },
+        });
+
+        // ✅ backend returns List<String>, not {times:[]}
+        const list = Array.isArray(res.data) ? res.data : [];
+        if (!mounted) return;
+
+        setAvailableTimes(list);
+      } catch (err) {
+        console.error("LOAD SLOTS ERROR:", err?.response?.status, err?.response?.data);
+        toast.error(getErrorMessage(err) || "Could not load availability.");
+        if (!mounted) return;
+        setAvailableTimes([]);
+      } finally {
+        if (mounted) setSlotsLoading(false);
+      }
+    }
+
+    loadSlots();
+    return () => (mounted = false);
+  }, [open, therapistId, date]);
+
   const createBooking = async () => {
     if (!selectedTherapist) return toast.error("Pick a therapist first.");
     if (!date) return toast.error("Select a date.");
     if (!time) return toast.error("Select a time.");
-
-    const therapistId = selectedTherapist.id || selectedTherapist.therapistId;
     if (!therapistId) return toast.error("Therapist id missing.");
+
+    // frontend guard: must be one of available
+    if (!availableTimes.includes(time)) {
+      return toast.error("Selected time is not available.");
+    }
 
     try {
       setBooking(true);
@@ -126,9 +179,7 @@ export default function Therapists() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Therapists</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Browse therapists and book a session.
-            </p>
+            <p className="mt-1 text-sm text-gray-600">Browse therapists and book a session.</p>
           </div>
 
           <button
@@ -166,6 +217,8 @@ export default function Therapists() {
           onClose={closeBook}
           onBook={createBooking}
           booking={booking}
+          slotsLoading={slotsLoading}
+          availableTimes={availableTimes}
         />
       )}
     </div>
@@ -185,9 +238,7 @@ function TherapistCard({ t, onBook }) {
           {image ? (
             <img src={image} alt={name} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
-              No image
-            </div>
+            <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">No image</div>
           )}
         </div>
 
@@ -210,7 +261,20 @@ function TherapistCard({ t, onBook }) {
   );
 }
 
-function BookModal({ therapistName, date, time, setDate, setTime, onClose, onBook, booking }) {
+function BookModal({
+  therapistName,
+  date,
+  time,
+  setDate,
+  setTime,
+  onClose,
+  onBook,
+  booking,
+  slotsLoading,
+  availableTimes,
+}) {
+  const noSlots = !!date && !slotsLoading && availableTimes.length === 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg">
@@ -237,6 +301,7 @@ function BookModal({ therapistName, date, time, setDate, setTime, onClose, onBoo
             <input
               type="date"
               value={date}
+              min={todayISO()}
               onChange={(e) => setDate(e.target.value)}
               className="mt-2 w-full rounded border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
@@ -245,28 +310,42 @@ function BookModal({ therapistName, date, time, setDate, setTime, onClose, onBoo
           <div>
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-gray-700">Select time</label>
-              <span className="text-xs text-gray-500">9:00 AM – 6:00 PM</span>
+              <span className="text-xs text-gray-500">Only available slots are shown</span>
             </div>
 
-            <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {TIMES.map((t) => {
-                const active = t === time;
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTime(t)}
-                    className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
-                      active
-                        ? "border-blue-200 bg-blue-50 text-blue-700"
-                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                );
-              })}
-            </div>
+            {!date ? (
+              <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+                Pick a date to see available time slots.
+              </div>
+            ) : slotsLoading ? (
+              <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+                Loading availability...
+              </div>
+            ) : noSlots ? (
+              <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+                No available time slots for this date.
+              </div>
+            ) : (
+              <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {availableTimes.map((t) => {
+                  const active = t === time;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTime(t)}
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+                        active
+                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -282,9 +361,11 @@ function BookModal({ therapistName, date, time, setDate, setTime, onClose, onBoo
           <button
             type="button"
             onClick={onBook}
-            disabled={booking}
+            disabled={booking || !date || !time}
             className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
-              booking ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+              booking || !date || !time
+                ? "bg-blue-300 cursor-not-allowed"
+                : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
             }`}
           >
             {booking ? "Booking..." : "Confirm Booking"}
