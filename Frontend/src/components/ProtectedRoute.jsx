@@ -1,20 +1,43 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 export default function ProtectedRoute() {
   const location = useLocation();
-  const token = localStorage.getItem("token");
   const shownRef = useRef(false);
 
+  // ✅ Support multiple common keys (prevents false logouts)
+  const token = useMemo(() => {
+    const t =
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("jwt") ||
+      "";
+
+    if (t && t.startsWith("Bearer ")) return t.slice(7);
+    return t;
+  }, []);
+
+  const hasMe = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("me");
+      const me = raw ? JSON.parse(raw) : null;
+      return !!me;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const isAuthed = Boolean(token && token.trim().length > 10) || hasMe;
+
   useEffect(() => {
-    if (!token && !shownRef.current) {
+    if (!isAuthed && !shownRef.current) {
       toast.error("Please login first");
       shownRef.current = true;
     }
-  }, [token]);
+  }, [isAuthed]);
 
-  if (!token) {
+  if (!isAuthed) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 

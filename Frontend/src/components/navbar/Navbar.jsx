@@ -121,6 +121,7 @@ export default function Navbar() {
             <Link to="/questionnaire">Questionnaire</Link>
             <Link to="/therapists">Therapists</Link>
             <Link to="/bookings">Bookings</Link>
+            <Link to="/activities">Activities</Link>
           </nav>
 
           {/* auth / avatar */}
@@ -162,9 +163,10 @@ export default function Navbar() {
                       </div>
                     )}
                   </div>
-            <span className="hidden sm:block text-sm font-semibold text-gray-700">
-              {me?.username || "User"}
-            </span>
+
+                  <span className="hidden sm:block text-sm font-semibold text-gray-700">
+                    {me?.username || "User"}
+                  </span>
 
                   <span className="hidden sm:block text-gray-400">▾</span>
                 </button>
@@ -177,6 +179,13 @@ export default function Navbar() {
                       className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
                     >
                       Edit Profile
+                    </button>
+
+                    <button
+                      onClick={() => go("/activities")}
+                      className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Activities Hub
                     </button>
 
                     {role === "ADMIN" && (

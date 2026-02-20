@@ -20,27 +20,27 @@ import Bookings from "./pages/Bookings";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import Therapists from "./pages/Therapists";
 
+import ActivitiesHub from "./pages/activities/ActivitiesHub";
+import ReactionTime from "./pages/Activities/ReactionTime";
+import SequenceMemory from "./pages/activities/SequenceMemory";
+import NumberMemory from "./pages/activities/NumberMemory";
+
+import VisualMemory from "./pages/activities/VisualMemory";
+import SoundTherapy from "./pages/activities/SoundTherapy";
+
+import Home from "./pages/Home";
+
 import { Toaster } from "react-hot-toast";
 import TherapistDashboardBookings from "./pages/TherapistsBookingApplcations";
-
-function Home() {
-  return (
-    <>
-      <Navbar />
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">Home</h1>
-        <p>Welcome to the home page.</p>
-      </div>
-    </>
-  );
-}
 
 // ✅ Small helper (role from localStorage)
 function getRole() {
   try {
     const raw = localStorage.getItem("me");
     const me = raw ? JSON.parse(raw) : null;
-    const r = (me?.role || localStorage.getItem("role") || "").toString().toUpperCase();
+    const r = (me?.role || localStorage.getItem("role") || "")
+      .toString()
+      .toUpperCase();
     return r || "USER";
   } catch {
     return (localStorage.getItem("role") || "USER").toString().toUpperCase();
@@ -69,6 +69,9 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
+        {/* ✅ common typo alias */}
+        <Route path="/activites" element={<Navigate to="/activities" replace />} />
+
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
           {/* Shared for all logged-in roles */}
@@ -78,6 +81,14 @@ export default function App() {
           <Route path="/therapists" element={<Therapists />} />
           <Route path="/bookings" element={<Bookings />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
+
+          {/* ✅ Activities */}
+          <Route path="/activities" element={<ActivitiesHub />} />
+          <Route path="/activities/reaction-time" element={<ReactionTime />} />
+          <Route path="/activities/sequence-memory" element={<SequenceMemory />} />
+          <Route path="/activities/number-memory" element={<NumberMemory />} />
+          <Route path="/activities/visual-memory" element={<VisualMemory />} />
+          <Route path="/activities/sound-therapy" element={<SoundTherapy />} />
 
           {/* USER routes */}
           <Route
@@ -107,7 +118,7 @@ export default function App() {
             }
           />
 
-          {/* THERAPIST routes (placeholder for now) */}
+          {/* THERAPIST routes */}
           <Route
             path="/therapist/dashboard"
             element={
@@ -116,10 +127,10 @@ export default function App() {
               </RoleRoute>
             }
           />
-
-          {/* fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
+
+        {/* ✅ Global fallback (public + protected) */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );
