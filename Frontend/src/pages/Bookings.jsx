@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
+import { useNavigate } from "react-router-dom";
 
 const MY_BOOKINGS_ENDPOINT = "/api/bookings/me"; // GET
 const RESCHEDULE_ENDPOINT = (id) => `/api/bookings/${id}/reschedule`; // PUT { date, time }
@@ -56,8 +57,13 @@ function addMinutes(dateObj, minutes) {
 }
 
 export default function Bookings() {
+  const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState([]);
+
+  // ✅ Search
+  const [search, setSearch] = useState("");
 
   // reschedule modal
   const [open, setOpen] = useState(false);
@@ -231,26 +237,90 @@ export default function Bookings() {
     toast.error("Contact info not available.");
   };
 
+  // ✅ Search filter (therapist name/date/time/status)
+  const filteredBookings = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return bookings;
+
+    return bookings.filter((b) => {
+      const name = String(b?.therapistName || b?.therapist?.name || "").toLowerCase();
+      const d = String(b?.date || "").toLowerCase();
+      const t = String(b?.time || "").toLowerCase();
+      const s = String(b?.status || "").toLowerCase();
+
+      return (
+        name.includes(q) ||
+        d.includes(q) ||
+        t.includes(q) ||
+        s.includes(q)
+      );
+    });
+  }, [bookings, search]);
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
 
-      <main className="mx-auto max-w-5xl px-6 py-10">
-        <div className="rounded-md border border-gray-100 bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-semibold text-gray-900">Booking History</h1>
-          <p className="mt-1 text-sm text-gray-600">View, reschedule, cancel, or contact your therapist.</p>
+      {/* ✅ page layout like your screenshot */}
+      <main className="mx-auto max-w-6xl px-6 py-10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold text-gray-900">Booking History</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              View your bookings, reschedule sessions, cancel, or contact your therapist.
+            </p>
+          </div>
+
+          {/* right-side action button (like "Booking History" button in screenshot) */}
+          <button
+            onClick={() => navigate("/therapists")}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4a6cf7] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#3f5ee0]"
+          >
+            Find Therapists
+          </button>
         </div>
 
+        {/* ✅ Search bar (replaces speciality chips) */}
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:max-w-md">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              🔍
+            </span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by therapist, date, time, or status..."
+              className="w-full rounded-full border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          {search.trim() ? (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="w-full rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto"
+            >
+              Clear
+            </button>
+          ) : null}
+
+          <div className="text-sm text-gray-500 sm:ml-auto">
+            Showing <span className="font-semibold text-gray-800">{filteredBookings.length}</span>{" "}
+            booking{filteredBookings.length === 1 ? "" : "s"}
+          </div>
+        </div>
+
+        {/* ✅ Cards grid like your screenshot */}
         <div className="mt-6">
           {loading ? (
             <div className="text-sm text-gray-600">Loading bookings...</div>
-          ) : bookings.length === 0 ? (
-            <div className="rounded border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
-              No bookings yet.
+          ) : filteredBookings.length === 0 ? (
+            <div className="rounded-xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
+              No bookings found.
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {bookings.map((b) => (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredBookings.map((b) => (
                 <BookingCard
                   key={b.id}
                   b={b}
@@ -281,7 +351,12 @@ export default function Bookings() {
       )}
 
       {cancelOpen && (
-        <CancelModal booking={cancelBookingObj} onClose={closeCancelModal} onConfirm={confirmCancel} canceling={canceling} />
+        <CancelModal
+          booking={cancelBookingObj}
+          onClose={closeCancelModal}
+          onConfirm={confirmCancel}
+          canceling={canceling}
+        />
       )}
     </div>
   );
@@ -314,45 +389,60 @@ function BookingCard({ b, onReschedule, onCancel, onContact }) {
   const actionsDisabled = isCancelled || isCompleted;
 
   return (
-    <div className="rounded-md border border-gray-100 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-base font-semibold text-gray-900">{therapistName}</div>
-          <div className="mt-1 text-sm text-gray-600">
-            Date: <span className="font-semibold text-gray-800">{b.date}</span>
-          </div>
-          <div className="text-sm text-gray-600">
-            Time: <span className="font-semibold text-gray-800">{b.time}</span>
-          </div>
+          <div className="text-lg font-semibold text-gray-900">{therapistName}</div>
 
-          <div className={`mt-2 text-sm font-semibold ${statusClass}`}>
-            Status: {displayStatus}
+          <div className="mt-3 space-y-2 text-sm text-gray-600">
+            <div className="flex items-center justify-between gap-4">
+              <span>Date</span>
+              <span className="font-semibold text-gray-800">{b.date || "-"}</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <span>Time</span>
+              <span className="font-semibold text-gray-800">{b.time || "-"}</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <span>Status</span>
+              <span className={`font-semibold ${statusClass}`}>{displayStatus}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {!actionsDisabled && (
-        <div className="mt-4 flex flex-wrap gap-2">
+      {!actionsDisabled ? (
+        <div className="mt-6 flex flex-col gap-2">
           <button
             onClick={onReschedule}
-            className="rounded border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
             Change Date/Time
           </button>
 
-          <button
-            onClick={onCancel}
-            className="rounded border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
-          >
-            Cancel
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onCancel}
+              className="w-full rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+            >
+              Cancel
+            </button>
 
-          <button
-            onClick={onContact}
-            className="ml-auto rounded bg-[#4a6cf7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
-          >
-            Contact Therapist
-          </button>
+            <button
+              onClick={onContact}
+              className="w-full rounded-xl bg-[#4a6cf7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
+            >
+              Contact
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-6 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+          {displayStatus === "COMPLETED"
+            ? "This session is completed."
+            : "This booking was cancelled."}
         </div>
       )}
     </div>
@@ -377,7 +467,7 @@ function RescheduleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold text-gray-900">Reschedule booking</h2>
@@ -403,7 +493,7 @@ function RescheduleModal({
               value={date}
               min={minDate}
               onChange={(e) => setDate(e.target.value)}
-              className="mt-2 w-full rounded border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
@@ -414,15 +504,15 @@ function RescheduleModal({
             </div>
 
             {!date ? (
-              <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+              <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
                 Pick a date to see available time slots.
               </div>
             ) : slotsLoading ? (
-              <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+              <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
                 Loading availability...
               </div>
             ) : noSlots ? (
-              <div className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+              <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
                 No available time slots for this date.
               </div>
             ) : (
@@ -434,7 +524,7 @@ function RescheduleModal({
                       key={t}
                       type="button"
                       onClick={() => setTime(t)}
-                      className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+                      className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
                         active
                           ? "border-blue-200 bg-blue-50 text-blue-700"
                           : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
@@ -453,7 +543,7 @@ function RescheduleModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
             Cancel
           </button>
@@ -462,7 +552,7 @@ function RescheduleModal({
             type="button"
             onClick={onSave}
             disabled={saving || !date || !time}
-            className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
+            className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
               saving || !date || !time ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
             }`}
           >
@@ -481,7 +571,7 @@ function CancelModal({ booking, onClose, onConfirm, canceling }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold text-gray-900">Cancel booking?</h2>
@@ -499,12 +589,14 @@ function CancelModal({ booking, onClose, onConfirm, canceling }) {
           </button>
         </div>
 
-        <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
-          <div>
-            Date: <span className="font-semibold">{date}</span>
+        <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
+          <div className="flex items-center justify-between">
+            <span>Date</span>
+            <span className="font-semibold">{date}</span>
           </div>
-          <div>
-            Time: <span className="font-semibold">{time}</span>
+          <div className="mt-2 flex items-center justify-between">
+            <span>Time</span>
+            <span className="font-semibold">{time}</span>
           </div>
         </div>
 
@@ -513,7 +605,7 @@ function CancelModal({ booking, onClose, onConfirm, canceling }) {
             type="button"
             onClick={onClose}
             disabled={canceling}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
             Keep
           </button>
@@ -522,7 +614,7 @@ function CancelModal({ booking, onClose, onConfirm, canceling }) {
             type="button"
             onClick={onConfirm}
             disabled={canceling}
-            className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
+            className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
               canceling ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
             }`}
           >
