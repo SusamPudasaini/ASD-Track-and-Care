@@ -75,7 +75,6 @@ function normalizeText(v) {
 
 function toCurrencyMaybe(v) {
   if (v === null || v === undefined || v === "") return "—";
-  // keep as-is if already string like "Rs. 2000"
   if (typeof v === "string") return v;
   if (typeof v === "number") return `Rs. ${v}`;
   return String(v);
@@ -90,9 +89,7 @@ function StarRow({ rating, reviews }) {
     <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
       <span className="text-yellow-500">★</span>
       <span className="font-semibold text-gray-800">{safeRating ?? "—"}</span>
-      <span className="text-gray-500">
-        ({safeReviews !== null ? `${safeReviews} reviews` : "no reviews"})
-      </span>
+      <span className="text-gray-500">({safeReviews !== null ? `${safeReviews} reviews` : "no reviews"})</span>
     </div>
   );
 }
@@ -103,10 +100,10 @@ export default function Therapists() {
   const [loading, setLoading] = useState(true);
   const [therapists, setTherapists] = useState([]);
 
-  // ✅ Search bar (replaces speciality chips)
+  // ✅ Search bar
   const [search, setSearch] = useState("");
 
-  // ✅ "Load more" behaviour (UI like screenshot)
+  // ✅ Load more
   const PAGE_SIZE = 6;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
@@ -268,7 +265,6 @@ export default function Therapists() {
     });
   }, [therapists, search]);
 
-  // reset visibleCount when search changes (so load-more doesn’t hide results)
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [search]);
@@ -284,13 +280,10 @@ export default function Therapists() {
       <Navbar />
 
       <main className="mx-auto max-w-6xl px-6 py-10">
-        {/* Header like screenshot */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-gray-900">Therapists</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Browse expert therapists and book your next session today.
-            </p>
+            <p className="mt-1 text-sm text-gray-600">Browse expert therapists and book your next session today.</p>
           </div>
 
           <button
@@ -301,7 +294,6 @@ export default function Therapists() {
           </button>
         </div>
 
-        {/* Search row (replaces chips) */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-md">
             <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
@@ -326,7 +318,6 @@ export default function Therapists() {
           )}
         </div>
 
-        {/* Cards */}
         <div className="mt-8">
           {loading ? (
             <div className="text-sm text-gray-600">Loading therapists...</div>
@@ -342,12 +333,16 @@ export default function Therapists() {
                     key={t.id || t.therapistId}
                     t={t}
                     onBook={() => openBook(t)}
+                    onViewProfile={() => {
+                      const id = t.id || t.therapistId;
+                      if (!id) return toast.error("Therapist id missing.");
+                      navigate(`/therapists/${id}`, { state: { therapist: t } });
+                    }}
                     unavailable={isTherapistUnavailable(t)}
                   />
                 ))}
               </div>
 
-              {/* Load more button like screenshot */}
               <div className="mt-10 flex justify-center">
                 <button
                   type="button"
@@ -386,12 +381,9 @@ export default function Therapists() {
   );
 }
 
-function TherapistCard({ t, onBook, unavailable }) {
+function TherapistCard({ t, onBook, onViewProfile, unavailable }) {
   const name =
-    t.name ||
-    t.fullName ||
-    `${t.firstName || ""} ${t.lastName || ""}`.trim() ||
-    "Therapist";
+    t.name || t.fullName || `${t.firstName || ""} ${t.lastName || ""}`.trim() || "Therapist";
 
   const role = t.role || t.specialization || t.speciality || t.type || t.category || "Therapist";
   const qualification = t.qualification || t.degree || t.title || "—";
@@ -428,15 +420,24 @@ function TherapistCard({ t, onBook, unavailable }) {
         <Row label="Price per session" value={price} valueClass="text-[#4a6cf7] font-semibold" />
       </div>
 
-      <button
-        onClick={onBook}
-        disabled={unavailable}
-        className={`mt-6 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white ${
-          unavailable ? "cursor-not-allowed bg-gray-300" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
-        }`}
-      >
-        {unavailable ? "Unavailable" : "Book Now"}
-      </button>
+      <div className="mt-6 grid grid-cols-2 gap-2">
+        <button
+          onClick={onViewProfile}
+          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          View Profile
+        </button>
+
+        <button
+          onClick={onBook}
+          disabled={unavailable}
+          className={`w-full rounded-xl px-4 py-3 text-sm font-semibold text-white ${
+            unavailable ? "cursor-not-allowed bg-gray-300" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+          }`}
+        >
+          {unavailable ? "Unavailable" : "Book Now"}
+        </button>
+      </div>
     </div>
   );
 }

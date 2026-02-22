@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 export default function Questionnaire() {
   const navigate = useNavigate();
 
+  // refs (uncontrolled inputs)
   const age_months = useRef(null);
   const sex = useRef(null);
   const residence = useRef(null);
@@ -34,8 +35,11 @@ export default function Questionnaire() {
 
   const [serverError, setServerError] = useState(null); // string or object
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [prediction, setPrediction] = useState(null);
-  const [riskLevel, setRiskLevel] = useState("");
+
+  // results + modal
+  const [prediction, setPrediction] = useState(null); // number 0-1
+  const [riskLevel, setRiskLevel] = useState(""); // Low/Moderate/High
+  const [resultModalOpen, setResultModalOpen] = useState(false);
 
   const yesNoTo01 = (v) => (v === "Yes" ? 1 : 0);
 
@@ -87,11 +91,122 @@ export default function Questionnaire() {
     };
   };
 
+  const setRefValue = (ref, value) => {
+    if (!ref?.current) return;
+    // works for input + select
+    ref.current.value = value;
+    // fire change event (helps if you later add watchers)
+    try {
+      ref.current.dispatchEvent(new Event("change", { bubbles: true }));
+    } catch {
+      // ignore
+    }
+  };
+
+  const clearAllFields = () => {
+    setRefValue(age_months, "");
+    setRefValue(sex, "");
+    setRefValue(residence, "");
+    setRefValue(parental_education, "");
+    setRefValue(family_history_asd, "");
+
+    setRefValue(preeclampsia, "");
+    setRefValue(preterm_birth, "");
+    setRefValue(birth_asphyxia, "");
+    setRefValue(low_birth_weight, "");
+
+    setRefValue(eye_contact_age_months, "");
+    setRefValue(social_smile_months, "");
+
+    setRefValue(intellectual_disability, "");
+    setRefValue(epilepsy, "");
+    setRefValue(adhd, "");
+    setRefValue(language_disorder, "");
+    setRefValue(motor_delay, "");
+
+    setRefValue(screening_done, "");
+    setRefValue(screening_result, "");
+
+    if (consent.current) consent.current.checked = false;
+  };
+
+  // ✅ Testing autofill button
+  const handleAutofill = () => {
+    // Example realistic values (tweak anytime)
+    setRefValue(age_months, "28");
+    setRefValue(sex, "Male");
+    setRefValue(residence, "Urban");
+    setRefValue(parental_education, "College/University");
+    setRefValue(family_history_asd, "No");
+
+    setRefValue(preeclampsia, "No");
+    setRefValue(preterm_birth, "No");
+    setRefValue(birth_asphyxia, "No");
+    setRefValue(low_birth_weight, "No");
+
+    setRefValue(eye_contact_age_months, "7");
+    setRefValue(social_smile_months, "3");
+
+    setRefValue(intellectual_disability, "No");
+    setRefValue(epilepsy, "No");
+    setRefValue(adhd, "No");
+    setRefValue(language_disorder, "Yes");
+    setRefValue(motor_delay, "No");
+
+    setRefValue(screening_done, "Yes");
+    setRefValue(screening_result, "Unknown");
+
+    if (consent.current) consent.current.checked = true;
+
+    toast.success("Autofilled test values.");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const resultQuery = useMemo(() => {
+    const p = typeof prediction === "number" ? prediction : null;
+    const rl = riskLevel || (p != null ? computeRiskLevel(p) : "");
+    return new URLSearchParams({
+      p: p != null ? String(p) : "",
+      risk: rl || "",
+    }).toString();
+  }, [prediction, riskLevel]);
+
+  const normalizeServerData = (resData) => {
+    let data = resData;
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        // leave it as string
+      }
+    }
+    if (!data || typeof data !== "object") return { p: null, rl: "" };
+
+    // support multiple shapes:
+    // { probability, riskLevel } or { autism_probability } etc.
+    const p =
+      typeof data.probability === "number"
+        ? data.probability
+        : typeof data.autism_probability === "number"
+          ? data.autism_probability
+          : null;
+
+    const rl =
+      typeof data.riskLevel === "string"
+        ? data.riskLevel
+        : typeof data.risk_level === "string"
+          ? data.risk_level
+          : "";
+
+    return { p, rl };
+  };
+
   // Only empty-field checks + consent check on Submit button click
   const handlePredict = async () => {
     setServerError(null);
     setPrediction(null);
     setRiskLevel("");
+    setResultModalOpen(false);
 
     const raw = {
       age_months: age_months.current?.value ?? "",
@@ -149,7 +264,7 @@ export default function Questionnaire() {
 
     const missing = required.filter((k) => raw[k] === "");
     if (missing.length > 0) {
-      toast.error(`Please fill all required fields`);
+      toast.error("Please fill all required fields.");
       return;
     }
 
@@ -158,31 +273,20 @@ export default function Questionnaire() {
     try {
       setIsSubmitting(true);
 
-        const res = await api.post("/ml/predict", payload);
-        setPrediction(res.data.probability);
-        setRiskLevel(res.data.riskLevel);
+      const res = await api.post("/ml/predict", payload);
+      const { p, rl } = normalizeServerData(res?.data);
 
-
-
-      
-
-      // Spring is returning String body from FastAPI; parse if it is stringified JSON
-      let data = res?.data;
-      if (typeof data === "string") {
-        try {
-          data = JSON.parse(data);
-        } catch {
-          // leave as is
-        }
+      if (typeof p !== "number" || Number.isNaN(p)) {
+        throw new Error("Invalid response from server.");
       }
 
-      const p = data?.autism_probability ?? data?.probability;
-      if (typeof p !== "number") throw new Error("Invalid response from server.");
+      const finalRisk = rl || computeRiskLevel(p);
 
       setPrediction(p);
-      setRiskLevel(computeRiskLevel(p));
+      setRiskLevel(finalRisk);
 
-      // Scroll ONLY on success (remove if you don't want it)
+      // ✅ show modal instead of banner
+      setResultModalOpen(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       const data = err?.response?.data;
@@ -200,9 +304,12 @@ export default function Questionnaire() {
     </div>
   );
 
-  const Select = ({ label, inputRef, options, placeholder }) => (
+  const Select = ({ label, inputRef, options, placeholder, helper }) => (
     <div>
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      <div className="flex items-start justify-between gap-3">
+        <label className="block text-sm font-medium text-gray-700">{label}</label>
+      </div>
+      {helper ? <p className="mt-1 text-xs text-gray-500">{helper}</p> : null}
       <select
         ref={inputRef}
         defaultValue=""
@@ -218,18 +325,117 @@ export default function Questionnaire() {
     </div>
   );
 
-  const NumberInput = ({ label, inputRef, placeholder }) => (
+  const NumberInput = ({ label, inputRef, placeholder, helper, min, max }) => (
     <div>
       <label className="block text-sm font-medium text-gray-700">{label}</label>
+      {helper ? <p className="mt-1 text-xs text-gray-500">{helper}</p> : null}
       <input
         ref={inputRef}
         type="number"
         inputMode="numeric"
         placeholder={placeholder || "Enter a number"}
+        min={min}
+        max={max}
         className="mt-2 w-full rounded border border-gray-200 px-4 py-2.5 text-sm outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500"
       />
     </div>
   );
+
+  const riskBadgeClass =
+    riskLevel === "High"
+      ? "bg-red-100 text-red-800 border-red-200"
+      : riskLevel === "Moderate"
+        ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+        : "bg-green-100 text-green-800 border-green-200";
+
+  const ResultModal = () => {
+    if (!resultModalOpen) return null;
+
+    const p = typeof prediction === "number" ? prediction : 0;
+    const pct = (p * 100).toFixed(1);
+
+    return (
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+        role="dialog"
+        aria-modal="true"
+        onMouseDown={(e) => {
+          // click outside to close
+          if (e.target === e.currentTarget) setResultModalOpen(false);
+        }}
+      >
+        <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Screening Result</h3>
+              <p className="mt-1 text-sm text-gray-600">
+                This is a screening estimate and not a medical diagnosis.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setResultModalOpen(false)}
+              className="rounded-md border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="mt-5 rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Predicted ASD Probability</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900">{pct}%</p>
+              </div>
+
+              <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold ${riskBadgeClass}`}>
+                <span className="h-2 w-2 rounded-full bg-current opacity-60" />
+                Risk: {riskLevel}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            <p className="text-sm font-medium text-gray-900">What would you like to do next?</p>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => navigate(`/SuggestedTherapists?${resultQuery}`)}
+                className="rounded-lg bg-[#4a6cf7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
+              >
+                Suggested Therapists
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate(`/SuggestedActivities?${resultQuery}`)}
+                className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Suggested Activities
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setResultModalOpen(false);
+                  setPrediction(null);
+                  setRiskLevel("");
+                  clearAllFields();
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Retake Assessment
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div
@@ -240,30 +446,41 @@ export default function Questionnaire() {
           e.preventDefault();
           e.stopPropagation();
         }
+        // Escape closes modal
+        if (e.key === "Escape") {
+          setResultModalOpen(false);
+        }
       }}
     >
       <Navbar />
 
+      {/* Modal */}
+      <ResultModal />
+
       <main className="relative overflow-hidden">
         <div className="relative z-10 mx-auto max-w-4xl px-6 py-10">
           <div className="rounded-md bg-white p-6 shadow-md">
-            <h1 className="text-xl font-semibold text-gray-900">
-              Autism Risk Screening Questionnaire
-            </h1>
-            <p className="mt-2 text-sm text-gray-600">
-              This tool provides a probabilistic screening result and does not replace a professional medical diagnosis.
-            </p>
-
-            {prediction !== null && (
-              <div className="mt-5 rounded border border-green-200 bg-green-50 p-4">
-                <p className="text-sm text-green-900 font-semibold">
-                  Predicted Autism Probability: {(prediction * 100).toFixed(1)}%
-                </p>
-                <p className="mt-1 text-sm text-green-800">
-                  Risk Level: <span className="font-semibold">{riskLevel}</span>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">
+                  Autism Risk Screening Questionnaire
+                </h1>
+                <p className="mt-2 text-sm text-gray-600">
+                  This tool provides a probabilistic screening result and does not replace a professional medical diagnosis.
                 </p>
               </div>
-            )}
+
+              {/* ✅ Testing button */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleAutofill}
+                  className="rounded-md border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Autofill Test Values
+                </button>
+              </div>
+            </div>
 
             {!!serverError && (
               <div className="mt-5 rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -289,7 +506,13 @@ export default function Questionnaire() {
 
           <div className="mt-8 space-y-6">
             <Section title="Section A: Child Information">
-              <NumberInput inputRef={age_months} label="1) Child age (in months)" placeholder="e.g., 24" />
+              <NumberInput
+                inputRef={age_months}
+                label="1) Child age (in months)"
+                placeholder="e.g., 24"
+                min={0}
+                helper="Enter the child’s current age in months."
+              />
               <Select inputRef={sex} label="2) Child biological sex" options={["Male", "Female"]} />
               <Select inputRef={residence} label="3) Current residence" options={["Urban", "Rural"]} />
             </Section>
@@ -304,6 +527,7 @@ export default function Questionnaire() {
                 inputRef={family_history_asd}
                 label="5) Family history of ASD"
                 options={["Yes", "No"]}
+                helper="Includes parents, siblings, or close relatives."
               />
             </Section>
 
@@ -315,8 +539,20 @@ export default function Questionnaire() {
             </Section>
 
             <Section title="Section D: Early Developmental Milestones">
-              <NumberInput inputRef={eye_contact_age_months} label="10) Eye contact age (months)" placeholder="e.g., 10" />
-              <NumberInput inputRef={social_smile_months} label="11) Social smile age (months)" placeholder="e.g., 3" />
+              <NumberInput
+                inputRef={eye_contact_age_months}
+                label="10) Eye contact age (months)"
+                placeholder="e.g., 10"
+                min={0}
+                helper="Approximate age when consistent eye contact began."
+              />
+              <NumberInput
+                inputRef={social_smile_months}
+                label="11) Social smile age (months)"
+                placeholder="e.g., 3"
+                min={0}
+                helper="Approximate age when social smiling began."
+              />
             </Section>
 
             <Section title="Section E: Developmental and Medical Conditions">
@@ -339,6 +575,7 @@ export default function Questionnaire() {
                 label="18) If yes, what was the screening outcome?"
                 options={["Positive", "Negative", "Unknown"]}
                 placeholder="Select (only required if Q17 is Yes)"
+                helper="Only required when Q17 is Yes."
               />
             </Section>
 
