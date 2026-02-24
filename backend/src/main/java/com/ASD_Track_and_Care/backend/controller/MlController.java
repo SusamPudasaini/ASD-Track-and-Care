@@ -10,6 +10,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,11 +19,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/ml")
+@RequestMapping("/api/ml")
 public class MlController {
 
     private static final Logger log = LoggerFactory.getLogger(MlController.class);
@@ -42,6 +44,113 @@ public class MlController {
         this.userRepo = userRepo;
     }
 
+    // -------------------- ✅ shared: resolve logged-in user --------------------
+    private User requireLoggedInUser(String authorizationHeader) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+        log.info("AUTH DEBUG => name={}, principal={}, authenticated={}, AuthorizationPresent={}",
+                auth != null ? auth.getName() : null,
+                auth != null ? auth.getPrincipal() : null,
+                auth != null && auth.isAuthenticated(),
+                authorizationHeader != null && !authorizationHeader.isBlank()
+        );
+
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+            throw new RuntimeException("UNAUTHORIZED");
+        }
+
+        String name = auth.getName();
+
+        Optional<User> byUsername = userRepo.findByUsername(name);
+        Optional<User> byEmail = userRepo.findByUserEmail(name);
+
+        return byUsername.or(() -> byEmail)
+                .orElseThrow(() -> new RuntimeException("User not found by username/email: " + name));
+    }
+
+    // -------------------- ✅ NEW: GET latest screening record --------------------
+    @GetMapping("/last")
+    public ResponseEntity<?> last(
+            @RequestHeader(value = "Authorization", required = false) String authorization
+    ) {
+        try {
+            User user = requireLoggedInUser(authorization);
+
+            Optional<QuestionnaireRecord> recOpt = repo.findTopByUser_IdOrderByIdDesc(user.getId());
+            if (recOpt.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "hasHistory", false
+                ));
+            }
+
+            QuestionnaireRecord r = recOpt.get();
+            return ResponseEntity.ok(Map.of(
+                    "hasHistory", true,
+                    "id", r.getId(),
+                    "probability", r.getProbability(),
+                    "riskLevel", r.getRiskLevel()
+                    // add createdAt if you have it in entity
+            ));
+        } catch (RuntimeException ex) {
+            if ("UNAUTHORIZED".equals(ex.getMessage())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Please login first"));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "message", "Could not load last result",
+                    "error", ex.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "message", "Could not load last result",
+                    "error", e.getClass().getSimpleName() + ": " + e.getMessage()
+            ));
+        }
+    }
+
+    // -------------------- ✅ NEW: GET history --------------------
+    @GetMapping("/history")
+    public ResponseEntity<?> history(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestParam(value = "limit", required = false, defaultValue = "10") int limit
+    ) {
+        try {
+            User user = requireLoggedInUser(authorization);
+
+            int safeLimit = Math.max(1, Math.min(limit, 50));
+            Pageable pageable = PageRequest.of(0, safeLimit);
+
+            List<QuestionnaireRecord> list = repo.findByUser_IdOrderByIdDesc(user.getId(), pageable);
+
+            // ⚠️ Only return safe fields (avoid sending all inputs)
+            List<Map<String, Object>> out = list.stream().map(r -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", r.getId());
+                m.put("probability", r.getProbability());
+                m.put("riskLevel", r.getRiskLevel());
+                // if you have timestamps, add:
+                // m.put("createdAt", r.getCreatedAt());
+                return m;
+            }).collect(Collectors.toList());
+
+            return ResponseEntity.ok(out);
+
+        } catch (RuntimeException ex) {
+            if ("UNAUTHORIZED".equals(ex.getMessage())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Please login first"));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "message", "Could not load history",
+                    "error", ex.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "message", "Could not load history",
+                    "error", e.getClass().getSimpleName() + ": " + e.getMessage()
+            ));
+        }
+    }
+
+    // -------------------- EXISTING: POST /predict --------------------
     @PostMapping("/predict")
     public ResponseEntity<?> predict(
             @RequestHeader(value = "Authorization", required = false) String authorization,
@@ -51,30 +160,16 @@ public class MlController {
         // -------------------- 0) GET LOGGED IN USER --------------------
         User user;
         try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-
-            log.info("AUTH DEBUG => name={}, principal={}, authenticated={}, AuthorizationPresent={}",
-                    auth != null ? auth.getName() : null,
-                    auth != null ? auth.getPrincipal() : null,
-                    auth != null && auth.isAuthenticated(),
-                    authorization != null && !authorization.isBlank()
-            );
-
-            if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
-                        "message", "Please login first"
-                ));
+            user = requireLoggedInUser(authorization);
+        } catch (RuntimeException ex) {
+            if ("UNAUTHORIZED".equals(ex.getMessage())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Please login first"));
             }
-
-            // auth.getName() may be username OR email depending on your JWT setup
-            String name = auth.getName();
-
-            Optional<User> byUsername = userRepo.findByUsername(name);
-            Optional<User> byEmail = userRepo.findByUserEmail(name);
-
-            user = byUsername.or(() -> byEmail)
-                    .orElseThrow(() -> new RuntimeException("User not found by username/email: " + name));
-
+            log.error("Failed to resolve logged-in user", ex);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "message", "Authentication error",
+                    "error", ex.getMessage()
+            ));
         } catch (Exception e) {
             log.error("Failed to resolve logged-in user", e);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
@@ -183,13 +278,14 @@ public class MlController {
             JsonNode node = mapper.readTree(body);
 
             Double probability = null;
-            // ✅ FastAPI returns {"asd_probability_score": pred}
             if (node.hasNonNull("asd_probability_score")) {
                 probability = node.get("asd_probability_score").asDouble();
             } else if (node.hasNonNull("probability")) {
                 probability = node.get("probability").asDouble();
             } else if (node.hasNonNull("autism_probability")) {
                 probability = node.get("autism_probability").asDouble();
+            } else if (node.hasNonNull("asd_probability_score")) {
+                probability = node.get("asd_probability_score").asDouble();
             }
 
             if (probability == null) {
@@ -204,11 +300,11 @@ public class MlController {
             // ✅ dataset-based thresholds
             String riskLevel;
             if (probability < 0.012) {
-                riskLevel = "Low";          // bottom ~5%
+                riskLevel = "Low";
             } else if (probability < 0.060) {
-                riskLevel = "Moderate";     // ~5% to ~50%
+                riskLevel = "Moderate";
             } else {
-                riskLevel = "High";         // top ~50%
+                riskLevel = "High";
             }
 
             record.setProbability(probability);

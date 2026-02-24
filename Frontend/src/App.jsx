@@ -29,8 +29,7 @@ import VisualMemory from "./pages/activities/VisualMemory";
 import SoundTherapy from "./pages/activities/SoundTherapy";
 
 import TherapistProfile from "./pages/TherapistProfile";
-import SuggestedTherapists from "./pages/SuggestedTherapists";
-import SuggestedActivities from "./pages/SuggestedActivities";
+
 
 import Home from "./pages/Home";
 
@@ -84,8 +83,6 @@ export default function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/therapists" element={<Therapists />} />
           <Route path="/therapists/:id" element={<TherapistProfile />} />
-          <Route path="/RecommendedTherapists" element={<SuggestedTherapists />} />
-          <Route path="/RecommendedActivities" element={<SuggestedActivities />} />
           <Route path="/bookings" element={<Bookings />} />          
           <Route path="/payment-success" element={<PaymentSuccess />} />
 

@@ -15,7 +15,7 @@ public class CreateBookingRequest {
     private String time;
 
     // for future Khalti integration
-    private String pidx;
+    private String pidx; 
 
     public Long getTherapistId() { return therapistId; }
     public void setTherapistId(Long therapistId) { this.therapistId = therapistId; }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const THERAPISTS_ENDPOINT = "/api/therapists"; // GET
 const CREATE_BOOKING_ENDPOINT = "/api/bookings"; // POST { therapistId, date, time }
@@ -94,8 +94,93 @@ function StarRow({ rating, reviews }) {
   );
 }
 
+// ✅ recommendation scoring
+function scoreTherapistForRisk(t, risk) {
+  const riskNorm = String(risk || "").toLowerCase();
+  const blob = normalizeText(
+    [
+      t?.role,
+      t?.specialization,
+      t?.speciality,
+      t?.type,
+      t?.category,
+      t?.qualification,
+      t?.degree,
+      t?.title,
+      t?.bio,
+      t?.about,
+      t?.description,
+    ].filter(Boolean).join(" ")
+  );
+
+  // keyword sets
+  const high = [
+    "autism",
+    "asd",
+    "aba",
+    "behavior",
+    "behaviour",
+    "occupational",
+    "ot",
+    "speech",
+    "speech therapy",
+    "developmental",
+    "child psychiatrist",
+    "pediatric",
+    "pediatrician",
+  ];
+  const moderate = [
+    "developmental",
+    "early intervention",
+    "speech",
+    "occupational",
+    "ot",
+    "child psychology",
+    "psychologist",
+    "behavior",
+    "behaviour",
+    "social skills",
+  ];
+  const low = [
+    "child psychologist",
+    "psychologist",
+    "counselor",
+    "counsellor",
+    "therapy",
+    "parent coaching",
+    "general",
+    "support",
+  ];
+
+  const pick = riskNorm === "high" ? high : riskNorm === "moderate" ? moderate : low;
+
+  let pts = 0;
+  for (const k of pick) {
+    if (blob.includes(k)) pts += 2;
+  }
+
+  // mild boosts
+  const exp = Number(t?.experienceYears ?? t?.yearsExperience ?? t?.years ?? 0);
+  if (Number.isFinite(exp)) pts += Math.min(exp, 20) * 0.1;
+
+  const rating = Number(t?.rating ?? t?.avgRating ?? t?.stars ?? 0);
+  if (Number.isFinite(rating)) pts += Math.min(rating, 5) * 0.2;
+
+  // deprioritize unavailable slightly (still shown)
+  if (isTherapistUnavailable(t)) pts -= 2;
+
+  return pts;
+}
+
 export default function Therapists() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // ✅ recommended mode from query params
+  const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const recP = useMemo(() => Number(query.get("p") || 0), [query]);
+  const recRisk = useMemo(() => (query.get("risk") || "").trim(), [query]);
+  const isRecommendedMode = useMemo(() => query.has("p") || !!recRisk, [query, recRisk]);
 
   const [loading, setLoading] = useState(true);
   const [therapists, setTherapists] = useState([]);
@@ -265,15 +350,33 @@ export default function Therapists() {
     });
   }, [therapists, search]);
 
+  // ✅ Prioritize when in recommended mode (keeps "show all" but reorders)
+  const recommendedTherapists = useMemo(() => {
+    if (!isRecommendedMode) return filteredTherapists;
+    const risk = recRisk || (query.has("p") ? (recP >= 0.66 ? "High" : recP >= 0.33 ? "Moderate" : "Low") : "Low");
+
+    return [...filteredTherapists].sort((a, b) => scoreTherapistForRisk(b, risk) - scoreTherapistForRisk(a, risk));
+  }, [filteredTherapists, isRecommendedMode, recRisk, recP, query]);
+
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [search]);
+  }, [search, isRecommendedMode, recRisk, recP]);
 
   const visibleTherapists = useMemo(() => {
-    return filteredTherapists.slice(0, visibleCount);
-  }, [filteredTherapists, visibleCount]);
+    return recommendedTherapists.slice(0, visibleCount);
+  }, [recommendedTherapists, visibleCount]);
 
-  const canLoadMore = visibleCount < filteredTherapists.length;
+  const canLoadMore = visibleCount < recommendedTherapists.length;
+
+  const derivedRisk = useMemo(() => {
+    if (recRisk) return recRisk;
+    if (query.has("p")) {
+      if (recP >= 0.66) return "High";
+      if (recP >= 0.33) return "Moderate";
+      return "Low";
+    }
+    return "";
+  }, [recRisk, recP, query]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -293,6 +396,38 @@ export default function Therapists() {
             ⏱ Booking History
           </button>
         </div>
+
+        {/* ✅ Recommended mode banner */}
+        {isRecommendedMode && (
+          <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="font-semibold">Recommended Mode is ON</div>
+                <div className="text-blue-800">
+                  Prioritizing therapists for <span className="font-semibold">{derivedRisk || "your result"}</span>
+                  {query.has("p") ? (
+                    <>
+                      {" "}
+                      (ASD probability: <span className="font-semibold">{(recP * 100).toFixed(1)}%</span>)
+                    </>
+                  ) : null}
+                  .
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  navigate("/therapists", { replace: true });
+                }}
+                className="rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+              >
+                Reset (View all)
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-md">
@@ -321,7 +456,7 @@ export default function Therapists() {
         <div className="mt-8">
           {loading ? (
             <div className="text-sm text-gray-600">Loading therapists...</div>
-          ) : filteredTherapists.length === 0 ? (
+          ) : recommendedTherapists.length === 0 ? (
             <div className="rounded-xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
               No therapists found.
             </div>
@@ -346,7 +481,7 @@ export default function Therapists() {
               <div className="mt-10 flex justify-center">
                 <button
                   type="button"
-                  onClick={() => setVisibleCount((c) => Math.min(c + PAGE_SIZE, filteredTherapists.length))}
+                  onClick={() => setVisibleCount((c) => Math.min(c + PAGE_SIZE, recommendedTherapists.length))}
                   disabled={!canLoadMore}
                   className={`inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-3 text-sm font-semibold ${
                     canLoadMore
@@ -382,8 +517,7 @@ export default function Therapists() {
 }
 
 function TherapistCard({ t, onBook, onViewProfile, unavailable }) {
-  const name =
-    t.name || t.fullName || `${t.firstName || ""} ${t.lastName || ""}`.trim() || "Therapist";
+  const name = t.name || t.fullName || `${t.firstName || ""} ${t.lastName || ""}`.trim() || "Therapist";
 
   const role = t.role || t.specialization || t.speciality || t.type || t.category || "Therapist";
   const qualification = t.qualification || t.degree || t.title || "—";
