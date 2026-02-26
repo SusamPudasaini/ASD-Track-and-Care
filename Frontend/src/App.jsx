@@ -28,6 +28,8 @@ import NumberMemory from "./pages/activities/NumberMemory";
 import VisualMemory from "./pages/activities/VisualMemory";
 import SoundTherapy from "./pages/activities/SoundTherapy";
 
+import Analytics from "./pages/Analytics";
+
 import TherapistProfile from "./pages/TherapistProfile";
 
 
@@ -83,7 +85,8 @@ export default function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/therapists" element={<Therapists />} />
           <Route path="/therapists/:id" element={<TherapistProfile />} />
-          <Route path="/bookings" element={<Bookings />} />          
+          <Route path="/bookings" element={<Bookings />} />
+          <Route path="/analytics" element={<Analytics />} />          
           <Route path="/payment-success" element={<PaymentSuccess />} />
 
           {/* ✅ Activities */}

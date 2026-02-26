@@ -156,7 +156,7 @@ export default function NumberMemory() {
 
   async function fail() {
     // if you failed at digits = N, max remembered is N-1
-    const maxDigits = Math.max(0, digits - 1);
+    const maxDigits = Math.max(1, digits - 1);
     setPhase("fail");
     await saveResult(maxDigits);
   }

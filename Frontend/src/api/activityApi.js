@@ -1,17 +1,26 @@
+// src/api/activityApi.js
 import api from "./axios";
 
-// Save one attempt/session
+/**
+ * Save an activity result
+ * Backend: POST /api/activities/results
+ * Body: { type: "NUMBER_MEMORY", score: 5, details: {...} }
+ */
 export async function saveActivityResult(payload) {
-  // payload example:
-  // { type: "REACTION_TIME", score: 245, details: { trials: [...], averageMs: 245 } }
   const res = await api.post("/api/activities/results", payload);
   return res.data;
 }
 
-// Get recent history for an activity type
-export async function getMyActivityResults(type, limit = 20) {
-  const res = await api.get("/api/activities/results/me", {
-    params: { type, limit },
-  });
+/**
+ * Get current user's activity results (history/analytics)
+ * Backend: GET /api/analytics/activities?type=NUMBER_MEMORY&limit=12
+ */
+export async function getMyActivityResults(type, limit = 12) {
+  const params = {
+    limit,
+    type: type || undefined,
+  };
+
+  const res = await api.get("/api/analytics/activities", { params });
   return res.data;
 }

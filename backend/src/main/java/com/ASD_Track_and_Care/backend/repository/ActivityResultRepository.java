@@ -8,5 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ActivityResultRepository extends JpaRepository<ActivityResult, Long> {
-    List<ActivityResult> findByUsernameAndTypeOrderByCreatedAtDesc(String username, ActivityType type, Pageable pageable);
-}
+	  List<ActivityResult> findByUsernameOrderByCreatedAtDesc(String username, Pageable pageable);
+
+	    List<ActivityResult> findByUsernameAndTypeOrderByCreatedAtDesc(String username, ActivityType type, Pageable pageable);
+	}
