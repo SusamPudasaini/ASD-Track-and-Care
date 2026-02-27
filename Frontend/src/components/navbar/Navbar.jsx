@@ -27,7 +27,9 @@ export default function Navbar() {
   });
 
   const role = useMemo(() => {
-    const r = (me?.role || localStorage.getItem("role") || "").toString().toUpperCase();
+    const r = (me?.role || localStorage.getItem("role") || "")
+      .toString()
+      .toUpperCase();
     return r;
   }, [me]);
 
@@ -39,7 +41,6 @@ export default function Navbar() {
   }, []);
 
   const avatarUrl = useMemo(() => {
-    // backend ProfileResponse uses profilePictureUrl
     const raw =
       me?.profilePictureUrl ||
       me?.avatarUrl ||
@@ -47,21 +48,14 @@ export default function Navbar() {
       "";
 
     if (!raw) return "";
-
-    // ✅ keep blob preview working
     if (raw.startsWith("blob:")) return raw;
-
-    // ✅ already absolute
     if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-
-    // ✅ relative -> serve from backend (NOT frontend)
     if (raw.startsWith("/")) return `${backendBase}${raw}`;
 
-    // fallback
     return `${backendBase}/${raw}`;
   }, [me, backendBase]);
 
-  // refresh user info (optional, but nice)
+  // refresh user info
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -77,12 +71,15 @@ export default function Navbar() {
         if (res?.data?.role) localStorage.setItem("role", res.data.role);
 
         if (res?.data?.profilePictureUrl) {
-          localStorage.setItem("profilePictureUrl", res.data.profilePictureUrl);
+          localStorage.setItem(
+            "profilePictureUrl",
+            res.data.profilePictureUrl
+          );
         } else {
           localStorage.removeItem("profilePictureUrl");
         }
       } catch {
-        // ignore: navbar still uses cached values
+        // ignore
       }
     })();
 
@@ -112,7 +109,11 @@ export default function Navbar() {
         <div className="flex items-center justify-between">
           {/* logo */}
           <Link to="/" className="flex items-center">
-            <img src="/images/logo/asd-logo.png" alt="ASD" className="h-10" />
+            <img
+              src="/images/logo/asd-logo.png"
+              alt="ASD"
+              className="h-10"
+            />
           </Link>
 
           {/* center nav */}
@@ -153,7 +154,6 @@ export default function Navbar() {
                         alt="Me"
                         className="h-full w-full object-cover"
                         onError={(e) => {
-                          // fallback if url broken
                           e.currentTarget.style.display = "none";
                         }}
                       />
@@ -186,6 +186,14 @@ export default function Navbar() {
                       className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
                     >
                       Activities Hub
+                    </button>
+
+                    {/* ✅ NEW ANALYTICS PAGE */}
+                    <button
+                      onClick={() => go("/analytics")}
+                      className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Analytics
                     </button>
 
                     {role === "ADMIN" && (
