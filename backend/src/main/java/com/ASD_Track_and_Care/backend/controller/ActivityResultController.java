@@ -34,7 +34,7 @@ public class ActivityResultController {
         this.mapper = mapper;
     }
 
-    // ✅ DTO for create
+    // DTO for create
     public static class ActivityResultCreateRequest {
         @NotBlank
         public String type; // e.g. "REACTION_TIME"

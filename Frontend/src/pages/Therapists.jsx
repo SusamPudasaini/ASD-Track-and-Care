@@ -4,6 +4,20 @@ import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 import { useLocation, useNavigate } from "react-router-dom";
 
+// ✅ FontAwesome (react-icons / FA6)
+import {
+  FaClockRotateLeft,
+  FaMagnifyingGlass,
+  FaRotateLeft,
+  FaArrowsRotate,
+  FaStar,
+  FaUser,
+  FaXmark,
+  FaCalendarDays,
+  FaClock,
+  FaCircleInfo,
+} from "react-icons/fa6";
+
 const THERAPISTS_ENDPOINT = "/api/therapists"; // GET
 const CREATE_BOOKING_ENDPOINT = "/api/bookings"; // POST { therapistId, date, time }
 
@@ -87,7 +101,7 @@ function StarRow({ rating, reviews }) {
 
   return (
     <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
-      <span className="text-yellow-500">★</span>
+      <FaStar className="text-yellow-500" />
       <span className="font-semibold text-gray-800">{safeRating ?? "—"}</span>
       <span className="text-gray-500">({safeReviews !== null ? `${safeReviews} reviews` : "no reviews"})</span>
     </div>
@@ -110,7 +124,9 @@ function scoreTherapistForRisk(t, risk) {
       t?.bio,
       t?.about,
       t?.description,
-    ].filter(Boolean).join(" ")
+    ]
+      .filter(Boolean)
+      .join(" ")
   );
 
   // keyword sets
@@ -393,7 +409,8 @@ export default function Therapists() {
             onClick={() => navigate("/bookings")}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4a6cf7] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#3f5ee0]"
           >
-            ⏱ Booking History
+            <FaClockRotateLeft />
+            Booking History
           </button>
         </div>
 
@@ -401,17 +418,20 @@ export default function Therapists() {
         {isRecommendedMode && (
           <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="font-semibold">Recommended Mode is ON</div>
-                <div className="text-blue-800">
-                  Prioritizing therapists for <span className="font-semibold">{derivedRisk || "your result"}</span>
-                  {query.has("p") ? (
-                    <>
-                      {" "}
-                      (ASD probability: <span className="font-semibold">{(recP * 100).toFixed(1)}%</span>)
-                    </>
-                  ) : null}
-                  .
+              <div className="flex items-start gap-3">
+                <FaCircleInfo className="mt-0.5 text-blue-700" />
+                <div>
+                  <div className="font-semibold">Recommended Mode is ON</div>
+                  <div className="text-blue-800">
+                    Prioritizing therapists for <span className="font-semibold">{derivedRisk || "your result"}</span>
+                    {query.has("p") ? (
+                      <>
+                        {" "}
+                        (ASD probability: <span className="font-semibold">{(recP * 100).toFixed(1)}%</span>)
+                      </>
+                    ) : null}
+                    .
+                  </div>
                 </div>
               </div>
 
@@ -421,8 +441,9 @@ export default function Therapists() {
                   setSearch("");
                   navigate("/therapists", { replace: true });
                 }}
-                className="rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
               >
+                <FaRotateLeft />
                 Reset (View all)
               </button>
             </div>
@@ -431,7 +452,9 @@ export default function Therapists() {
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-md">
-            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+              <FaMagnifyingGlass />
+            </span>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -489,7 +512,7 @@ export default function Therapists() {
                       : "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed"
                   }`}
                 >
-                  Load More Therapists <span className={`${canLoadMore ? "" : "opacity-50"}`}>⟳</span>
+                  Load More Therapists <FaArrowsRotate className={`${canLoadMore ? "" : "opacity-50"}`} />
                 </button>
               </div>
             </>
@@ -537,7 +560,10 @@ function TherapistCard({ t, onBook, onViewProfile, unavailable }) {
           {image ? (
             <img src={image} alt={name} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">No image</div>
+            <div className="flex h-full w-full items-center justify-center gap-2 text-xs text-gray-400">
+              <FaUser />
+              No image
+            </div>
           )}
         </div>
 
@@ -614,9 +640,10 @@ function BookModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+            className="inline-flex items-center justify-center rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+            aria-label="Close"
           >
-            ✕
+            <FaXmark />
           </button>
         </div>
 
@@ -629,13 +656,18 @@ function BookModal({
             <div className="mt-5 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Select date</label>
-                <input
-                  type="date"
-                  value={date}
-                  min={todayISO()}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                />
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <FaCalendarDays />
+                  </span>
+                  <input
+                    type="date"
+                    value={date}
+                    min={todayISO()}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 pl-11 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
               </div>
 
               <div>
@@ -671,7 +703,10 @@ function BookModal({
                               : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                           }`}
                         >
-                          {t}
+                          <span className="inline-flex items-center gap-2">
+                            <FaClock className={`${active ? "text-blue-700" : "text-gray-400"}`} />
+                            {t}
+                          </span>
                         </button>
                       );
                     })}

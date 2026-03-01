@@ -15,6 +15,21 @@ import {
   Legend,
 } from "recharts";
 
+// ✅ FontAwesome (react-icons / FA6)
+import {
+  FaChartLine,
+  FaChartColumn,
+  FaCalendarDays,
+  FaFilter,
+  FaGaugeHigh,
+  FaListCheck,
+  FaTrophy,
+  FaBug,
+  FaArrowTrendUp,
+  FaRegClock,
+  FaHashtag,
+} from "react-icons/fa6";
+
 const LABELS = {
   REACTION_TIME: "Reaction Time",
   SEQUENCE_MEMORY: "Sequence Memory",
@@ -47,9 +62,6 @@ function clamp01(x) {
 
 /**
  * Normalizes a score to a 0–100 "performance" scale per activity type.
- * - If we have enough samples, uses min/max scaling within that activity type.
- * - If few samples, uses rough fallback heuristics.
- * - Respects LOWER_BETTER vs HIGHER_BETTER direction.
  */
 function normalizePerformance(type, score, allScoresForType) {
   if (!Number.isFinite(score)) return null;
@@ -62,11 +74,11 @@ function normalizePerformance(type, score, allScoresForType) {
   // fallback if very few data points
   if (scores.length < 3) {
     if (dir === "LOWER_BETTER") {
-      // for reaction time: assume 0ms best, 1000ms worst
+      // reaction time: 0ms best, 1000ms worst
       const p = 1 - clamp01(score / 1000);
       return Math.round(p * 100);
     } else {
-      // for memory-ish scores: assume 0..10 range
+      // memory-ish: assume 0..10
       const p = clamp01(score / 10);
       return Math.round(p * 100);
     }
@@ -101,13 +113,14 @@ export default function Analytics() {
     message: "",
   });
 
+  // ✅ show/hide debug (nicer than always showing)
+  const [showDebug, setShowDebug] = useState(false);
+
   useEffect(() => {
     let mounted = true;
 
     async function load() {
-      const url = `/api/analytics/activities?limit=400${
-        type ? `&type=${encodeURIComponent(type)}` : ""
-      }`;
+      const url = `/api/analytics/activities?limit=400${type ? `&type=${encodeURIComponent(type)}` : ""}`;
 
       try {
         setLoading(true);
@@ -257,7 +270,6 @@ export default function Analytics() {
     const total = ranged.length;
     const unique = new Set(ranged.map((r) => r.type)).size;
 
-    // average depends on mode
     let avg = 0;
     if (total) {
       if (mode === "performance") {
@@ -270,7 +282,6 @@ export default function Analytics() {
       }
     }
 
-    // best depends on direction + mode (performance higher is always better)
     let best = null;
     if (total) {
       if (mode === "performance") {
@@ -286,18 +297,11 @@ export default function Analytics() {
           return p > bp ? r : bestRow;
         }, null);
       } else {
-        // raw: direction differs per type, so show "best attempt" only if filtered to one type
         if (type) {
           const dir = DIRECTION[type] || "HIGHER_BETTER";
           best = ranged.reduce((bestRow, r) => {
             if (bestRow == null) return r;
-            return dir === "LOWER_BETTER"
-              ? r.score < bestRow.score
-                ? r
-                : bestRow
-              : r.score > bestRow.score
-              ? r
-              : bestRow;
+            return dir === "LOWER_BETTER" ? (r.score < bestRow.score ? r : bestRow) : r.score > bestRow.score ? r : bestRow;
           }, null);
         }
       }
@@ -306,98 +310,145 @@ export default function Analytics() {
     return { total, unique, avg, best };
   }, [ranged, mode, scoresByType, type]);
 
+  const modeLabel = mode === "performance" ? "Normalized (0–100)" : "Raw scores";
+  const rangeLabel = range === "all" ? "All time" : `Last ${range} days`;
+  const typeLabel = type ? (LABELS[type] || type) : "All Activities";
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
 
       <main className="mx-auto max-w-6xl px-6 py-10">
+        {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-gray-900">Analytics</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Progress tracking across activities.
-            </p>
+            <div className="flex items-center gap-2">
+              <FaArrowTrendUp className="text-[#4a6cf7]" />
+              <h1 className="text-3xl font-semibold text-gray-900">Analytics</h1>
+            </div>
+            <p className="mt-1 text-sm text-gray-600">Progress tracking across activities.</p>
+
+            {/* subtle chips summary */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip icon={<FaFilter />} text={typeLabel} />
+              <Chip icon={<FaCalendarDays />} text={rangeLabel} />
+              <Chip icon={<FaGaugeHigh />} text={modeLabel} />
+            </div>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm"
-            >
-              <option value="">All Activities</option>
-              {Object.keys(LABELS).map((k) => (
-                <option key={k} value={k}>
-                  {LABELS[k]}
-                </option>
-              ))}
-            </select>
+          {/* Right-side action */}
+          <button
+            type="button"
+            onClick={() => setShowDebug((s) => !s)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            <FaBug />
+            {showDebug ? "Hide Debug" : "Show Debug"}
+          </button>
+        </div>
 
-            <select
-              value={range}
-              onChange={(e) => setRange(e.target.value)}
-              className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm"
-            >
-              <option value="7">Last 7 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="90">Last 90 days</option>
-              <option value="all">All time</option>
-            </select>
+        {/* Filters */}
+        <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <FaFilter />
+                </span>
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:w-[220px]"
+                >
+                  <option value="">All Activities</option>
+                  {Object.keys(LABELS).map((k) => (
+                    <option key={k} value={k}>
+                      {LABELS[k]}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <select
-              value={mode}
-              onChange={(e) => setMode(e.target.value)}
-              className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm"
-            >
-              <option value="performance">Normalized (0–100)</option>
-              <option value="raw">Raw scores</option>
-            </select>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <FaCalendarDays />
+                </span>
+                <select
+                  value={range}
+                  onChange={(e) => setRange(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:w-[190px]"
+                >
+                  <option value="7">Last 7 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                  <option value="all">All time</option>
+                </select>
+              </div>
+
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <FaGaugeHigh />
+                </span>
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:w-[210px]"
+                >
+                  <option value="performance">Normalized (0–100)</option>
+                  <option value="raw">Raw scores</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="text-sm text-gray-500">
+              <span className="inline-flex items-center gap-2">
+                <FaHashtag className="text-gray-400" />
+                Rows: <span className="font-semibold text-gray-800">{rows.length}</span>
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Debug panel (keep for now, remove later) */}
-        <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700">
-          <div>
-            <span className="font-semibold">Debug URL:</span>{" "}
-            {debug.lastUrl || "—"}
+        {/* Debug panel */}
+        {showDebug && (
+          <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700">
+            <div>
+              <span className="font-semibold">Debug URL:</span> {debug.lastUrl || "—"}
+            </div>
+            <div>
+              <span className="font-semibold">HTTP Status:</span> {debug.status || "—"}
+            </div>
+            <div>
+              <span className="font-semibold">Message:</span> {debug.message || "—"}
+            </div>
+            <div className="mt-2">
+              <span className="font-semibold">Rows loaded:</span> {rows.length}
+              {rows[0] ? (
+                <>
+                  <span className="ml-3 font-semibold">First row:</span> {rows[0].type} / {rows[0].score} / {rows[0].createdAt}
+                </>
+              ) : null}
+            </div>
           </div>
-          <div>
-            <span className="font-semibold">HTTP Status:</span>{" "}
-            {debug.status || "—"}
-          </div>
-          <div>
-            <span className="font-semibold">Message:</span>{" "}
-            {debug.message || "—"}
-          </div>
-          <div className="mt-2">
-            <span className="font-semibold">Rows loaded:</span> {rows.length}
-            {rows[0] ? (
-              <>
-                <span className="ml-3 font-semibold">First row:</span>{" "}
-                {rows[0].type} / {rows[0].score} / {rows[0].createdAt}
-              </>
-            ) : null}
-          </div>
-        </div>
+        )}
 
         {/* KPI Cards */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card title="Total attempts" value={kpis.total} />
-          <Card title="Activities used" value={kpis.unique} />
-          <Card
+          <KpiCard icon={<FaListCheck />} title="Total attempts" value={kpis.total} />
+          <KpiCard icon={<FaChartColumn />} title="Activities used" value={kpis.unique} />
+          <KpiCard
+            icon={<FaGaugeHigh />}
             title={mode === "performance" ? "Avg performance" : "Average score"}
             value={kpis.total ? kpis.avg.toFixed(2) : "—"}
+            hint={mode === "performance" ? "Higher is better" : "Depends on activity"}
           />
-          <Card
+          <KpiCard
+            icon={<FaTrophy />}
             title="Best attempt"
             value={
               kpis.best
                 ? mode === "performance"
-                  ? `${normalizePerformance(
-                      kpis.best.type,
-                      kpis.best.score,
-                      scoresByType.get(kpis.best.type)
-                    )}%`
+                  ? `${normalizePerformance(kpis.best.type, kpis.best.score, scoresByType.get(kpis.best.type))}%`
                   : kpis.best.score.toFixed(2)
                 : "—"
             }
@@ -408,103 +459,121 @@ export default function Analytics() {
         {loading ? (
           <div className="mt-10 text-sm text-gray-600">Loading analytics...</div>
         ) : ranged.length === 0 ? (
-          <div className="mt-10 rounded-xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
+          <div className="mt-10 rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
             No activity results found yet for this account.
             <div className="mt-2 text-xs text-gray-500">
-              Make sure you played an activity while logged in, and that it
-              successfully POSTed to <b>/api/activities/results</b>.
+              Make sure you played an activity while logged in, and that it successfully POSTed to <b>/api/activities/results</b>.
             </div>
           </div>
         ) : (
           <div className="mt-10 grid gap-6 lg:grid-cols-2">
+            {/* Line chart */}
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <div className="text-lg font-semibold text-gray-900">
-                Progress over time
-              </div>
-              <div className="mt-1 text-xs text-gray-500">
-                {mode === "performance"
-                  ? "0–100 scale (higher is better)"
-                  : "Raw score (meaning depends on activity)"}
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                    <FaChartLine className="text-[#4a6cf7]" />
+                    Progress over time
+                  </div>
+                  <div className="mt-1 text-xs text-gray-500">
+                    {mode === "performance" ? "0–100 scale (higher is better)" : "Raw score (meaning depends on activity)"}
+                  </div>
+                </div>
               </div>
 
               <div className="mt-6 h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis domain={mode === "performance" ? [0, 100] : undefined} />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis domain={mode === "performance" ? [0, 100] : undefined} tick={{ fontSize: 12 }} />
                     <Tooltip />
                     <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      name={mode === "performance" ? "Performance" : "Score"}
-                      dot={false}
-                    />
+                    <Line type="monotone" dataKey="value" name={mode === "performance" ? "Performance" : "Score"} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
+            {/* Bar chart */}
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <div className="text-lg font-semibold text-gray-900">
-                {mode === "performance"
-                  ? "Average performance by activity"
-                  : "Average score by activity"}
+              <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                <FaChartColumn className="text-[#4a6cf7]" />
+                {mode === "performance" ? "Average performance by activity" : "Average score by activity"}
               </div>
 
               <div className="mt-6 h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={avgByType}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="label" />
-                    <YAxis domain={mode === "performance" ? [0, 100] : undefined} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} height={60} angle={-20} textAnchor="end" />
+                    <YAxis domain={mode === "performance" ? [0, 100] : undefined} tick={{ fontSize: 12 }} />
                     <Tooltip />
                     <Legend />
-                    <Bar
-                      dataKey="value"
-                      name={mode === "performance" ? "Avg performance" : "Avg score"}
-                    />
+                    <Bar dataKey="value" name={mode === "performance" ? "Avg performance" : "Avg score"} />
                     <Bar dataKey="attempts" name="Attempts" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
+            {/* Recent results table */}
             <div className="lg:col-span-2 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <div className="text-lg font-semibold text-gray-900">Recent results</div>
-              <div className="mt-4 overflow-hidden rounded-lg border border-gray-100">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                  <FaRegClock className="text-[#4a6cf7]" />
+                  Recent results
+                </div>
+                <div className="text-xs text-gray-500">{rangeLabel}</div>
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-xl border border-gray-100">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-gray-700">
                     <tr>
-                      <th className="px-4 py-2 text-left">Date</th>
-                      <th className="px-4 py-2 text-left">Activity</th>
-                      <th className="px-4 py-2 text-left">
-                        {mode === "performance" ? "Performance" : "Score"}
+                      <th className="px-4 py-3 text-left">
+                        <span className="inline-flex items-center gap-2">
+                          <FaCalendarDays className="text-gray-400" />
+                          Date
+                        </span>
+                      </th>
+                      <th className="px-4 py-3 text-left">Activity</th>
+                      <th className="px-4 py-3 text-left">
+                        <span className="inline-flex items-center gap-2">
+                          <FaGaugeHigh className="text-gray-400" />
+                          {mode === "performance" ? "Performance" : "Score"}
+                        </span>
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white">
                     {ranged.slice(0, 12).map((r) => {
-                      const perf = normalizePerformance(
-                        r.type,
-                        r.score,
-                        scoresByType.get(r.type)
-                      );
+                      const perf = normalizePerformance(r.type, r.score, scoresByType.get(r.type));
+                      const val =
+                        mode === "performance"
+                          ? typeof perf === "number"
+                            ? `${perf}%`
+                            : "—"
+                          : r.score.toFixed(2);
+
+                      // tiny badge style for performance
+                      const badgeClass =
+                        mode === "performance" && typeof perf === "number"
+                          ? perf >= 75
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : perf >= 50
+                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                            : "bg-yellow-50 text-yellow-700 border-yellow-200"
+                          : "bg-gray-50 text-gray-700 border-gray-200";
+
                       return (
                         <tr key={r.id} className="border-t">
-                          <td className="px-4 py-2 text-gray-700">
-                            {dateShort(r.createdAt) || "—"}
-                          </td>
-                          <td className="px-4 py-2 font-semibold text-gray-900">
-                            {LABELS[r.type] || r.type}
-                          </td>
-                          <td className="px-4 py-2 text-gray-700">
-                            {mode === "performance"
-                              ? typeof perf === "number"
-                                ? `${perf}%`
-                                : "—"
-                              : r.score.toFixed(2)}
+                          <td className="px-4 py-3 text-gray-700">{dateShort(r.createdAt) || "—"}</td>
+                          <td className="px-4 py-3 font-semibold text-gray-900">{LABELS[r.type] || r.type}</td>
+                          <td className="px-4 py-3 text-gray-700">
+                            <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${badgeClass}`}>
+                              {val}
+                            </span>
                           </td>
                         </tr>
                       );
@@ -513,9 +582,8 @@ export default function Analytics() {
                 </table>
               </div>
 
-              <p className="mt-2 text-xs text-gray-500">
-                Note: Reaction Time is “lower is better”, so the normalized
-                performance converts it to “higher is better” for fair charts.
+              <p className="mt-3 text-xs text-gray-500">
+                Note: Reaction Time is “lower is better”, so the normalized performance converts it to “higher is better” for fair charts.
               </p>
             </div>
           </div>
@@ -525,12 +593,25 @@ export default function Analytics() {
   );
 }
 
-function Card({ title, value, sub }) {
+function Chip({ icon, text }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-700">
+      <span className="text-gray-400">{icon}</span>
+      {text}
+    </span>
+  );
+}
+
+function KpiCard({ icon, title, value, sub, hint }) {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-      <div className="text-sm text-gray-600">{title}</div>
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-600">{title}</div>
+        <div className="text-[#4a6cf7]">{icon}</div>
+      </div>
       <div className="mt-2 text-2xl font-bold text-gray-900">{value}</div>
       {sub ? <div className="mt-1 text-sm text-gray-600">{sub}</div> : null}
+      {hint ? <div className="mt-1 text-xs text-gray-500">{hint}</div> : null}
     </div>
   );
 }

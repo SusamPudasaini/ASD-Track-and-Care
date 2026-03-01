@@ -4,6 +4,23 @@ import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 
+// ✅ FontAwesome (react-icons / FA6)
+import {
+  FaUserDoctor,
+  FaCalendarDays,
+  FaClock,
+  FaCircleCheck,
+  FaCircleXmark,
+  FaCircleInfo,
+  FaMagnifyingGlass,
+  FaBroom,
+  FaPenToSquare,
+  FaPhone,
+  FaEnvelope,
+  FaXmark,
+  FaUserGroup,
+} from "react-icons/fa6";
+
 const MY_BOOKINGS_ENDPOINT = "/api/bookings/me"; // GET
 const RESCHEDULE_ENDPOINT = (id) => `/api/bookings/${id}/reschedule`; // PUT { date, time }
 const CANCEL_ENDPOINT = (id) => `/api/bookings/${id}`; // DELETE
@@ -89,7 +106,7 @@ export default function Bookings() {
       setBookings(list);
     } catch (err) {
       console.error("LOAD BOOKINGS ERROR:", err?.response?.status, err?.response?.data);
-      toast.error(err?.response?.data?.message || "Could not load bookings.");
+      toast.error(getErrorMessage(err) || "Could not load bookings.");
     } finally {
       setLoading(false);
     }
@@ -185,7 +202,7 @@ export default function Bookings() {
       loadBookings();
     } catch (err) {
       console.error("RESCHEDULE ERROR:", err?.response?.status, err?.response?.data);
-      toast.error(err?.response?.data?.message || err?.response?.data || "Reschedule failed.");
+      toast.error(getErrorMessage(err) || "Reschedule failed.");
     } finally {
       setSaving(false);
     }
@@ -213,7 +230,7 @@ export default function Bookings() {
       loadBookings();
     } catch (err) {
       console.error("CANCEL ERROR:", err?.response?.status, err?.response?.data);
-      toast.error(err?.response?.data?.message || err?.response?.data || "Cancel failed.");
+      toast.error(getErrorMessage(err) || "Cancel failed.");
       setCanceling(false);
     }
   };
@@ -248,12 +265,7 @@ export default function Bookings() {
       const t = String(b?.time || "").toLowerCase();
       const s = String(b?.status || "").toLowerCase();
 
-      return (
-        name.includes(q) ||
-        d.includes(q) ||
-        t.includes(q) ||
-        s.includes(q)
-      );
+      return name.includes(q) || d.includes(q) || t.includes(q) || s.includes(q);
     });
   }, [bookings, search]);
 
@@ -261,7 +273,6 @@ export default function Bookings() {
     <div className="min-h-screen bg-white">
       <Navbar />
 
-      {/* ✅ page layout like your screenshot */}
       <main className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -271,20 +282,20 @@ export default function Bookings() {
             </p>
           </div>
 
-          {/* right-side action button (like "Booking History" button in screenshot) */}
           <button
             onClick={() => navigate("/therapists")}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4a6cf7] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#3f5ee0]"
           >
+            <FaUserGroup />
             Find Therapists
           </button>
         </div>
 
-        {/* ✅ Search bar (replaces speciality chips) */}
+        {/* Search bar */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative w-full sm:max-w-md">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              🔍
+              <FaMagnifyingGlass />
             </span>
             <input
               value={search}
@@ -298,8 +309,9 @@ export default function Bookings() {
             <button
               type="button"
               onClick={() => setSearch("")}
-              className="w-full rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto"
             >
+              <FaBroom />
               Clear
             </button>
           ) : null}
@@ -310,7 +322,7 @@ export default function Bookings() {
           </div>
         </div>
 
-        {/* ✅ Cards grid like your screenshot */}
+        {/* Cards grid */}
         <div className="mt-6">
           {loading ? (
             <div className="text-sm text-gray-600">Loading bookings...</div>
@@ -371,11 +383,7 @@ function BookingCard({ b, onReschedule, onCancel, onContact }) {
   // ✅ Completed only after session duration has passed
   const start = parseLocalDateTime(b.date, b.time);
   const end = start ? addMinutes(start, SESSION_MINUTES) : null;
-  const isCompleted =
-    !isCancelled &&
-    end instanceof Date &&
-    !Number.isNaN(end) &&
-    end.getTime() < Date.now();
+  const isCompleted = !isCancelled && end instanceof Date && !Number.isNaN(end) && end.getTime() < Date.now();
 
   const displayStatus = isCancelled ? "CANCELLED" : isCompleted ? "COMPLETED" : rawStatus;
 
@@ -386,28 +394,47 @@ function BookingCard({ b, onReschedule, onCancel, onContact }) {
       ? "text-gray-600"
       : "text-green-600";
 
+  const StatusIcon =
+    displayStatus === "CANCELLED"
+      ? FaCircleXmark
+      : displayStatus === "COMPLETED"
+      ? FaCircleCheck
+      : FaCircleInfo;
+
   const actionsDisabled = isCancelled || isCompleted;
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-lg font-semibold text-gray-900">{therapistName}</div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+            <FaUserDoctor className="text-[#4a6cf7]" />
+            <span className="truncate">{therapistName}</span>
+          </div>
 
           <div className="mt-3 space-y-2 text-sm text-gray-600">
             <div className="flex items-center justify-between gap-4">
-              <span>Date</span>
+              <span className="inline-flex items-center gap-2">
+                <FaCalendarDays className="text-gray-400" />
+                Date
+              </span>
               <span className="font-semibold text-gray-800">{b.date || "-"}</span>
             </div>
 
             <div className="flex items-center justify-between gap-4">
-              <span>Time</span>
+              <span className="inline-flex items-center gap-2">
+                <FaClock className="text-gray-400" />
+                Time
+              </span>
               <span className="font-semibold text-gray-800">{b.time || "-"}</span>
             </div>
 
             <div className="flex items-center justify-between gap-4">
               <span>Status</span>
-              <span className={`font-semibold ${statusClass}`}>{displayStatus}</span>
+              <span className={`inline-flex items-center gap-2 font-semibold ${statusClass}`}>
+                <StatusIcon />
+                {displayStatus}
+              </span>
             </div>
           </div>
         </div>
@@ -417,32 +444,33 @@ function BookingCard({ b, onReschedule, onCancel, onContact }) {
         <div className="mt-6 flex flex-col gap-2">
           <button
             onClick={onReschedule}
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
+            <FaPenToSquare />
             Change Date/Time
           </button>
 
           <div className="flex gap-2">
             <button
               onClick={onCancel}
-              className="w-full rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
             >
+              <FaCircleXmark />
               Cancel
             </button>
 
             <button
               onClick={onContact}
-              className="w-full rounded-xl bg-[#4a6cf7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#4a6cf7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
             >
+              {b?.therapistEmail ? <FaEnvelope /> : <FaPhone />}
               Contact
             </button>
           </div>
         </div>
       ) : (
         <div className="mt-6 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
-          {displayStatus === "COMPLETED"
-            ? "This session is completed."
-            : "This booking was cancelled."}
+          {displayStatus === "COMPLETED" ? "This session is completed." : "This booking was cancelled."}
         </div>
       )}
     </div>
@@ -479,22 +507,28 @@ function RescheduleModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+            className="inline-flex items-center justify-center rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+            aria-label="Close"
           >
-            ✕
+            <FaXmark />
           </button>
         </div>
 
         <div className="mt-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Select date</label>
-            <input
-              type="date"
-              value={date}
-              min={minDate}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            />
+            <div className="relative">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <FaCalendarDays />
+              </span>
+              <input
+                type="date"
+                value={date}
+                min={minDate}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 pl-11 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
           <div>
@@ -530,7 +564,10 @@ function RescheduleModal({
                           : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                       }`}
                     >
-                      {t}
+                      <span className="inline-flex items-center gap-2">
+                        <FaClock className={`${active ? "text-blue-700" : "text-gray-400"}`} />
+                        {t}
+                      </span>
                     </button>
                   );
                 })}
@@ -545,7 +582,7 @@ function RescheduleModal({
             onClick={onClose}
             className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
-            Cancel
+            Close
           </button>
 
           <button
@@ -583,19 +620,26 @@ function CancelModal({ booking, onClose, onConfirm, canceling }) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+            className="inline-flex items-center justify-center rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+            aria-label="Close"
           >
-            ✕
+            <FaXmark />
           </button>
         </div>
 
         <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
           <div className="flex items-center justify-between">
-            <span>Date</span>
+            <span className="inline-flex items-center gap-2 text-gray-600">
+              <FaCalendarDays className="text-gray-400" />
+              Date
+            </span>
             <span className="font-semibold">{date}</span>
           </div>
           <div className="mt-2 flex items-center justify-between">
-            <span>Time</span>
+            <span className="inline-flex items-center gap-2 text-gray-600">
+              <FaClock className="text-gray-400" />
+              Time
+            </span>
             <span className="font-semibold">{time}</span>
           </div>
         </div>

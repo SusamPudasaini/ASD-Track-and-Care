@@ -1,10 +1,11 @@
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/navbar/Navbar";
+import { motion } from "framer-motion";
 
 // ✅ Font Awesome (react-icons wrapper)
 import {
   FaGamepad,
-  FaUserDoctor,   
+  FaUserDoctor,
   FaChartLine,
   FaBrain,
   FaEarListen,
@@ -13,21 +14,66 @@ import {
   FaArrowRight,
 } from "react-icons/fa6";
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.08,
+    },
+  },
+};
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 24, scale: 0.98 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.55,
+      ease: "easeOut",
+    },
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.92 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.45,
+      ease: "easeOut",
+    },
+  },
+};
+
 export default function Home() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-white">
+    <motion.div
+      className="min-h-screen bg-white"
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+    >
       <Navbar />
 
       {/* HERO */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-blue-50 to-white">
+      <motion.section
+        variants={sectionVariants}
+        className="relative overflow-hidden bg-gradient-to-b from-blue-50 to-white"
+      >
         {/* soft blobs */}
         <div className="pointer-events-none absolute -top-24 right-[-120px] h-[520px] w-[520px] rounded-full bg-blue-200/40 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 left-[-120px] h-[420px] w-[420px] rounded-full bg-indigo-200/40 blur-3xl" />
 
         <div className="mx-auto max-w-6xl px-6 pb-16 pt-20 md:pb-20 md:pt-28">
-          <div className="mx-auto max-w-3xl text-center">
+          <motion.div variants={cardVariants} className="mx-auto max-w-3xl text-center">
             <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-gray-900 md:text-5xl">
               Supporting Children with Autism through{" "}
               <span className="text-[#4a6cf7]">Therapy & Interactive Activities</span>
@@ -41,7 +87,7 @@ export default function Home() {
             <div className="mt-10 flex flex-wrap justify-center gap-4">
               <Link
                 to="/activities"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#4a6cf7] px-6 py-3 text-white font-semibold shadow-sm transition hover:bg-[#3f5ee0] hover:-translate-y-0.5"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#4a6cf7] px-6 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#3f5ee0]"
               >
                 <FaGamepad className="text-lg" />
                 Explore Activities
@@ -50,20 +96,20 @@ export default function Home() {
 
               <Link
                 to="/therapists"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-800 transition hover:bg-gray-50 hover:-translate-y-0.5"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-800 transition hover:-translate-y-0.5 hover:bg-gray-50"
               >
                 <FaUserDoctor className="text-lg text-[#4a6cf7]" />
                 Find Therapists
               </Link>
             </div>
-          </div>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       {/* FEATURES */}
-      <section className="bg-white">
+      <motion.section variants={sectionVariants} className="bg-white">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
-          <div className="mx-auto max-w-3xl text-center">
+          <motion.div variants={cardVariants} className="mx-auto max-w-3xl text-center">
             <p className="text-sm font-semibold tracking-widest text-[#4a6cf7]">
               CORE FEATURES
             </p>
@@ -74,7 +120,7 @@ export default function Home() {
               Designed to make therapy, home practice, and progress tracking simple
               for families and professionals.
             </p>
-          </div>
+          </motion.div>
 
           <div className="mt-12 grid gap-6 md:mt-14 md:grid-cols-3">
             <FeatureCard
@@ -101,12 +147,15 @@ export default function Home() {
             />
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* MODULES */}
-      <section className="bg-gradient-to-b from-white to-slate-50">
+      <motion.section
+        variants={sectionVariants}
+        className="bg-gradient-to-b from-white to-slate-50"
+      >
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
-          <div className="mx-auto max-w-3xl text-center">
+          <motion.div variants={cardVariants} className="mx-auto max-w-3xl text-center">
             <p className="text-sm font-semibold tracking-widest text-[#4a6cf7]">
               MODULE AREAS
             </p>
@@ -116,7 +165,7 @@ export default function Home() {
             <p className="mt-4 text-gray-600 md:text-lg">
               Balanced modules that support skill-building across key developmental areas.
             </p>
-          </div>
+          </motion.div>
 
           <div className="mt-12 grid gap-6 md:mt-14 md:grid-cols-3">
             <ModuleCard
@@ -153,22 +202,28 @@ export default function Home() {
             />
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* STATS */}
-      <section className="bg-white">
+      <motion.section variants={sectionVariants} className="bg-white">
         <div className="mx-auto max-w-6xl px-6 py-14 md:py-16">
-          <div className="grid grid-cols-2 gap-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:grid-cols-4 md:p-10">
+          <motion.div
+            variants={cardVariants}
+            className="grid grid-cols-2 gap-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm md:grid-cols-4 md:p-10"
+          >
             <StatItem value="20" label="Activities" />
             <StatItem value="10" label="Therapists" />
             <StatItem value="100" label="Sessions Tracked" />
             <StatItem value="24/7" label="Tracking System" />
-          </div>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       {/* CTA */}
-      <section className="relative overflow-hidden bg-gradient-to-r from-[#3f5ee0] to-[#4a6cf7]">
+      <motion.section
+        variants={sectionVariants}
+        className="relative overflow-hidden bg-gradient-to-r from-[#3f5ee0] to-[#4a6cf7]"
+      >
         <div className="pointer-events-none absolute inset-0 opacity-10">
           <div className="absolute left-6 top-6 h-10 w-10 rounded-xl border border-white" />
           <div className="absolute right-10 top-16 h-12 w-12 rounded-xl border border-white" />
@@ -176,28 +231,31 @@ export default function Home() {
         </div>
 
         <div className="mx-auto max-w-6xl px-6 py-16 text-center text-white md:py-20">
-          <h2 className="text-2xl font-extrabold md:text-4xl">
-            Ready to start a structured routine?
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-white/90 md:text-lg">
-            Explore activities, connect with therapists, and track progress in one place.
-          </p>
+          <motion.div variants={cardVariants}>
+            <h2 className="text-2xl font-extrabold md:text-4xl">
+              Ready to start a structured routine?
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-white/90 md:text-lg">
+              Explore activities, connect with therapists, and track progress in one place.
+            </p>
 
-          <button
-            onClick={() => navigate("/activities")}
-            className="mt-10 inline-flex items-center justify-center gap-2 rounded-xl bg-white px-7 py-3 font-semibold text-[#4a6cf7] shadow-sm transition hover:-translate-y-0.5 hover:bg-white/95"
-          >
-            Get Started <FaArrowRight className="text-sm" />
-          </button>
+            <button
+              onClick={() => navigate("/activities")}
+              className="mt-10 inline-flex items-center justify-center gap-2 rounded-xl bg-white px-7 py-3 font-semibold text-[#4a6cf7] shadow-sm transition hover:-translate-y-0.5 hover:bg-white/95"
+            >
+              Get Started <FaArrowRight className="text-sm" />
+            </button>
+          </motion.div>
         </div>
-      </section>
-    </div>
+      </motion.section>
+    </motion.div>
   );
 }
 
 function FeatureCard({ icon, title, desc, onClick, badge, highlight }) {
   return (
-    <div
+    <motion.div
+      variants={cardVariants}
       onClick={onClick}
       className={[
         "group relative cursor-pointer rounded-2xl border bg-white p-7 shadow-sm transition",
@@ -223,13 +281,16 @@ function FeatureCard({ icon, title, desc, onClick, badge, highlight }) {
       <div className="mt-5 text-xl font-bold text-[#4a6cf7] opacity-0 transition group-hover:translate-x-1 group-hover:opacity-100">
         <FaArrowRight />
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 function ModuleCard({ icon, title, desc, items }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-7 shadow-sm transition hover:-translate-y-2 hover:border-[#4a6cf7]/50 hover:shadow-lg">
+    <motion.div
+      variants={cardVariants}
+      className="rounded-2xl border border-gray-100 bg-white p-7 shadow-sm transition hover:-translate-y-2 hover:border-[#4a6cf7]/50 hover:shadow-lg"
+    >
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-100 text-2xl text-[#4a6cf7]">
         {icon}
       </div>
@@ -245,17 +306,17 @@ function ModuleCard({ icon, title, desc, items }) {
           </li>
         ))}
       </ul>
-    </div>
+    </motion.div>
   );
 }
 
 function StatItem({ value, label }) {
   return (
-    <div className="text-center">
+    <motion.div variants={cardVariants} className="text-center">
       <div className="text-3xl font-extrabold text-[#4a6cf7] md:text-4xl">{value}</div>
       <div className="mt-2 text-xs font-semibold tracking-widest text-gray-500">
         {label.toUpperCase()}
       </div>
-    </div>
+    </motion.div>
   );
 }
