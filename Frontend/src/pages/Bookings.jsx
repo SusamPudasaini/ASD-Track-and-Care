@@ -20,13 +20,29 @@ import {
   FaXmark,
   FaUserGroup,
   FaMoneyCheckDollar,
+  FaComments,
+  FaStar,
 } from "react-icons/fa6";
 
 const MY_BOOKINGS_ENDPOINT = "/api/bookings/me"; // GET
 const RESCHEDULE_ENDPOINT = (id) => `/api/bookings/${id}/reschedule`; // PUT { date, time }
 const CANCEL_ENDPOINT = (id) => `/api/bookings/${id}`; // DELETE
+const REVIEW_ENDPOINT = (id) => `/api/bookings/${id}/review`; // POST { rating, comment }
 
 const SESSION_MINUTES = 30;
+
+function backendBase() {
+  return (import.meta.env.VITE_API_BASE_URL || "http://localhost:8081").replace(/\/api\/?$/, "");
+}
+
+function resolveImageUrl(raw) {
+  if (!raw) return "";
+  const s = String(raw);
+  if (s.startsWith("blob:")) return s;
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+  if (s.startsWith("/")) return `${backendBase()}${s}`;
+  return `${backendBase()}/${s}`;
+}
 
 function getErrorMessage(err) {
   const data = err?.response?.data;
@@ -187,6 +203,12 @@ export default function Bookings() {
   const [cancelBookingObj, setCancelBookingObj] = useState(null);
   const [canceling, setCanceling] = useState(false);
 
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewBooking, setReviewBooking] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
   const loadBookings = async () => {
     try {
       setLoading(true);
@@ -342,6 +364,40 @@ export default function Bookings() {
     toast.error("Contact info not available.");
   };
 
+  const openReview = (b) => {
+    setReviewBooking(b);
+    setReviewRating(5);
+    setReviewComment("");
+    setReviewOpen(true);
+  };
+
+  const closeReview = () => {
+    setReviewOpen(false);
+    setReviewBooking(null);
+    setReviewRating(5);
+    setReviewComment("");
+    setReviewSubmitting(false);
+  };
+
+  const submitReview = async () => {
+    if (!reviewBooking?.id) return;
+
+    try {
+      setReviewSubmitting(true);
+      await api.post(REVIEW_ENDPOINT(reviewBooking.id), {
+        rating: reviewRating,
+        comment: reviewComment.trim() || null,
+      });
+      toast.success("Review submitted successfully.");
+      closeReview();
+      loadBookings();
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Could not submit review.");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   const filteredBookings = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return bookings;
@@ -417,7 +473,7 @@ export default function Bookings() {
               No bookings found.
             </div>
           ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredBookings.map((b) => (
                 <BookingCard
                   key={b.id}
@@ -425,6 +481,8 @@ export default function Bookings() {
                   onReschedule={() => openReschedule(b)}
                   onCancel={() => openCancelModal(b)}
                   onContact={() => contactTherapist(b)}
+                  onChat={() => navigate(`/bookings/${b.id}/chat`)}
+                  onReview={() => openReview(b)}
                 />
               ))}
             </div>
@@ -456,12 +514,35 @@ export default function Bookings() {
           canceling={canceling}
         />
       )}
+
+      {reviewOpen && (
+        <ReviewModal
+          booking={reviewBooking}
+          rating={reviewRating}
+          setRating={setReviewRating}
+          comment={reviewComment}
+          setComment={setReviewComment}
+          onClose={closeReview}
+          onSubmit={submitReview}
+          submitting={reviewSubmitting}
+        />
+      )}
     </div>
   );
 }
 
-function BookingCard({ b, onReschedule, onCancel, onContact }) {
+function BookingCard({ b, onReschedule, onCancel, onContact, onChat, onReview }) {
   const therapistName = b.therapistName || "Therapist";
+  const therapistRole = b?.therapistSpecialization || b?.therapistRole || b?.therapistType || "Therapist";
+  const therapistQualification = b?.therapistQualification || "Not provided";
+  const therapistExperience = b?.therapistExperienceYears ?? b?.therapistExperience ?? "Not provided";
+  const therapistPrice =
+    b?.therapistPricePerSession ?? b?.therapistSessionPrice ?? b?.pricePerSession ?? null;
+  const therapistRating = Number(b?.therapistAverageReview ?? b?.therapistRating ?? 0);
+  const therapistReviewCount = Number(b?.therapistReviewCount ?? b?.reviews ?? 0);
+  const therapistImage = resolveImageUrl(
+    b?.therapistProfilePictureUrl || b?.therapistAvatarUrl || b?.therapistImageUrl || ""
+  );
 
   const bookingDisplay = getBookingDisplayStatus(b.status, b.paymentStatus, b.date, b.time);
   const paymentDisplay = getPaymentDisplay(b.paymentStatus);
@@ -472,102 +553,233 @@ function BookingCard({ b, onReschedule, onCancel, onContact }) {
   const actionsDisabled =
     normalizeStatus(b.status) === "CANCELLED" ||
     bookingDisplay.label === "COMPLETED";
+  const canChat = normalizeStatus(b.status) === "CONFIRMED";
+  const canReview = bookingDisplay.label === "COMPLETED" && !b?.reviewSubmitted;
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 w-full">
-          <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-            <FaUserDoctor className="text-[#4a6cf7]" />
-            <span className="truncate">{therapistName}</span>
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-gray-200 bg-gray-100">
+          {therapistImage ? (
+            <img src={therapistImage} alt={therapistName} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-gray-500">
+              <FaUserDoctor />
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-gray-900">{therapistName}</div>
+          <div className="truncate text-xs text-gray-500">{therapistRole}</div>
+          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+            <FaStar className="text-amber-500" />
+            <span className="font-semibold text-slate-700">{Number.isFinite(therapistRating) ? therapistRating.toFixed(1) : "0.0"}</span>
+            <span>
+              ({Number.isFinite(therapistReviewCount) ? therapistReviewCount : 0} reviews)
+            </span>
           </div>
-
-          <div className="mt-3 space-y-2 text-sm text-gray-600">
-            <div className="flex items-center justify-between gap-4">
-              <span className="inline-flex items-center gap-2">
-                <FaCalendarDays className="text-gray-400" />
-                Date
-              </span>
-              <span className="font-semibold text-gray-800">{b.date || "-"}</span>
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <span className="inline-flex items-center gap-2">
-                <FaClock className="text-gray-400" />
-                Time
-              </span>
-              <span className="font-semibold text-gray-800">{b.time || "-"}</span>
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <span>Booking</span>
-              <span className={`inline-flex items-center gap-2 text-right font-semibold ${bookingDisplay.className}`}>
-                <BookingStatusIcon />
-                {bookingDisplay.label}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <span className="inline-flex items-center gap-2">
-                <FaMoneyCheckDollar className="text-gray-400" />
-                Payment
-              </span>
-              <span className={`inline-flex items-center gap-2 text-right font-semibold ${paymentDisplay.className}`}>
-                <PaymentStatusIcon />
-                {paymentDisplay.label}
-              </span>
-            </div>
-          </div>
-
-          {b?.therapistMessage ? (
-            <div className="mt-4 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-              <span className="font-semibold">Therapist note:</span> {b.therapistMessage}
-            </div>
-          ) : null}
-
-          {bookingDisplay.helperText ? (
-            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
-              {bookingDisplay.helperText}
-            </div>
-          ) : null}
         </div>
       </div>
 
-      {!actionsDisabled ? (
-        <div className="mt-6 flex flex-col gap-2">
-          <button
-            onClick={onReschedule}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            <FaPenToSquare />
-            Change Date/Time
-          </button>
+      <div className="mt-3 space-y-1.5 text-xs">
+        <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+          <span className="text-slate-400">Qualification</span>
+          <span className="font-medium text-slate-700">{therapistQualification}</span>
+        </div>
+        <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+          <span className="text-slate-400">Experience</span>
+          <span className="font-medium text-slate-700">
+            {therapistExperience === "Not provided" ? therapistExperience : `${therapistExperience}+ Years`}
+          </span>
+        </div>
+        <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+          <span className="text-slate-400">Price per session</span>
+          <span className="font-semibold text-[#4a6cf7]">
+            {therapistPrice == null ? "—" : `Rs. ${therapistPrice}`}
+          </span>
+        </div>
+      </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={onCancel}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
-            >
-              <FaCircleXmark />
-              Cancel
-            </button>
-
-            <button
-              onClick={onContact}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#4a6cf7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
-            >
-              {b?.therapistEmail ? <FaEnvelope /> : <FaPhone />}
-              Contact
-            </button>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-slate-600">
+          <div className="flex items-center gap-1">
+            <FaCalendarDays className="text-slate-400" />
+            <span className="font-medium">{b.date || "-"}</span>
           </div>
         </div>
-      ) : (
-        <div className="mt-6 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
-          {bookingDisplay.label === "COMPLETED"
-            ? "This session is completed."
-            : "This booking was cancelled."}
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-slate-600">
+          <div className="flex items-center gap-1">
+            <FaClock className="text-slate-400" />
+            <span className="font-medium">{b.time || "-"}</span>
+          </div>
         </div>
-      )}
+      </div>
+
+      <div className="mt-2 space-y-1.5 text-xs text-gray-600">
+        <div className="flex items-center justify-between gap-4">
+          <span>Booking</span>
+          <span className={`inline-flex items-center gap-1.5 text-right font-semibold ${bookingDisplay.className}`}>
+            <BookingStatusIcon />
+            {bookingDisplay.label}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="inline-flex items-center gap-1">
+            <FaMoneyCheckDollar className="text-gray-400" />
+            Payment
+          </span>
+          <span className={`inline-flex items-center gap-1.5 text-right font-semibold ${paymentDisplay.className}`}>
+            <PaymentStatusIcon />
+            {paymentDisplay.label}
+          </span>
+        </div>
+      </div>
+
+      {b?.therapistMessage ? (
+        <div className="mt-3 rounded-md border border-yellow-200 bg-yellow-50 p-2.5 text-xs text-yellow-800">
+          <span className="font-semibold">Therapist note:</span> {b.therapistMessage}
+        </div>
+      ) : null}
+
+      {bookingDisplay.helperText ? (
+        <div className="mt-3 rounded-md border border-blue-100 bg-blue-50 p-2.5 text-xs text-blue-800">
+          {bookingDisplay.helperText}
+        </div>
+      ) : null}
+
+      <div className="mt-4 space-y-2">
+        {!actionsDisabled ? (
+          <>
+            <button
+              onClick={canChat ? onChat : onContact}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#4a6cf7] px-3 py-2 text-xs font-semibold text-white hover:bg-[#3f5ee0]"
+            >
+              {canChat ? <FaComments /> : b?.therapistEmail ? <FaEnvelope /> : <FaPhone />}
+              {canChat ? "Open Chat" : "Contact Therapist"}
+            </button>
+
+            <div className="flex gap-2">
+              <button
+                onClick={onReschedule}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                <FaPenToSquare />
+                Change Date/Time
+              </button>
+
+              <button
+                onClick={onCancel}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+              >
+                <FaCircleXmark />
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={canReview ? onReview : undefined}
+              disabled={!canReview}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold text-white ${
+                canReview ? "bg-[#4a6cf7] hover:bg-[#3f5ee0]" : "cursor-not-allowed bg-slate-300"
+              }`}
+            >
+              {canReview ? "Rate This Session" : bookingDisplay.label === "COMPLETED" ? "Session Completed" : "Booking Cancelled"}
+            </button>
+
+            <div className="rounded-md border border-gray-100 bg-gray-50 p-2.5 text-xs text-gray-600">
+              {bookingDisplay.label === "COMPLETED"
+                ? "This session is completed."
+                : "This booking was cancelled."}
+            </div>
+
+            {bookingDisplay.label === "COMPLETED" && b?.reviewSubmitted && (
+              <div className="rounded-md border border-emerald-100 bg-emerald-50 p-2.5 text-xs text-emerald-800">
+                Review submitted {b?.reviewRating ? `(${b.reviewRating}/5)` : ""}.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReviewModal({ booking, rating, setRating, comment, setComment, onClose, onSubmit, submitting }) {
+  const therapistName = booking?.therapistName || "Therapist";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Rate your therapist</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Session with <span className="font-semibold">{therapistName}</span>
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center justify-center rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+          >
+            <FaXmark />
+          </button>
+        </div>
+
+        <div className="mt-4">
+          <div className="text-sm font-medium text-gray-700">Your rating</div>
+          <div className="mt-2 flex gap-2">
+            {[1, 2, 3, 4, 5].map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setRating(v)}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                  v <= rating ? "bg-amber-400 text-white" : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700">Comment (optional)</label>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={3}
+            className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            placeholder="Share your experience"
+          />
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={submitting}
+            className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
+              submitting ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+            }`}
+          >
+            {submitting ? "Submitting..." : "Submit Review"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

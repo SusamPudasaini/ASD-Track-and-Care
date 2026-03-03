@@ -55,6 +55,7 @@ public class SecurityConfig {
 
                 // public endpoints
                 .requestMatchers("/auth/**").permitAll()
+                .requestMatchers("/ws-chat/**").permitAll()
 
                 // ADMIN ONLY
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

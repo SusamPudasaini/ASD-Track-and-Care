@@ -3,26 +3,21 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   ArrowLeft,
-  CalendarDays,
+  MapPin,
   Camera,
-  Clock3,
   KeyRound,
   Mail,
   Save,
   Shield,
-  Stethoscope,
   UserCircle2,
-  Wallet,
   X,
 } from "lucide-react";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
+import MapLocationPicker from "../components/map/MapLocationPicker";
 
 // ✅ Backend endpoints
 const USER_AVATAR_ENDPOINT = "/api/users/me/avatar";
-const THERAPIST_UPDATE_ENDPOINT = "/api/users/me/therapist-settings";
-
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 // ✅ Build backend base (strip /api if present)
 function backendBase() {
@@ -41,52 +36,13 @@ function resolveImageUrl(raw) {
   return `${backendBase()}/${s}`;
 }
 
-// 09:00 -> 18:00, every 30 mins
-function buildTimeSlots() {
-  const slots = [];
-  for (let h = 9; h <= 18; h++) {
-    for (let m of [0, 30]) {
-      if (h === 18 && m !== 0) continue;
-      const hh = String(h).padStart(2, "0");
-      const mm = String(m).padStart(2, "0");
-      slots.push(`${hh}:${mm}`);
-    }
+function toNumberOrNull(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
   }
-  return slots;
-}
-const TIME_SLOTS = buildTimeSlots();
-
-function isValidSlotTime(time) {
-  try {
-    const [hh, mm] = String(time).split(":");
-    const h = Number(hh);
-    const m = Number(mm);
-    if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
-    if (!(m === 0 || m === 30)) return false;
-    if (h < 9) return false;
-    if (h > 18) return false;
-    if (h === 18 && m !== 0) return false;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function normalizeAvailability(inMap) {
-  if (!inMap || typeof inMap !== "object") return {};
-  const out = {};
-  for (const [day, times] of Object.entries(inMap)) {
-    if (!day || !Array.isArray(times)) continue;
-    const clean = times
-      .filter((t) => typeof t === "string")
-      .map((t) => t.trim())
-      .filter(Boolean)
-      .filter(isValidSlotTime)
-      .filter((v, i, arr) => arr.indexOf(v) === i)
-      .sort();
-    if (clean.length) out[day] = clean;
-  }
-  return out;
+  return null;
 }
 
 const cardBase =
@@ -134,21 +90,16 @@ export default function Profile() {
     firstName: "",
     lastName: "",
     phoneNumber: "",
+    address: "",
+    latitude: null,
+    longitude: null,
   });
 
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState("");
 
-  const [therapistSaving, setTherapistSaving] = useState(false);
-
-  const [therapistForm, setTherapistForm] = useState({
-    pricePerSession: "",
-    availability: {},
-  });
-
-  const [selectedDay, setSelectedDay] = useState("Sunday");
-  const [slotsModalOpen, setSlotsModalOpen] = useState(false);
+  const [aiStatus, setAiStatus] = useState({ loading: false, completed: false });
 
   const onChange = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 
@@ -181,19 +132,21 @@ export default function Profile() {
           firstName: u.firstName || "",
           lastName: u.lastName || "",
           phoneNumber: u.phoneNumber || "",
+          address: u.address || "",
+          latitude: toNumberOrNull(u.latitude),
+          longitude: toNumberOrNull(u.longitude),
         });
 
-        const avail = normalizeAvailability(u.availability);
-        setTherapistForm({
-          pricePerSession:
-            u.pricePerSession === null || u.pricePerSession === undefined
-              ? ""
-              : String(u.pricePerSession),
-          availability: avail,
-        });
-
-        const firstDayWithSlots = DAYS.find((d) => (avail?.[d] || []).length > 0);
-        setSelectedDay(firstDayWithSlots || "Sunday");
+        const role = (u.role || "").toString().toUpperCase();
+        if (role.includes("USER")) {
+          try {
+            setAiStatus({ loading: true, completed: false });
+            const aiRes = await api.get("/api/ml/last");
+            setAiStatus({ loading: false, completed: Boolean(aiRes?.data?.hasHistory) });
+          } catch {
+            setAiStatus({ loading: false, completed: false });
+          }
+        }
       } catch (err) {
         console.error("LOAD PROFILE ERROR:", err?.response?.status, err?.response?.data);
         toast.error(err?.response?.data?.message || "Could not load profile.");
@@ -220,20 +173,43 @@ export default function Profile() {
     if (!form.firstName.trim()) return toast.error("First name is required.");
     if (!form.lastName.trim()) return toast.error("Last name is required.");
     if (!form.phoneNumber.trim()) return toast.error("Phone number is required.");
+    if (!form.address.trim()) return toast.error("Address is required.");
+    if (typeof form.latitude !== "number" || typeof form.longitude !== "number") {
+      return toast.error("Please select your location on the map.");
+    }
 
     try {
       setSaving(true);
 
-      await api.put("/api/users/me", {
+      const updateRes = await api.put("/api/users/me", {
         firstName: form.firstName,
         lastName: form.lastName,
         phoneNumber: form.phoneNumber,
+        address: form.address,
+        latitude: Number(form.latitude),
+        longitude: Number(form.longitude),
       });
 
       toast.success("Profile updated.");
+      const updated = updateRes?.data || {};
+      const returnedLat = toNumberOrNull(updated.latitude);
+      const returnedLng = toNumberOrNull(updated.longitude);
 
-      const res = await api.get("/api/users/me");
-      setMe(res.data || {});
+      setMe((prev) => ({
+        ...(prev || {}),
+        ...updated,
+        latitude: returnedLat ?? prev?.latitude ?? form.latitude,
+        longitude: returnedLng ?? prev?.longitude ?? form.longitude,
+      }));
+      setForm((prev) => ({
+        ...prev,
+        firstName: updated.firstName || prev.firstName,
+        lastName: updated.lastName || prev.lastName,
+        phoneNumber: updated.phoneNumber || prev.phoneNumber,
+        address: updated.address || prev.address,
+        latitude: returnedLat ?? prev.latitude,
+        longitude: returnedLng ?? prev.longitude,
+      }));
     } catch (err) {
       console.error("UPDATE PROFILE ERROR:", err?.response?.status, err?.response?.data);
       toast.error(err?.response?.data?.message || "Update failed.");
@@ -292,99 +268,6 @@ export default function Profile() {
     }
   };
 
-  const daySelectedCount = useMemo(() => {
-    const a = therapistForm.availability || {};
-    return Object.keys(a).filter((d) => (a[d] || []).length > 0).length;
-  }, [therapistForm.availability]);
-
-  const totalSlotsSelected = useMemo(() => {
-    const a = therapistForm.availability || {};
-    return Object.values(a).reduce((acc, arr) => acc + (arr?.length || 0), 0);
-  }, [therapistForm.availability]);
-
-  const selectedTimesForDay = useMemo(() => {
-    return therapistForm.availability?.[selectedDay] || [];
-  }, [therapistForm.availability, selectedDay]);
-
-  const toggleSlot = (day, time) => {
-    setTherapistForm((p) => {
-      const next = { ...(p.availability || {}) };
-      const set = new Set(next[day] || []);
-      if (set.has(time)) set.delete(time);
-      else set.add(time);
-      const arr = Array.from(set).sort();
-      if (arr.length) next[day] = arr;
-      else delete next[day];
-      return { ...p, availability: next };
-    });
-  };
-
-  const clearDay = (day) => {
-    setTherapistForm((p) => {
-      const next = { ...(p.availability || {}) };
-      delete next[day];
-      return { ...p, availability: next };
-    });
-  };
-
-  const selectDayAll = (day) => {
-    setTherapistForm((p) => {
-      const next = { ...(p.availability || {}) };
-      next[day] = [...TIME_SLOTS];
-      return { ...p, availability: next };
-    });
-  };
-
-  const saveTherapistProfile = async () => {
-    if (therapistSaving) return;
-
-    const price = therapistForm.pricePerSession?.toString().trim();
-    if (!price) return toast.error("Price per session is required.");
-
-    const priceNum = Number(price);
-    if (Number.isNaN(priceNum) || priceNum <= 0) return toast.error("Enter a valid price.");
-
-    const availability = therapistForm.availability || {};
-    const totalSlots = Object.values(availability).reduce((acc, arr) => acc + (arr?.length || 0), 0);
-
-    try {
-      setTherapistSaving(true);
-
-      const res = await api.put(THERAPIST_UPDATE_ENDPOINT, {
-        pricePerSession: priceNum,
-        availability,
-      });
-
-      toast.success(
-        totalSlots === 0 ? "Saved. You are marked as not available." : "Therapist settings updated."
-      );
-
-      const updated = res?.data || {};
-      setMe(updated);
-
-      localStorage.setItem("me", JSON.stringify(updated));
-      if (updated?.role) localStorage.setItem("role", updated.role);
-      if (updated?.profilePictureUrl) localStorage.setItem("profilePictureUrl", updated.profilePictureUrl);
-
-      const avail = normalizeAvailability(updated.availability);
-      setTherapistForm({
-        pricePerSession:
-          updated.pricePerSession === null || updated.pricePerSession === undefined
-            ? ""
-            : String(updated.pricePerSession),
-        availability: avail,
-      });
-
-      const firstDayWithSlots = DAYS.find((d) => (avail?.[d] || []).length > 0);
-      setSelectedDay(firstDayWithSlots || selectedDay);
-    } catch (err) {
-      console.error("UPDATE THERAPIST ERROR:", err?.response?.status, err?.response?.data);
-      toast.error(err?.response?.data?.message || err?.response?.data || "Therapist update failed.");
-    } finally {
-      setTherapistSaving(false);
-    }
-  };
-
   const sendResetPasswordLink = async () => {
     if (!form.userEmail?.trim()) {
       toast.error("Email not found on your profile.");
@@ -425,8 +308,23 @@ export default function Profile() {
                   My Profile
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-blue-50 md:text-base">
-                  View and manage your account details, profile picture, and therapist availability in one place.
+                  View and manage your account details and profile picture in one place.
                 </p>
+                {!isTherapist && !aiStatus.loading && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-4 py-1.5 text-xs font-semibold text-white">
+                      <span className={`inline-block h-2.5 w-2.5 rounded-full ${aiStatus.completed ? "bg-emerald-300" : "bg-amber-300"}`} />
+                      AI Questionnaire: {aiStatus.completed ? "Completed" : "Pending"}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/questionnaire")}
+                      className="rounded-full border border-white/35 bg-white/15 px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/25"
+                    >
+                      {aiStatus.completed ? "View AI History" : "Open Questionnaire"}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -439,13 +337,15 @@ export default function Profile() {
                   Reset Password
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => navigate("/therapist/apply")}
-                  className="rounded-2xl border border-white/25 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-blue-50"
-                >
-                  Become a Therapist
-                </button>
+                {!isTherapist && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/therapist/apply")}
+                    className="rounded-2xl border border-white/25 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-blue-50"
+                  >
+                    Become a Therapist
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -575,6 +475,25 @@ export default function Profile() {
                   placeholder="e.g., +97798XXXXXXXX"
                 />
 
+                <Field
+                  label="Address"
+                  value={form.address}
+                  onChange={(v) => onChange("address", v)}
+                  placeholder="e.g., Kathmandu, Bagmati"
+                  icon={MapPin}
+                />
+
+                <MapLocationPicker
+                  label="Profile location"
+                  hint="Click your location on the map. This is used for distance-based recommendations."
+                  latitude={form.latitude}
+                  longitude={form.longitude}
+                  onChange={(lat, lng) => {
+                    onChange("latitude", lat);
+                    onChange("longitude", lng);
+                  }}
+                />
+
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
                   <button
                     type="button"
@@ -601,158 +520,8 @@ export default function Profile() {
               </form>
             )}
           </SectionCard>
-
-          {!loading && isTherapist && (
-            <SectionCard
-              icon={Stethoscope}
-              title="Therapist Settings"
-              description="Manage your pricing and weekly availability. Saved slots remain visible for each selected day."
-              action={
-                totalSlotsSelected === 0 ? (
-                  <span className="rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700">
-                    Not available
-                  </span>
-                ) : null
-              }
-            >
-              <div className="grid gap-6">
-                <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-800">
-                      Price per session
-                    </label>
-                    <div className="mt-2 flex items-center gap-3">
-                      <div className="relative w-full">
-                        <Wallet
-                          size={16}
-                          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                        />
-                        <input
-                          value={therapistForm.pricePerSession}
-                          onChange={(e) =>
-                            setTherapistForm((p) => ({ ...p, pricePerSession: e.target.value }))
-                          }
-                          placeholder="e.g., 20"
-                          inputMode="decimal"
-                          className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                        />
-                      </div>
-                      <span className="text-sm font-semibold text-slate-500">/ session</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:w-[280px]">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Active days
-                      </div>
-                      <div className="mt-2 text-xl font-bold text-slate-900">{daySelectedCount}</div>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Total slots
-                      </div>
-                      <div className="mt-2 text-xl font-bold text-slate-900">{totalSlotsSelected}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-800">Availability</label>
-                      <div className="mt-1 text-xs text-slate-500">
-                        Choose a day, then edit the available 30-minute time slots.
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <select
-                        value={selectedDay}
-                        onChange={(e) => setSelectedDay(e.target.value)}
-                        className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                      >
-                        {DAYS.map((d) => (
-                          <option key={d} value={d}>
-                            {d}
-                          </option>
-                        ))}
-                      </select>
-
-                      <button
-                        type="button"
-                        onClick={() => setSlotsModalOpen(true)}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                      >
-                        <CalendarDays size={16} />
-                        Edit times
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                        <Clock3 size={16} className="text-blue-600" />
-                        {selectedDay}
-                      </div>
-                      <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                        {selectedTimesForDay.length} selected
-                      </div>
-                    </div>
-
-                    {selectedTimesForDay.length === 0 ? (
-                      <div className="mt-3 text-sm text-slate-600">No times selected for this day.</div>
-                    ) : (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {selectedTimesForDay.map((t) => (
-                          <span
-                            key={t}
-                            className="rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700"
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <p className="mt-3 text-xs text-slate-500">
-                    Slots are available in 30-minute steps from 09:00 to 18:00.
-                  </p>
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={saveTherapistProfile}
-                    disabled={therapistSaving}
-                    className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition ${
-                      therapistSaving
-                        ? "cursor-not-allowed bg-blue-300"
-                        : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:-translate-y-0.5 hover:shadow-md"
-                    }`}
-                  >
-                    <Save size={16} />
-                    {therapistSaving ? "Saving..." : "Save Therapist Settings"}
-                  </button>
-                </div>
-              </div>
-            </SectionCard>
-          )}
         </div>
       </main>
-
-      {slotsModalOpen && (
-        <SlotsModal
-          day={selectedDay}
-          selectedTimes={new Set(therapistForm.availability?.[selectedDay] || [])}
-          onClose={() => setSlotsModalOpen(false)}
-          onToggle={(time) => toggleSlot(selectedDay, time)}
-          onSelectAll={() => selectDayAll(selectedDay)}
-          onClear={() => clearDay(selectedDay)}
-        />
-      )}
 
       {resetOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
@@ -815,89 +584,6 @@ export default function Profile() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function SlotsModal({ day, selectedTimes, onClose, onToggle, onSelectAll, onClear }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-4xl overflow-hidden rounded-3xl border border-white/40 bg-white shadow-2xl">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="flex items-center gap-2 text-lg font-semibold">
-                <CalendarDays size={20} />
-                Edit Availability
-              </h2>
-              <p className="mt-2 text-sm text-blue-50">
-                Day: <span className="font-semibold">{day}</span> ·{" "}
-                <span className="font-semibold">{selectedTimes.size}</span> selected
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-white/20 bg-white/10 p-2 text-white hover:bg-white/20"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={onSelectAll}
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-            >
-              Select all
-            </button>
-            <button
-              type="button"
-              onClick={onClear}
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-            >
-              Clear
-            </button>
-            <div className="ml-auto text-xs text-slate-500">
-              Click a time to toggle it. Green means selected.
-            </div>
-          </div>
-
-          <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-            {TIME_SLOTS.map((t) => {
-              const active = selectedTimes.has(t);
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => onToggle(t)}
-                  className={`rounded-2xl border px-3 py-2.5 text-center text-xs font-semibold transition ${
-                    active
-                      ? "border-green-200 bg-green-50 text-green-700 shadow-sm"
-                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  {t}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-6 flex justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

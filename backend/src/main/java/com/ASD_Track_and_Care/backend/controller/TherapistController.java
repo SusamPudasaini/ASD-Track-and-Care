@@ -42,6 +42,11 @@ public class TherapistController {
         return ResponseEntity.ok(therapistService.listTherapists());
     }
 
+        @GetMapping("/{id}")
+        public ResponseEntity<TherapistCardResponse> getTherapistById(@PathVariable("id") Long therapistId) {
+                return ResponseEntity.ok(therapistService.getTherapistById(therapistId));
+        }
+
     /**
      * ✅ Date -> available times (based on therapist slot table)
      * GET /api/therapists/{id}/available-slots?date=YYYY-MM-DD
@@ -91,4 +96,9 @@ public class TherapistController {
         String username = authentication.getName();
         return ResponseEntity.ok(applicationService.getLatestForUser(username));
     }
+
+        @GetMapping("/me/reviews")
+        public ResponseEntity<?> myReviews(Authentication authentication) {
+                return ResponseEntity.ok(therapistService.myReviewInsights(authentication));
+        }
 }

@@ -14,9 +14,14 @@ import java.util.List;
 public class DayCareCenterService {
 
     private final DayCareCenterRepository dayCareCenterRepository;
+    private final AddressGeocodingService addressGeocodingService;
 
-    public DayCareCenterService(DayCareCenterRepository dayCareCenterRepository) {
+    public DayCareCenterService(
+            DayCareCenterRepository dayCareCenterRepository,
+            AddressGeocodingService addressGeocodingService
+    ) {
         this.dayCareCenterRepository = dayCareCenterRepository;
+        this.addressGeocodingService = addressGeocodingService;
     }
 
     public DayCareCenterResponse create(CreateDayCareCenterRequest req) {
@@ -82,12 +87,12 @@ public class DayCareCenterService {
     }
 
     private void apply(DayCareCenter item, CreateDayCareCenterRequest req) {
+        String address = req.getAddress().trim();
         item.setName(req.getName().trim());
         item.setDescription(req.getDescription().trim());
         item.setCategory(req.getCategory());
-        item.setAddress(req.getAddress().trim());
-        item.setLatitude(req.getLatitude());
-        item.setLongitude(req.getLongitude());
+        item.setAddress(address);
+        applyCoordinates(item, address, req.getLatitude(), req.getLongitude());
         item.setPhone(trimToNull(req.getPhone()));
         item.setEmail(trimToNull(req.getEmail()));
         item.setWebsiteUrl(trimToNull(req.getWebsiteUrl()));
@@ -98,12 +103,12 @@ public class DayCareCenterService {
     }
 
     private void apply(DayCareCenter item, UpdateDayCareCenterRequest req) {
+        String address = req.getAddress().trim();
         item.setName(req.getName().trim());
         item.setDescription(req.getDescription().trim());
         item.setCategory(req.getCategory());
-        item.setAddress(req.getAddress().trim());
-        item.setLatitude(req.getLatitude());
-        item.setLongitude(req.getLongitude());
+        item.setAddress(address);
+        applyCoordinates(item, address, req.getLatitude(), req.getLongitude());
         item.setPhone(trimToNull(req.getPhone()));
         item.setEmail(trimToNull(req.getEmail()));
         item.setWebsiteUrl(trimToNull(req.getWebsiteUrl()));
@@ -117,6 +122,22 @@ public class DayCareCenterService {
         if (v == null) return null;
         String s = v.trim();
         return s.isEmpty() ? null : s;
+    }
+
+    private void applyCoordinates(DayCareCenter item, String address, Double latitude, Double longitude) {
+        if (latitude != null && longitude != null) {
+            item.setLatitude(latitude);
+            item.setLongitude(longitude);
+            return;
+        }
+
+        addressGeocodingService.geocode(address).ifPresentOrElse(coords -> {
+            item.setLatitude(coords.latitude());
+            item.setLongitude(coords.longitude());
+        }, () -> {
+            item.setLatitude(null);
+            item.setLongitude(null);
+        });
     }
 
     private DayCareCenterResponse toDto(DayCareCenter item) {

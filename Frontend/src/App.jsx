@@ -10,6 +10,7 @@ import ResetPassword from "./auth/ResetPassword";
 import AdminTherapistApplications from "./pages/AdminTherapistApplications";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import OnboardingGuard from "./components/OnboardingGuard";
 import Navbar from "./components/navbar/Navbar";
 import Questionnaire from "./pages/questionnaire";
 import Profile from "./pages/Profile";
@@ -17,6 +18,7 @@ import TherapistApply from "./pages/TherapistsapplyHistory";
 import TherapistApplyNew from "./pages/TherapistApplyNew";
 
 import Bookings from "./pages/Bookings";
+import BookingChat from "./pages/BookingChat";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import Therapists from "./pages/Therapists";
 
@@ -81,6 +83,26 @@ function RoleRoute({ allow, children }) {
   return children;
 }
 
+function PublicAuthRoute({ children }) {
+  const token = localStorage.getItem("token");
+  if (token && token.trim().length > 10) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function LandingRoute() {
+  const token = localStorage.getItem("token") || "";
+  const isAuthed = token.trim().length > 10;
+
+  // Logged-in parent users now land directly on their analytics dashboard.
+  if (isAuthed && getRole() === "USER") {
+    return <Navigate to="/analytics" replace />;
+  }
+
+  return <Home />;
+}
+
 export default function App() {
   return (
     <>
@@ -88,9 +110,9 @@ export default function App() {
 
       <Routes>
         {/* Public routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/logout" element={<Logout />} />
-        <Route path="/signup" element={<Signup />} />
+        <Route path="/" element={<LandingRoute />} />
+        <Route path="/login" element={<PublicAuthRoute><Login /></PublicAuthRoute>} />
+        <Route path="/signup" element={<PublicAuthRoute><Signup /></PublicAuthRoute>} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/check-email" element={<CheckEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -101,119 +123,123 @@ export default function App() {
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
+          <Route path="/logout" element={<Logout />} />
+
           {/* Shared for all logged-in roles */}
-          <Route path="/" element={<Home />} />
-          <Route path="/questionnaire" element={<Questionnaire />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/therapists" element={<Therapists />} />
-          <Route path="/therapists/:id" element={<TherapistProfile />} />
-          <Route path="/bookings" element={<Bookings />} />
-          <Route path="/analytics" element={<Analytics />} />          
-          <Route path="/payment-success" element={<PaymentSuccess />} />
+          <Route element={<OnboardingGuard />}>
+            <Route path="/questionnaire" element={<Questionnaire />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/therapists" element={<Therapists />} />
+            <Route path="/therapists/:id" element={<TherapistProfile />} />
+            <Route path="/bookings" element={<Bookings />} />
+            <Route path="/bookings/:id/chat" element={<BookingChat />} />
+            <Route path="/analytics" element={<MChatQuestionnaireAnalytics />} />
+            <Route path="/gameanalytics" element={<Analytics />} />
+            <Route path="/payment-success" element={<PaymentSuccess />} />
 
-          <Route path="/mchat-questionnaire" element={<MChatQuestionnaire />} />
-          <Route path="/mchat-questionnaire/analytics" element={<MChatQuestionnaireAnalytics />} />
+            <Route path="/mchat-questionnaire" element={<MChatQuestionnaire />} />
+            <Route path="/mchat-questionnaire/analytics" element={<Navigate to="/analytics" replace />} />
 
-          <Route path="/resources" element={<ResourceHub />} />
-          <Route path="/resources/:id" element={<ResourceDetail />} />
+            <Route path="/resources" element={<ResourceHub />} />
+            <Route path="/resources/:id" element={<ResourceDetail />} />
 
-          <Route path="/daycares" element={<DayCareFinder />} />
-          <Route path="/daycares/:id" element={<DayCareDetail />} />
-          
+            <Route path="/daycares" element={<DayCareFinder />} />
+            <Route path="/daycares/:id" element={<DayCareDetail />} />
 
-          {/* ✅ Activities */}
-          <Route path="/activities" element={<ActivitiesHub />} />
-          <Route path="/activities/reaction-time" element={<ReactionTime />} />
-          <Route path="/activities/sequence-memory" element={<SequenceMemory />} />
-          <Route path="/activities/number-memory" element={<NumberMemory />} />
-          <Route path="/activities/visual-memory" element={<VisualMemory />} />
-          <Route path="/activities/sound-therapy" element={<SoundTherapy />} />
+            {/* ✅ Activities */}
+            <Route path="/activities" element={<ActivitiesHub />} />
+            <Route path="/activities/reaction-time" element={<ReactionTime />} />
+            <Route path="/activities/sequence-memory" element={<SequenceMemory />} />
+            <Route path="/activities/number-memory" element={<NumberMemory />} />
+            <Route path="/activities/visual-memory" element={<VisualMemory />} />
+            <Route path="/activities/sound-therapy" element={<SoundTherapy />} />
 
-          <Route path="/aac-board" element={<AacBoard />} />
-          <Route path="/first-then" element={<FirstThenBoard />} />
-          <Route path="/activities/matching-sorting" element={<MatchingSortingActivity />} />
+            <Route path="/aac-board" element={<AacBoard />} />
+            <Route path="/first-then" element={<FirstThenBoard />} />
+            <Route path="/activities/matching-sorting" element={<MatchingSortingActivity />} />
 
-          {/* USER routes */}
-          <Route
-            path="/therapist/apply"
-            element={
-              <RoleRoute allow={["USER"]}>
-                <TherapistApply />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/therapist/apply/new"
-            element={
-              <RoleRoute allow={["USER"]}>
-                <TherapistApplyNew />
-              </RoleRoute>
-            }
-          />
+            {/* USER routes */}
+            <Route
+              path="/therapist/apply"
+              element={
+                <RoleRoute allow={["USER"]}>
+                  <TherapistApply />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/therapist/apply/new"
+              element={
+                <RoleRoute allow={["USER"]}>
+                  <TherapistApplyNew />
+                </RoleRoute>
+              }
+            />
 
-          {/* ADMIN routes */}
-          <Route
-            path="/admin/request"
-            element={
-              <RoleRoute allow={["ADMIN"]}>
-                <AdminTherapistApplications />
-              </RoleRoute>
-            }
-          />
+            {/* ADMIN routes */}
+            <Route
+              path="/admin/request"
+              element={
+                <RoleRoute allow={["ADMIN"]}>
+                  <AdminTherapistApplications />
+                </RoleRoute>
+              }
+            />
 
-          <Route
-  path="/admin/matching-sorting"
-  element={
-    <RoleRoute allow={["ADMIN"]}>
-      <AdminMatchingSorting />
-    </RoleRoute>
-  }
-/>
-                  <Route
-          path="/admin/mchat-questions"
-          element={
-            <RoleRoute allow={["ADMIN"]}>
-              <AdminMChatQuestionnaireQuestions />
-            </RoleRoute>
-          }
-        />
+            <Route
+              path="/admin/matching-sorting"
+              element={
+                <RoleRoute allow={["ADMIN"]}>
+                  <AdminMatchingSorting />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/admin/mchat-questions"
+              element={
+                <RoleRoute allow={["ADMIN"]}>
+                  <AdminMChatQuestionnaireQuestions />
+                </RoleRoute>
+              }
+            />
 
-        <Route
-  path="/admin/aac-cards"
-  element={
-    <RoleRoute allow={["ADMIN"]}>
-      <AdminAacCards />
-    </RoleRoute>
-  }
-/>
+            <Route
+              path="/admin/aac-cards"
+              element={
+                <RoleRoute allow={["ADMIN"]}>
+                  <AdminAacCards />
+                </RoleRoute>
+              }
+            />
 
-        <Route
-  path="/admin/daycares"
-  element={
-    <RoleRoute allow={["ADMIN"]}>
-      <AdminDayCares />
-    </RoleRoute>
-  }
-/>
+            <Route
+              path="/admin/daycares"
+              element={
+                <RoleRoute allow={["ADMIN"]}>
+                  <AdminDayCares />
+                </RoleRoute>
+              }
+            />
 
-                <Route
-          path="/admin/resources"
-          element={
-            <RoleRoute allow={["ADMIN"]}>
-              <AdminResources />
-            </RoleRoute>
-          }
-        />
+            <Route
+              path="/admin/resources"
+              element={
+                <RoleRoute allow={["ADMIN"]}>
+                  <AdminResources />
+                </RoleRoute>
+              }
+            />
 
-          {/* THERAPIST routes */}
-          <Route
-            path="/therapist/dashboard"
-            element={
-              <RoleRoute allow={["THERAPIST"]}>
-                <TherapistDashboardBookings />
-              </RoleRoute>
-            }
-          />
+            {/* THERAPIST routes */}
+            <Route
+              path="/therapist/dashboard"
+              element={
+                <RoleRoute allow={["THERAPIST"]}>
+                  <TherapistDashboardBookings />
+                </RoleRoute>
+              }
+            />
+          </Route>
         </Route>
 
         {/* ✅ Global fallback (public + protected) */}

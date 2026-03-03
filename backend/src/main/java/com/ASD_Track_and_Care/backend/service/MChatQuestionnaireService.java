@@ -124,6 +124,26 @@ public class MChatQuestionnaireService {
                 .toList();
     }
 
+    public Map<String, Object> myLatest(Authentication authentication) {
+        User user = requireUser(authentication);
+        Optional<MChatQuestionnaireSubmission> latest = submissionRepository.findTopByUserOrderBySubmittedAtDesc(user);
+
+        if (latest.isEmpty()) {
+            return Map.of("hasHistory", false);
+        }
+
+        MChatQuestionnaireSubmission s = latest.get();
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("hasHistory", true);
+        out.put("id", s.getId());
+        out.put("developmentScore", s.getNormalizedDevelopmentScore());
+        out.put("concernScore", s.getNormalizedConcernScore());
+        out.put("riskLevel", s.getRiskLevel());
+        out.put("submittedAt", s.getSubmittedAt());
+        return out;
+    }
+
     private User requireUser(Authentication auth) {
         if (auth == null || auth.getName() == null) {
             throw new RuntimeException("Unauthorized");

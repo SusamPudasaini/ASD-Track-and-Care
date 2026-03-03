@@ -23,12 +23,18 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final TherapistTimeSlotRepository therapistTimeSlotRepository;
+    private final AddressGeocodingService addressGeocodingService;
 
     private static final String UPLOAD_DIR = "uploads/profile-pics";
 
-    public UserService(UserRepository userRepository, TherapistTimeSlotRepository therapistTimeSlotRepository) {
+    public UserService(
+            UserRepository userRepository,
+            TherapistTimeSlotRepository therapistTimeSlotRepository,
+            AddressGeocodingService addressGeocodingService
+    ) {
         this.userRepository = userRepository;
         this.therapistTimeSlotRepository = therapistTimeSlotRepository;
+        this.addressGeocodingService = addressGeocodingService;
     }
 
     public ProfileResponse getMyProfile(Authentication authentication) {
@@ -42,9 +48,27 @@ public class UserService {
         user.setFirstName(req.getFirstName().trim());
         user.setLastName(req.getLastName().trim());
         user.setPhoneNumber(req.getPhoneNumber().trim());
+        String address = req.getAddress().trim();
+        user.setAddress(address);
 
-        userRepository.save(user);
-        return toProfileResponse(user);
+        Double reqLat = req.getLatitude();
+        Double reqLon = req.getLongitude();
+
+        if (reqLat == null || reqLon == null) {
+            throw new IllegalArgumentException("Location coordinates are required. Please pick a point on the map.");
+        }
+
+        if (!isValidLatLng(reqLat, reqLon)) {
+            throw new IllegalArgumentException("Invalid latitude/longitude values.");
+        }
+
+        // Persist exact coordinates selected on the map.
+        user.setLatitude(reqLat);
+        user.setLongitude(reqLon);
+
+        User saved = userRepository.saveAndFlush(user);
+        User reloaded = userRepository.findById(saved.getId()).orElse(saved);
+        return toProfileResponse(reloaded);
     }
 
     public ProfileResponse updateMyAvatar(Authentication authentication, MultipartFile file) {
@@ -156,6 +180,12 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
+    private boolean isValidLatLng(Double latitude, Double longitude) {
+        if (latitude == null || longitude == null) return false;
+        if (!Double.isFinite(latitude) || !Double.isFinite(longitude)) return false;
+        return latitude >= -90.0 && latitude <= 90.0 && longitude >= -180.0 && longitude <= 180.0;
+    }
+
     private ProfileResponse toProfileResponse(User user) {
         ProfileResponse res = new ProfileResponse();
         res.setUsername(user.getUsername());
@@ -163,11 +193,21 @@ public class UserService {
         res.setFirstName(user.getFirstName());
         res.setLastName(user.getLastName());
         res.setPhoneNumber(user.getPhoneNumber());
+        res.setAddress(user.getAddress());
+        res.setLatitude(user.getLatitude());
+        res.setLongitude(user.getLongitude());
+        res.setWorkplaceAddress(user.getWorkplaceAddress());
+        res.setWorkplaceLatitude(user.getWorkplaceLatitude());
+        res.setWorkplaceLongitude(user.getWorkplaceLongitude());
         res.setRole(user.getRole());
         res.setProfilePictureUrl(user.getProfilePictureUrl());
 
         if (user.getRole() == Role.THERAPIST) {
             res.setPricePerSession(user.getPricePerSession());
+            res.setQualification(user.getQualification());
+            res.setExperienceYears(user.getExperienceYears());
+            res.setAverageReview(user.getAverageReview() == null ? 0.0 : user.getAverageReview());
+            res.setReviewCount(user.getReviewCount() == null ? 0 : user.getReviewCount());
 
             // availability map from therapist_time_slots
             List<TherapistTimeSlot> slots = therapistTimeSlotRepository.findAllByTherapistId(user.getId());
@@ -193,6 +233,10 @@ public class UserService {
             res.setAvailability(map);
         } else {
             res.setPricePerSession(null);
+            res.setQualification(null);
+            res.setExperienceYears(null);
+            res.setAverageReview(null);
+            res.setReviewCount(null);
             res.setAvailability(null);
         }
 

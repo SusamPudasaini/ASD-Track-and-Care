@@ -52,6 +52,27 @@ function getErrorMessage(err) {
   return String(data);
 }
 
+function getBookingPaymentError(err) {
+  const status = err?.response?.status;
+  const data = err?.response?.data;
+  const text =
+    typeof data === "string"
+      ? data
+      : typeof data === "object"
+        ? data?.message || data?.error || data?.title || ""
+        : "";
+
+  if (status >= 500 || /khalti|payment|gateway|pidx/i.test(String(text || ""))) {
+    return "Khalti payment initialization failed. Please try again in a moment.";
+  }
+
+  if (err?.message === "Payment URL not received.") {
+    return "Payment link was not returned by server. Please try booking again.";
+  }
+
+  return getErrorMessage(err) || "Booking failed.";
+}
+
 function todayISO() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -175,12 +196,35 @@ function scoreTherapistForRisk(t, risk) {
     if (blob.includes(k)) pts += 2;
   }
 
-  // mild boosts
-  const exp = Number(t?.experienceYears ?? t?.yearsExperience ?? t?.years ?? 0);
-  if (Number.isFinite(exp)) pts += Math.min(exp, 20) * 0.1;
+  const exp = Number(t?.experienceYears ?? t?.experience ?? t?.yearsExperience ?? t?.years ?? 0);
+  const rating = Number(t?.averageReview ?? t?.rating ?? t?.avgRating ?? t?.stars ?? 0);
+  const reviewCount = Number(t?.reviewCount ?? t?.reviewsCount ?? t?.reviews ?? 0);
 
-  const rating = Number(t?.rating ?? t?.avgRating ?? t?.stars ?? 0);
-  if (Number.isFinite(rating)) pts += Math.min(rating, 5) * 0.2;
+  if (riskNorm === "high") {
+    if (Number.isFinite(exp)) {
+      if (exp >= 12) pts += 8;
+      else if (exp >= 8) pts += 6;
+      else if (exp >= 5) pts += 4;
+      else pts += 1;
+    }
+    if (Number.isFinite(rating)) pts += Math.min(rating, 5) * 1.4;
+    if (Number.isFinite(reviewCount)) pts += Math.min(reviewCount, 80) * 0.05;
+  } else if (riskNorm === "moderate") {
+    if (Number.isFinite(exp)) {
+      if (exp >= 6 && exp <= 12) pts += 6;
+      else if (exp >= 3) pts += 4;
+      else pts += 2;
+    }
+    if (Number.isFinite(rating)) pts += Math.min(rating, 5) * 1.1;
+    if (Number.isFinite(reviewCount)) pts += Math.min(reviewCount, 60) * 0.03;
+  } else {
+    if (Number.isFinite(exp)) {
+      if (exp <= 5) pts += 4.5;
+      else if (exp <= 10) pts += 3;
+      else pts += 1.5;
+    }
+    if (Number.isFinite(rating)) pts += Math.min(rating, 5) * 0.8;
+  }
 
   // deprioritize unavailable slightly (still shown)
   if (isTherapistUnavailable(t)) pts -= 2;
@@ -200,6 +244,7 @@ export default function Therapists() {
 
   const [loading, setLoading] = useState(true);
   const [therapists, setTherapists] = useState([]);
+  const [usingServerRecommendations, setUsingServerRecommendations] = useState(false);
 
   // ✅ Search bar
   const [search, setSearch] = useState("");
@@ -225,11 +270,27 @@ export default function Therapists() {
     async function loadTherapists() {
       try {
         setLoading(true);
+        if (isRecommendedMode) {
+          const recRes = await api.get("/api/recommendations/child-plan");
+          if (!mounted) return;
+
+          const list = Array.isArray(recRes?.data?.recommendedTherapists)
+            ? recRes.data.recommendedTherapists
+            : [];
+
+          if (list.length > 0) {
+            setTherapists(list);
+            setUsingServerRecommendations(true);
+            return;
+          }
+        }
+
         const res = await api.get(THERAPISTS_ENDPOINT);
         if (!mounted) return;
 
         const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
         setTherapists(list);
+        setUsingServerRecommendations(false);
       } catch (err) {
         console.error("LOAD THERAPISTS ERROR:", err?.response?.status, err?.response?.data);
         toast.error(getErrorMessage(err) || "Could not load therapists.");
@@ -240,7 +301,7 @@ export default function Therapists() {
 
     loadTherapists();
     return () => (mounted = false);
-  }, []);
+  }, [isRecommendedMode]);
 
   const openBook = (t) => {
     if (isTherapistUnavailable(t)) {
@@ -347,7 +408,7 @@ export default function Therapists() {
       window.location.href = paymentUrl;
     } catch (err) {
       console.error("CREATE BOOKING ERROR:", err?.response?.status, err?.response?.data);
-      toast.error(getErrorMessage(err) || "Booking failed.");
+      toast.error(getBookingPaymentError(err));
     } finally {
       setBooking(false);
     }
@@ -373,10 +434,11 @@ export default function Therapists() {
   // ✅ Prioritize when in recommended mode (keeps "show all" but reorders)
   const recommendedTherapists = useMemo(() => {
     if (!isRecommendedMode) return filteredTherapists;
+    if (usingServerRecommendations) return filteredTherapists;
     const risk = recRisk || (query.has("p") ? (recP >= 0.66 ? "High" : recP >= 0.33 ? "Moderate" : "Low") : "Low");
 
     return [...filteredTherapists].sort((a, b) => scoreTherapistForRisk(b, risk) - scoreTherapistForRisk(a, risk));
-  }, [filteredTherapists, isRecommendedMode, recRisk, recP, query]);
+  }, [filteredTherapists, isRecommendedMode, usingServerRecommendations, recRisk, recP, query]);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -548,11 +610,12 @@ function TherapistCard({ t, onBook, onViewProfile, unavailable }) {
 
   const role = t.role || t.specialization || t.speciality || t.type || t.category || "Therapist";
   const qualification = t.qualification || t.degree || t.title || "—";
-  const experience = t.experience || t.yearsExperience || t.years || "—";
+  const experience = t.experienceYears ?? t.experience ?? t.yearsExperience ?? t.years ?? "—";
   const price = toCurrencyMaybe(t.pricePerSession ?? t.sessionPrice ?? t.price ?? "—");
+  const address = t.address || t.location || "—";
 
-  const rating = t.rating ?? t.avgRating ?? t.stars;
-  const reviews = t.reviewsCount ?? t.reviewCount ?? t.reviews;
+  const rating = t.averageReview ?? t.rating ?? t.avgRating ?? t.stars;
+  const reviews = t.reviewCount ?? t.reviewsCount ?? t.reviews;
 
   const imageRaw = t.profilePictureUrl || t.avatarUrl || t.imageUrl || "";
   const image = resolveImageUrl(imageRaw);
@@ -581,6 +644,7 @@ function TherapistCard({ t, onBook, onViewProfile, unavailable }) {
       <div className="mt-5 space-y-3 text-sm text-gray-700">
         <Row label="Qualification" value={qualification} />
         <Row label="Experience" value={experience} />
+        <Row label="Address" value={address} />
         <Row label="Price per session" value={price} valueClass="text-[#4a6cf7] font-semibold" />
       </div>
 

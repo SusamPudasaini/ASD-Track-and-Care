@@ -159,6 +159,7 @@ export default function Navbar() {
       items: [
         { label: "AI Questionnaire", path: "/questionnaire" },
         { label: "M-CHAT", path: "/mchat-questionnaire" },
+        { label: "Analytics", path: "/analytics" },
       ],
     },
     {
@@ -564,11 +565,8 @@ export default function Navbar() {
 
                           {role === "USER" && (
                             <>
-                              <ProfileMenuItem onClick={() => go("/analytics")}>
-                                Game Analytics
-                              </ProfileMenuItem>
-                              <ProfileMenuItem onClick={() => go("/mchat-questionnaire/analytics")}>
-                                M-CHAT Analytics
+                              <ProfileMenuItem onClick={() => go("/gameanalytics")}>
+                                GameAnalytics
                               </ProfileMenuItem>
                             </>
                           )}
@@ -578,8 +576,8 @@ export default function Navbar() {
                               <ProfileMenuItem onClick={() => go("/therapist/dashboard")}>
                                 Therapist Dashboard
                               </ProfileMenuItem>
-                              <ProfileMenuItem onClick={() => go("/analytics")}>
-                                Game Analytics
+                              <ProfileMenuItem onClick={() => go("/gameanalytics")}>
+                                GameAnalytics
                               </ProfileMenuItem>
                             </>
                           )}

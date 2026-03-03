@@ -1,6 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import Navbar from "../components/navbar/Navbar";
 import { motion } from "framer-motion";
+import api from "../api/axios";
 
 // ✅ Font Awesome (react-icons wrapper)
 import {
@@ -53,6 +55,38 @@ const cardVariants = {
 
 export default function Home() {
   const navigate = useNavigate();
+  const [aiStatus, setAiStatus] = useState({ loading: false, completed: false });
+
+  const isAuthed = useMemo(() => {
+    const token = localStorage.getItem("token") || "";
+    return token.trim().length > 10;
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadStatus() {
+      if (!isAuthed) return;
+
+      try {
+        setAiStatus({ loading: true, completed: false });
+
+        const aiRes = await api.get("/api/ml/last");
+
+        if (!mounted) return;
+        setAiStatus({ loading: false, completed: Boolean(aiRes?.data?.hasHistory) });
+      } catch {
+        if (!mounted) return;
+        setAiStatus({ loading: false, completed: false });
+      }
+    }
+
+    loadStatus();
+
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthed]);
 
   return (
     <motion.div
@@ -102,6 +136,33 @@ export default function Home() {
                 Find Therapists
               </Link>
             </div>
+
+            {isAuthed && !aiStatus.loading && (
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold shadow-sm bg-white">
+                  <span
+                    className={`inline-block h-2.5 w-2.5 rounded-full ${aiStatus.completed ? "bg-emerald-500" : "bg-amber-500"}`}
+                  />
+                  AI Questionnaire: {aiStatus.completed ? "Completed" : "Pending"}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/questionnaire")}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                >
+                  {aiStatus.completed ? "View AI History" : "Open AI Questionnaire"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/analytics")}
+                  className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-100"
+                >
+                  Open Analytics
+                </button>
+              </div>
+            )}
           </motion.div>
         </div>
       </motion.section>

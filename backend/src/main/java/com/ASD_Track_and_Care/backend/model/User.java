@@ -31,6 +31,24 @@ public class User {
     @Column(name = "phone_number", nullable = false, unique = true)
     private String phoneNumber;
 
+    @Column(name = "address", length = 500)
+    private String address;
+
+    @Column(name = "workplace_address", length = 500)
+    private String workplaceAddress;
+
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+    @Column(name = "workplace_latitude")
+    private Double workplaceLatitude;
+
+    @Column(name = "workplace_longitude")
+    private Double workplaceLongitude;
+
     @Column(name = "user_password", nullable = false)
     private String password;
 
@@ -51,6 +69,15 @@ public class User {
     
     @Column(name = "qualification", length = 255)
     private String qualification;
+
+    @Column(name = "experience_years")
+    private Integer experienceYears;
+
+    @Column(name = "average_review")
+    private Double averageReview = 0.0;
+
+    @Column(name = "review_count")
+    private Integer reviewCount = 0;
 
     // RBAC role
     @Enumerated(EnumType.STRING)
@@ -89,6 +116,24 @@ public class User {
     public String getPhoneNumber() { return phoneNumber; }
     public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
 
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+
+    public String getWorkplaceAddress() { return workplaceAddress; }
+    public void setWorkplaceAddress(String workplaceAddress) { this.workplaceAddress = workplaceAddress; }
+
+    public Double getLatitude() { return latitude; }
+    public void setLatitude(Double latitude) { this.latitude = latitude; }
+
+    public Double getLongitude() { return longitude; }
+    public void setLongitude(Double longitude) { this.longitude = longitude; }
+
+    public Double getWorkplaceLatitude() { return workplaceLatitude; }
+    public void setWorkplaceLatitude(Double workplaceLatitude) { this.workplaceLatitude = workplaceLatitude; }
+
+    public Double getWorkplaceLongitude() { return workplaceLongitude; }
+    public void setWorkplaceLongitude(Double workplaceLongitude) { this.workplaceLongitude = workplaceLongitude; }
+
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
 
@@ -120,6 +165,15 @@ public class User {
     
     public String getQualification() { return qualification; }
     public void setQualification(String qualification) { this.qualification = qualification; }
+
+    public Integer getExperienceYears() { return experienceYears; }
+    public void setExperienceYears(Integer experienceYears) { this.experienceYears = experienceYears; }
+
+    public Double getAverageReview() { return averageReview; }
+    public void setAverageReview(Double averageReview) { this.averageReview = averageReview; }
+
+    public Integer getReviewCount() { return reviewCount; }
+    public void setReviewCount(Integer reviewCount) { this.reviewCount = reviewCount; }
 
     public Set<AvailabilityDay> getAvailableDays() { return availableDays; }
     public void setAvailableDays(Set<AvailabilityDay> availableDays) {

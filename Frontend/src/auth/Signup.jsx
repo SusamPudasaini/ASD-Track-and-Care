@@ -8,6 +8,7 @@ import {
   faUser,
   faEnvelope,
   faPhone,
+  faLocationDot,
   faLock,
   faArrowRight,
   faArrowLeft,
@@ -15,6 +16,7 @@ import {
   faIdBadge,
   faSpinner,
 } from "@fortawesome/free-solid-svg-icons";
+import MapLocationPicker from "../components/map/MapLocationPicker";
 
 function StepPill({ number, title, active, completed }) {
   return (
@@ -98,6 +100,9 @@ export default function Signup() {
 
   const [username, setUsername] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [address, setAddress] = useState("");
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
   const [email, setEmail] = useState("");
 
   const [password, setPassword] = useState("");
@@ -118,6 +123,8 @@ export default function Signup() {
     lastName: false,
     username: false,
     phoneNumber: false,
+    address: false,
+    location: false,
     email: false,
     password: false,
     confirmPassword: false,
@@ -179,6 +186,21 @@ export default function Signup() {
     }
     return "";
   }, [email, touched.email, availability.emailAvailable]);
+
+  const addressError = useMemo(() => {
+    if (!touched.address) return "";
+    if (!address.trim()) return "Address is required.";
+    if (address.trim().length < 8) return "Address must be at least 8 characters.";
+    return "";
+  }, [address, touched.address]);
+
+  const locationError = useMemo(() => {
+    if (!touched.location) return "";
+    if (typeof latitude !== "number" || typeof longitude !== "number") {
+      return "Please pick your location on the map.";
+    }
+    return "";
+  }, [latitude, longitude, touched.location]);
 
   const passwordError = useMemo(() => {
     if (!touched.password) return "";
@@ -244,10 +266,17 @@ export default function Signup() {
       username: true,
       email: true,
       phoneNumber: true,
+      address: true,
+      location: true,
     }));
 
-    if (!username.trim() || !email.trim() || !phoneNumber.trim()) {
-      toast.error("Please complete username, email, and phone number.");
+    if (!username.trim() || !email.trim() || !phoneNumber.trim() || !address.trim()) {
+      toast.error("Please complete username, email, phone number, and address.");
+      return;
+    }
+
+    if (typeof latitude !== "number" || typeof longitude !== "number") {
+      toast.error("Please select your location on the map.");
       return;
     }
 
@@ -263,6 +292,11 @@ export default function Signup() {
 
     if (!phoneValid(phoneNumber)) {
       toast.error("Please enter a valid phone number.");
+      return;
+    }
+
+    if (address.trim().length < 8) {
+      toast.error("Please enter a complete address.");
       return;
     }
 
@@ -302,6 +336,8 @@ export default function Signup() {
       lastName: true,
       username: true,
       phoneNumber: true,
+      address: true,
+      location: true,
       email: true,
       password: true,
       confirmPassword: true,
@@ -341,6 +377,9 @@ export default function Signup() {
         lastName: lastName.trim(),
         username: username.trim(),
         phoneNumber: phoneNumber.trim(),
+        address: address.trim(),
+        latitude,
+        longitude,
         email: email.trim(),
         password,
       });
@@ -522,6 +561,28 @@ export default function Signup() {
                         icon={faPhone}
                       />
                     </div>
+
+                    <Input
+                      label="Address"
+                      placeholder="Enter your full address"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      onBlur={() => setTouched((p) => ({ ...p, address: true }))}
+                      error={addressError}
+                      icon={faLocationDot}
+                    />
+
+                    <MapLocationPicker
+                      label="Select your location"
+                      hint="Click your exact location on the map to save latitude and longitude."
+                      latitude={latitude}
+                      longitude={longitude}
+                      onChange={(lat, lng) => {
+                        setLatitude(lat);
+                        setLongitude(lng);
+                      }}
+                    />
+                    {locationError ? <p className="-mt-2 text-xs text-red-600">{locationError}</p> : null}
                   </div>
 
                   <div className="flex items-center justify-between pt-2">

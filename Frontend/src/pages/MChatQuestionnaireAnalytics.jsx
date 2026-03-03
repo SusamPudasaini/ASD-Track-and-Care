@@ -17,11 +17,17 @@ import {
 } from "recharts";
 import {
   FaArrowTrendUp,
+  FaBookOpen,
+  FaBrain,
+  FaCircleInfo,
   FaGaugeHigh,
   FaTriangleExclamation,
   FaRegClock,
   FaListCheck,
   FaChartColumn,
+  FaLocationDot,
+  FaSchool,
+  FaUserDoctor,
 } from "react-icons/fa6";
 
 function getErrorMessage(err) {
@@ -52,12 +58,34 @@ function fmtDate(value) {
   }
 }
 
+function backendBase() {
+  return (import.meta.env.VITE_API_BASE_URL || "http://localhost:8081").replace(/\/api\/?$/, "");
+}
+
+function resolveImageUrl(raw) {
+  if (!raw) return "";
+  const s = String(raw);
+  if (s.startsWith("blob:")) return s;
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+  if (s.startsWith("/")) return `${backendBase()}${s}`;
+  return `${backendBase()}/${s}`;
+}
+
+function prettyText(v) {
+  return String(v || "")
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function MChatQuestionnaireAnalytics() {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState(null);
   const [history, setHistory] = useState([]);
+  const [recommendation, setRecommendation] = useState(null);
+  const [aiStatus, setAiStatus] = useState({ completed: false, probabilityPercent: null });
 
   useEffect(() => {
     let mounted = true;
@@ -66,15 +94,44 @@ export default function MChatQuestionnaireAnalytics() {
       try {
         setLoading(true);
 
-        const [analyticsRes, historyRes] = await Promise.all([
+        const [analyticsRes, historyRes, planRes, aiRes] = await Promise.allSettled([
           api.get("/api/analytics/mchat-questionnaire"),
           api.get("/api/mchat-questionnaire/history"),
+          api.get("/api/recommendations/child-plan"),
+          api.get("/api/ml/last"),
         ]);
 
         if (!mounted) return;
 
-        setAnalytics(analyticsRes.data || null);
-        setHistory(Array.isArray(historyRes.data) ? historyRes.data : []);
+        const analyticsData = analyticsRes.status === "fulfilled" ? analyticsRes.value?.data : null;
+        const historyData = historyRes.status === "fulfilled" && Array.isArray(historyRes.value?.data)
+          ? historyRes.value.data
+          : [];
+        const planData = planRes.status === "fulfilled" ? planRes.value?.data : null;
+        const aiData = aiRes.status === "fulfilled" ? aiRes.value?.data : null;
+
+        setAnalytics(analyticsData || null);
+        setHistory(historyData);
+        setRecommendation(planData || null);
+
+        const aiProbability =
+          typeof aiData?.probability === "number"
+            ? aiData.probability
+            : typeof aiData?.latest?.probability === "number"
+              ? aiData.latest.probability
+              : null;
+
+        const aiProbabilityPercent =
+          aiProbability != null
+            ? Math.round(aiProbability * 1000) / 10
+            : typeof planData?.riskSummary?.aiProbabilityPercent === "number"
+              ? Math.round(planData.riskSummary.aiProbabilityPercent * 10) / 10
+              : null;
+
+        setAiStatus({
+          completed: Boolean(aiData?.hasHistory),
+          probabilityPercent: aiProbabilityPercent,
+        });
       } catch (err) {
         toast.error(getErrorMessage(err));
       } finally {
@@ -107,76 +164,381 @@ export default function MChatQuestionnaireAnalytics() {
   }, [analytics]);
 
   const latest = history[0] || null;
+  const riskSummary = recommendation?.riskSummary || null;
+  const combinedRisk = riskSummary?.combinedRiskLevel || latest?.riskLevel || "UNKNOWN";
+
+  const riskToneClass =
+    combinedRisk === "HIGH"
+      ? "border-red-200 bg-red-50 text-red-800"
+      : combinedRisk === "MODERATE"
+        ? "border-amber-200 bg-amber-50 text-amber-800"
+        : "border-emerald-200 bg-emerald-50 text-emerald-800";
+
+  const alerts = useMemo(() => {
+    const out = [];
+    if (!aiStatus.completed) {
+      out.push("AI questionnaire is pending. Complete it to improve recommendation quality.");
+    }
+    if (!latest) {
+      out.push("M-CHAT is pending. Complete it to unlock richer trend analytics.");
+    }
+    if (riskSummary?.combinedRiskLevel === "HIGH") {
+      out.push("High combined risk detected. Prioritize therapist consultation and structured intervention.");
+    } else if (riskSummary?.combinedRiskLevel === "MODERATE") {
+      out.push("Moderate combined risk detected. Weekly guided therapy and routine follow-up are recommended.");
+    }
+    if (out.length === 0) {
+      out.push("No urgent alerts right now. Continue with your current routine and monitor trends regularly.");
+    }
+    return out;
+  }, [aiStatus.completed, latest, riskSummary?.combinedRiskLevel]);
+
+  const primaryAlert = alerts[0] || "No urgent alerts right now.";
+  const hasUrgentAlert = combinedRisk === "HIGH" || combinedRisk === "MODERATE";
+  const weakAreas = Array.isArray(riskSummary?.weakAreas) ? riskSummary.weakAreas : [];
+
+  const recommendedTherapists = Array.isArray(recommendation?.recommendedTherapists)
+    ? recommendation.recommendedTherapists
+    : [];
+  const recommendedActivities = Array.isArray(recommendation?.recommendedActivities)
+    ? recommendation.recommendedActivities
+    : [];
+  const recommendedResources = Array.isArray(recommendation?.recommendedResources)
+    ? recommendation.recommendedResources
+    : [];
+  const recommendedCenters = Array.isArray(recommendation?.recommendedDayCareCenters)
+    ? recommendation.recommendedDayCareCenters
+    : [];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_30%,_#ffffff)]">
       <Navbar />
 
       <main className="mx-auto max-w-6xl px-6 py-10">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+        <div className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
             <div className="flex items-center gap-2">
               <FaArrowTrendUp className="text-[#4a6cf7]" />
-              <h1 className="text-3xl font-semibold text-gray-900">M-CHAT Analytics</h1>
+              <h1 className="text-3xl font-semibold text-gray-900">Child Analytics Dashboard</h1>
             </div>
-            <p className="mt-1 text-sm text-gray-600">
-              Track questionnaire-based development and concern trends over time.
-            </p>
+            
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => navigate("/mchat-questionnaire")}
-              className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              Fill Questionnaire
-            </button>
-          </div>
         </div>
 
         {loading ? (
           <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
-            Loading M-CHAT analytics...
-          </div>
-        ) : !analytics || (analytics.totalSubmissions || 0) === 0 ? (
-          <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
-            No questionnaire submissions found yet.
+            Loading analytics dashboard...
           </div>
         ) : (
           <>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <KpiCard
+              <DashboardStatCard
                 icon={<FaListCheck />}
-                title="Total submissions"
-                value={analytics.totalSubmissions ?? 0}
+                title="M-CHAT Submissions"
+                value={analytics?.totalSubmissions ?? 0}
+                subtitle="Total"
+                gradient="from-[#7C3AED] to-[#A78BFA]"
               />
-              <KpiCard
+              <DashboardStatCard
+                icon={<FaBrain />}
+                title="AI Questionnaire"
+                value={aiStatus.completed ? `${aiStatus.probabilityPercent ?? 0}%` : "Pending"}
+                subtitle={aiStatus.completed ? "Latest score" : "Incomplete"}
+                gradient="from-[#F59E0B] to-[#FBBF24]"
+              />
+              <DashboardStatCard
                 icon={<FaGaugeHigh />}
-                title="Latest development"
-                value={`${analytics.latestDevelopmentScore ?? 0}%`}
-                hint="Higher is better"
+                title="Concern Level"
+                value={`${analytics?.latestConcernScore ?? 0}%`}
+                subtitle="Current"
+                gradient="from-[#22C55E] to-[#4ADE80]"
               />
-              <KpiCard
-                icon={<FaTriangleExclamation />}
-                title="Latest concern"
-                value={`${analytics.latestConcernScore ?? 0}%`}
-                hint="Lower is better"
-              />
-              <KpiCard
+              <DashboardStatCard
                 icon={<FaArrowTrendUp />}
-                title="Improvement"
-                value={
-                  analytics.improvementDelta == null
-                    ? "—"
-                    : `${analytics.improvementDelta > 0 ? "+" : ""}${analytics.improvementDelta}%`
+                title="Combined risk"
+                value={combinedRisk}
+                subtitle={riskSummary?.urgency ? riskSummary.urgency.replaceAll("_", " ") : "Monitoring"}
+                gradient="from-[#3B82F6] to-[#60A5FA]"
+                valueClass={
+                  combinedRisk === "HIGH"
+                    ? "text-red-200"
+                    : combinedRisk === "MODERATE"
+                      ? "text-yellow-200"
+                      : "text-white"
                 }
-                sub={analytics.latestRiskLevel ? `Risk: ${analytics.latestRiskLevel}` : ""}
+                showHighAlert={combinedRisk === "HIGH"}
               />
             </div>
 
+
+            <div className={`mt-6 rounded-2xl border p-5 shadow-sm ${riskToneClass}`}>
+              <div className="flex items-start gap-3">
+                <FaCircleInfo className="mt-0.5" />
+                <div>
+                  <h2 className="text-base font-semibold">Risk Summary</h2>
+                  <p className="mt-1 text-sm">
+                    {riskSummary?.guidance || "Complete AI + M-CHAT questionnaires to generate full guidance."}
+                  </p>
+                  {weakAreas.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {weakAreas.map((w) => (
+                        <span
+                          key={w}
+                          className="rounded-full border border-current/30 bg-white/50 px-3 py-1 text-xs font-semibold"
+                        >
+                          {w}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-amber-100 bg-white p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900">Active Alerts</h3>
+                <div className="mt-4 space-y-3">
+                  {alerts.map((alert, idx) => (
+                    <div
+                      key={`${alert}-${idx}`}
+                      className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                    >
+                      {alert}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900">Next Step Recommendations</h3>
+                <p className="mt-2 text-sm text-gray-600">
+                  {riskSummary?.guidance || "Start by completing both questionnaires, then follow suggested support options."}
+                </p>
+
+                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/therapists")}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <FaUserDoctor /> Therapists
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/daycares")}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <FaSchool /> Centers
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/resources")}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <FaBookOpen /> Resources
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Recommended Therapists</h3>
+                  <p className="mt-1 text-sm text-gray-600">Prioritized by risk level, experience, review quality, and relevance.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/therapists")}
+                  className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                >
+                  Browse All
+                </button>
+              </div>
+
+              {recommendedTherapists.length === 0 ? (
+                <p className="mt-4 text-sm text-gray-500">No therapist recommendations yet.</p>
+              ) : (
+                <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
+                  {recommendedTherapists.slice(0, 8).map((t) => {
+                    const img = resolveImageUrl(t.profilePictureUrl);
+                    return (
+                      <article key={t.id} className="min-w-[270px] max-w-[270px] rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                        <div className="flex items-start gap-3">
+                          <div className="h-14 w-14 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                            {img ? <img src={img} alt={t.name || "Therapist"} className="h-full w-full object-cover" /> : null}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="truncate text-sm font-semibold text-gray-900">{t.name || "Therapist"}</h4>
+                            <p className="mt-1 line-clamp-2 text-xs text-gray-600">{t.qualification || "Qualification not listed"}</p>
+                          </div>
+                        </div>
+                        <p className="mt-3 text-xs text-gray-500">
+                          {t.experienceYears ?? 0} yrs • {Number(t.averageReview || 0).toFixed(1)}★ ({t.reviewCount || 0})
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {t.distanceKm != null ? `${t.distanceKm} km away` : "Distance unavailable"}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-xs text-gray-500">
+                          <span className="inline-flex items-center gap-1">
+                            <FaLocationDot className="text-[11px]" />
+                            {t.workplaceAddress || t.address || "Workplace address unavailable"}
+                          </span>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/therapists/${t.id}`)}
+                          className="mt-3 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                        >
+                          View Profile
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Recommended Therapy Activities</h3>
+                  <p className="mt-1 text-sm text-gray-600">Mapped to weak areas from M-CHAT categories.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/activities")}
+                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                >
+                  Activities Hub
+                </button>
+              </div>
+
+              {recommendedActivities.length === 0 ? (
+                <p className="mt-4 text-sm text-gray-500">No activity recommendations yet.</p>
+              ) : (
+                <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
+                  {recommendedActivities.slice(0, 8).map((a, idx) => (
+                    <article key={`${a.name}-${idx}`} className="min-w-[290px] max-w-[290px] rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">A</span>
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">Recommended</span>
+                      </div>
+                      <h4 className="mt-3 text-sm font-semibold text-gray-900">{a.name}</h4>
+                      <p className="mt-2 line-clamp-3 text-xs text-gray-600">{a.plan}</p>
+                      <button
+                        type="button"
+                        onClick={() => navigate(a.route || "/activities")}
+                        className="mt-3 w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                      >
+                        Open Activity
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-sky-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Recommended Resources</h3>
+                  <p className="mt-1 text-sm text-gray-600">Reading material and guidance tailored to weak categories.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/resources")}
+                  className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                >
+                  Open Resource Hub
+                </button>
+              </div>
+
+              {recommendedResources.length === 0 ? (
+                <p className="mt-4 text-sm text-gray-500">No resource recommendations yet.</p>
+              ) : (
+                <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
+                  {recommendedResources.slice(0, 8).map((r) => {
+                    const thumb = resolveImageUrl(r.thumbnailUrl);
+                    return (
+                      <article key={r.id || r.title} className="min-w-[300px] max-w-[300px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                        <div className="h-32 bg-slate-100">
+                          {thumb ? <img src={thumb} alt={r.title || "Resource"} className="h-full w-full object-cover" /> : null}
+                        </div>
+                        <div className="p-4">
+                          <h4 className="line-clamp-2 text-sm font-semibold text-gray-900">{r.title}</h4>
+                          <p className="mt-1 text-xs font-medium text-sky-700">{prettyText(r.category || "General")}</p>
+                          <p className="mt-2 line-clamp-2 text-xs text-gray-600">{r.description || "No description available."}</p>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/resources/${r.id}`)}
+                            className="mt-3 w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                          >
+                            View Resource
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-purple-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Recommended Therapy Centers</h3>
+                  <p className="mt-1 text-sm text-gray-600">Matched to child needs (sensory, communication, play, and more).</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/daycares")}
+                  className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100"
+                >
+                  View All Centers
+                </button>
+              </div>
+
+              {recommendedCenters.length === 0 ? (
+                <p className="mt-4 text-sm text-gray-500">No therapy center recommendations yet.</p>
+              ) : (
+                <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
+                  {recommendedCenters.slice(0, 8).map((c) => {
+                    const image = resolveImageUrl(c.imageUrl);
+                    return (
+                      <article key={c.id} className="min-w-[300px] max-w-[300px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                        <div className="h-32 bg-purple-100">
+                          {image ? <img src={image} alt={c.name || "Center"} className="h-full w-full object-cover" /> : null}
+                        </div>
+                        <div className="p-4">
+                          <h4 className="line-clamp-2 text-sm font-semibold text-gray-900">{c.name}</h4>
+                          <p className="mt-1 text-xs font-medium text-purple-700">{prettyText(c.category || "General")}</p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {c.distanceKm != null ? `${c.distanceKm} km away` : "Distance unavailable (check profile address)"}
+                            {c.rating != null ? ` • ${Number(c.rating).toFixed(1)}★` : ""}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/daycares/${c.id}`)}
+                            className="mt-3 w-full rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100"
+                          >
+                            View Center
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {!!analytics && (analytics.totalSubmissions || 0) > 0 && (
             <div className="mt-8 grid gap-6 lg:grid-cols-2">
-              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border border-cyan-100 bg-white p-6 shadow-sm">
                 <div className="text-lg font-semibold text-gray-900">Trend Over Time</div>
                 <div className="mt-1 text-xs text-gray-500">
                   Development should trend upward. Concern should trend downward.
@@ -185,19 +547,43 @@ export default function MChatQuestionnaireAnalytics() {
                 <div className="mt-6 h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
+                      <defs>
+                        <linearGradient id="devStroke" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#0ea5e9" />
+                          <stop offset="100%" stopColor="#0284c7" />
+                        </linearGradient>
+                        <linearGradient id="concernStroke" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#f97316" />
+                          <stop offset="100%" stopColor="#dc2626" />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
                       <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
                       <Tooltip />
                       <Legend />
-                      <Line type="monotone" dataKey="development" name="Development %" dot={false} />
-                      <Line type="monotone" dataKey="concern" name="Concern %" dot={false} />
+                      <Line
+                        type="monotone"
+                        dataKey="development"
+                        name="Development %"
+                        dot={false}
+                        stroke="url(#devStroke)"
+                        strokeWidth={3}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="concern"
+                        name="Concern %"
+                        dot={false}
+                        stroke="url(#concernStroke)"
+                        strokeWidth={3}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
                 <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
                   <FaChartColumn className="text-[#4a6cf7]" />
                   Category Scores
@@ -206,7 +592,7 @@ export default function MChatQuestionnaireAnalytics() {
                 <div className="mt-6 h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={categoryData}>
-                      <CartesianGrid strokeDasharray="3 3" />
+                      <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
                       <XAxis
                         dataKey="category"
                         tick={{ fontSize: 11 }}
@@ -218,14 +604,16 @@ export default function MChatQuestionnaireAnalytics() {
                       <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
                       <Tooltip />
                       <Legend />
-                      <Bar dataKey="development" name="Development %" />
-                      <Bar dataKey="concern" name="Concern %" />
+                      <Bar dataKey="development" name="Development %" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="concern" name="Concern %" fill="#f97316" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
             </div>
+            )}
 
+            {!!analytics && (analytics.totalSubmissions || 0) > 0 && (
             <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
@@ -275,6 +663,13 @@ export default function MChatQuestionnaireAnalytics() {
                 </p>
               ) : null}
             </div>
+            )}
+
+            {(!analytics || (analytics.totalSubmissions || 0) === 0) && (
+              <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
+                No M-CHAT submissions found yet. You can still use this dashboard to view AI status, risk alerts, and next-step recommendations.
+              </div>
+            )}
           </>
         )}
       </main>
@@ -282,16 +677,27 @@ export default function MChatQuestionnaireAnalytics() {
   );
 }
 
-function KpiCard({ icon, title, value, sub, hint }) {
+function DashboardStatCard({ icon, title, value, subtitle, gradient, valueClass = "text-white", showHighAlert = false }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600">{title}</div>
-        <div className="text-[#4a6cf7]">{icon}</div>
+    <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-r p-5 text-white shadow-lg ${gradient}`}>
+      <div className="absolute -right-5 -top-5 h-20 w-20 rounded-full bg-white/10" />
+      <div className="absolute -bottom-7 right-10 h-16 w-16 rounded-full bg-white/10" />
+
+      <div className="relative flex items-start justify-between">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white backdrop-blur">
+          {icon}
+        </span>
+
+        {showHighAlert ? (
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-500/85 text-white shadow-sm">
+            <FaTriangleExclamation />
+          </span>
+        ) : null}
       </div>
-      <div className="mt-2 text-2xl font-bold text-gray-900">{value}</div>
-      {sub ? <div className="mt-1 text-sm text-gray-600">{sub}</div> : null}
-      {hint ? <div className="mt-1 text-xs text-gray-500">{hint}</div> : null}
+
+      <div className={`relative mt-3 text-4xl font-extrabold leading-none tracking-tight ${valueClass}`}>{value}</div>
+      <div className="relative mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-white/80">{title}</div>
+      {subtitle ? <div className="relative mt-1 text-xs font-medium text-white/80">{subtitle}</div> : null}
     </div>
   );
 }

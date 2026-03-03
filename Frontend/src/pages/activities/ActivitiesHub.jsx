@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Navbar from "../../components/navbar/Navbar";
+import api from "../../api/axios";
 
 import {
   FaBolt,
@@ -16,6 +17,7 @@ import {
 export default function ActivitiesHub() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [reminder, setReminder] = useState({ streak: 0, inactiveDays: 0, loading: true });
 
   const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const recP = useMemo(() => Number(query.get("p") || 0), [query]);
@@ -91,6 +93,68 @@ export default function ActivitiesHub() {
     return [...rec, ...rest];
   }, [activities, isRecommendedMode, recommendedKeys]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadReminder() {
+      try {
+        const res = await api.get("/api/analytics/activities", { params: { limit: 120 } });
+        if (!mounted) return;
+
+        const rows = Array.isArray(res.data) ? res.data : [];
+        const uniqueDays = Array.from(
+          new Set(
+            rows
+              .map((r) => String(r?.createdAt || "").slice(0, 10))
+              .filter(Boolean)
+          )
+        ).sort((a, b) => (a > b ? -1 : 1));
+
+        const today = new Date();
+        const toDateOnly = (x) => new Date(x + "T00:00:00");
+
+        let streak = 0;
+        let cursor = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+        for (let i = 0; i < 365; i += 1) {
+          const key = cursor.toISOString().slice(0, 10);
+          if (uniqueDays.includes(key)) {
+            streak += 1;
+            cursor.setDate(cursor.getDate() - 1);
+            continue;
+          }
+
+          if (i === 0) {
+            cursor.setDate(cursor.getDate() - 1);
+            continue;
+          }
+          break;
+        }
+
+        const last = uniqueDays[0] ? toDateOnly(uniqueDays[0]) : null;
+        const inactiveDays = last
+          ? Math.max(
+              0,
+              Math.floor(
+                (new Date(today.getFullYear(), today.getMonth(), today.getDate()) - last) /
+                  (1000 * 60 * 60 * 24)
+              )
+            )
+          : 999;
+
+        setReminder({ streak, inactiveDays, loading: false });
+      } catch {
+        if (!mounted) return;
+        setReminder({ streak: 0, inactiveDays: 0, loading: false });
+      }
+    }
+
+    loadReminder();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -99,6 +163,24 @@ export default function ActivitiesHub() {
         <h1 className="text-3xl font-semibold text-gray-900">
           Therapy & Activity Modules
         </h1>
+
+        {!reminder.loading && (
+          <div
+            className={`mt-6 rounded-xl border p-4 text-sm ${
+              reminder.inactiveDays >= 3
+                ? "border-orange-200 bg-orange-50 text-orange-900"
+                : "border-emerald-200 bg-emerald-50 text-emerald-900"
+            }`}
+          >
+            <div className="font-semibold">Activity reminder</div>
+            <p className="mt-1">
+              Current streak: {reminder.streak} day{reminder.streak === 1 ? "" : "s"}.{" "}
+              {reminder.inactiveDays >= 3
+                ? `No activity logged for ${reminder.inactiveDays} days. Restart with a short 10-minute session today.`
+                : "Great consistency. Keep a daily routine to strengthen progress."}
+            </p>
+          </div>
+        )}
 
         {/* Recommended Mode Banner */}
         {isRecommendedMode && (

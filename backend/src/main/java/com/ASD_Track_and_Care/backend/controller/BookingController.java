@@ -1,9 +1,12 @@
 package com.ASD_Track_and_Care.backend.controller;
 
 import com.ASD_Track_and_Care.backend.dto.BookingDecisionRequest;
+import com.ASD_Track_and_Care.backend.dto.BookingChatMessageRequest;
+import com.ASD_Track_and_Care.backend.dto.BookingChatMessageResponse;
 import com.ASD_Track_and_Care.backend.dto.BookingResponse;
 import com.ASD_Track_and_Care.backend.dto.CreateBookingRequest;
 import com.ASD_Track_and_Care.backend.dto.RescheduleBookingRequest;
+import com.ASD_Track_and_Care.backend.dto.SubmitTherapistReviewRequest;
 import com.ASD_Track_and_Care.backend.service.BookingService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +51,23 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.therapistBookings(authentication));
     }
 
+    @GetMapping("/{id}/chat/messages")
+    public ResponseEntity<List<BookingChatMessageResponse>> bookingChatMessages(
+            Authentication authentication,
+            @PathVariable("id") Long id
+    ) {
+        return ResponseEntity.ok(bookingService.bookingChatMessages(authentication, id));
+    }
+
+    @PostMapping("/{id}/chat/messages")
+    public ResponseEntity<BookingChatMessageResponse> sendBookingChatMessage(
+            Authentication authentication,
+            @PathVariable("id") Long id,
+            @Valid @RequestBody BookingChatMessageRequest req
+    ) {
+        return ResponseEntity.ok(bookingService.sendBookingChatMessage(authentication, id, req));
+    }
+
     @PutMapping("/{id}/approve")
     public ResponseEntity<BookingResponse> approve(Authentication authentication, @PathVariable("id") Long id) {
         return ResponseEntity.ok(bookingService.approve(authentication, id));
@@ -81,5 +101,14 @@ public class BookingController {
     public ResponseEntity<?> cancel(Authentication authentication, @PathVariable("id") Long id) {
         bookingService.cancel(authentication, id);
         return ResponseEntity.ok("Booking cancelled");
+    }
+
+    @PostMapping("/{id}/review")
+    public ResponseEntity<BookingResponse> submitReview(
+            Authentication authentication,
+            @PathVariable("id") Long id,
+            @Valid @RequestBody SubmitTherapistReviewRequest req
+    ) {
+        return ResponseEntity.ok(bookingService.submitReview(authentication, id, req));
     }
 }

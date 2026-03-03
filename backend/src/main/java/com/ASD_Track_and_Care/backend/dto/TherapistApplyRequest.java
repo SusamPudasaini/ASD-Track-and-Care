@@ -37,6 +37,10 @@ public class TherapistApplyRequest {
     @Size(max = 80, message = "City too long")
     private String city;
 
+    private Double workplaceLatitude;
+
+    private Double workplaceLongitude;
+
     @Size(max = 1000, message = "Message too long")
     private String message;
 
@@ -68,6 +72,12 @@ public class TherapistApplyRequest {
 
     public String getCity() { return city; }
     public void setCity(String city) { this.city = city; }
+
+    public Double getWorkplaceLatitude() { return workplaceLatitude; }
+    public void setWorkplaceLatitude(Double workplaceLatitude) { this.workplaceLatitude = workplaceLatitude; }
+
+    public Double getWorkplaceLongitude() { return workplaceLongitude; }
+    public void setWorkplaceLongitude(Double workplaceLongitude) { this.workplaceLongitude = workplaceLongitude; }
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }

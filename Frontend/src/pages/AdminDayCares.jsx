@@ -22,18 +22,19 @@ import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 
 const CATEGORY_OPTIONS = [
-  "GENERAL",
-  "ASD_FRIENDLY",
-  "SPECIAL_NEEDS",
-  "EARLY_INTERVENTION",
-  "THERAPY_CENTER",
+  "SOCIAL_INTERACTION",
+  "COMMUNICATION",
+  "PLAY",
+  "ATTENTION",
+  "BEHAVIOR",
+  "SENSORY",
 ];
 
 function emptyForm() {
   return {
     name: "",
     description: "",
-    category: "GENERAL",
+    category: "COMMUNICATION",
     address: "",
     latitude: "",
     longitude: "",
@@ -247,7 +248,7 @@ export default function AdminDayCares() {
     setForm({
       name: row.name || "",
       description: row.description || "",
-      category: row.category || "GENERAL",
+      category: row.category || "COMMUNICATION",
       address: row.address || "",
       latitude: row.latitude ?? "",
       longitude: row.longitude ?? "",

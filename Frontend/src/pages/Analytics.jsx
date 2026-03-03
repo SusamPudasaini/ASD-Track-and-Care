@@ -324,7 +324,7 @@ export default function Analytics() {
           <div>
             <div className="flex items-center gap-2">
               <FaArrowTrendUp className="text-[#4a6cf7]" />
-              <h1 className="text-3xl font-semibold text-gray-900">Analytics</h1>
+              <h1 className="text-3xl font-semibold text-gray-900">GameAnalytics</h1>
             </div>
             <p className="mt-1 text-sm text-gray-600">Progress tracking across activities.</p>
 

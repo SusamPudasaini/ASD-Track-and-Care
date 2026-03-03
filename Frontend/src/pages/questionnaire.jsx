@@ -92,11 +92,13 @@ const SelectField = ({
   placeholder,
   helper,
   onValueChange,
+  disabled,
 }) => (
   <FieldShell label={label} helper={helper}>
     <select
       ref={inputRef}
       defaultValue=""
+      disabled={disabled}
       onChange={(e) => onValueChange?.(e.target.value)}
       className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
     >
@@ -110,12 +112,13 @@ const SelectField = ({
   </FieldShell>
 );
 
-const NumberInputField = ({ label, inputRef, placeholder, helper, min, max }) => (
+const NumberInputField = ({ label, inputRef, placeholder, helper, min, max, disabled }) => (
   <FieldShell label={label} helper={helper}>
     <input
       ref={inputRef}
       type="number"
       inputMode="numeric"
+      disabled={disabled}
       placeholder={placeholder || "Enter a number"}
       min={min}
       max={max}
@@ -132,8 +135,8 @@ const ResultModal = ({
   prediction,
   riskLevel,
   resultQuery,
+  mchatCompleted,
   onClose,
-  onRetake,
   onNavigate,
 }) => {
   if (!open) return null;
@@ -221,7 +224,9 @@ const ResultModal = ({
               </div>
 
               <p className="mt-4 text-sm leading-6 text-slate-600">
-                You can now explore suggested therapists or activities based on this result.
+                {mchatCompleted
+                  ? "M-CHAT is complete. You can now open suggested therapists and therapy centers."
+                  : "Next step: complete M-CHAT questionnaire to unlock therapist and therapy center suggestions."}
               </p>
             </div>
           </div>
@@ -231,31 +236,50 @@ const ResultModal = ({
               What would you like to do next?
             </p>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <button
-                type="button"
-                onClick={() => onNavigate(`/therapists?${resultQuery}`)}
-                className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
-              >
-                Suggested Therapists
-              </button>
+            {mchatCompleted ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => onNavigate(`/therapists?${resultQuery}`)}
+                  className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
+                >
+                  Suggested Therapists
+                </button>
 
-              <button
-                type="button"
-                onClick={() => onNavigate(`/activities?${resultQuery}`)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
-              >
-                Suggested Activities
-              </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate("/daycares")}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                >
+                  Suggested Therapy Centers
+                </button>
 
-              <button
-                type="button"
-                onClick={onRetake}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
-              >
-                Retake Assessment
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                >
+                  Review Saved Record
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => onNavigate("/mchat-questionnaire")}
+                  className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
+                >
+                  Fill M-CHAT Now
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                >
+                  I will do it later
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -273,7 +297,7 @@ const LastResultCard = ({
   latest,
   computeRiskLevel,
   fmtDate,
-  onRetake,
+  mchatCompleted,
   onNavigate,
 }) => {
   if (historyLoading) {
@@ -314,8 +338,8 @@ const LastResultCard = ({
           Autism Risk Screening Questionnaire
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-50">
-          Your latest recorded screening is shown below. You can review suggestions or retake the
-          questionnaire anytime.
+          Your latest recorded screening is shown below. The AI questionnaire is one-time only,
+          and this page is now used to review your submitted answers and risk result.
         </p>
       </div>
 
@@ -347,44 +371,99 @@ const LastResultCard = ({
         </div>
 
         <div className="mt-6 flex flex-col gap-3 md:flex-row">
-          <button
-            type="button"
-            onClick={() =>
-              onNavigate(
-                `/therapists?${new URLSearchParams({
-                  p: String(latest.probability),
-                  risk: String(lastRisk),
-                }).toString()}`
-              )
-            }
-            className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
-          >
-            View Suggested Therapists
-          </button>
+          {mchatCompleted ? (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  onNavigate(
+                    `/therapists?${new URLSearchParams({
+                      p: String(latest.probability),
+                      risk: String(lastRisk),
+                    }).toString()}`
+                  )
+                }
+                className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
+              >
+                View Suggested Therapists
+              </button>
 
-          <button
-            type="button"
-            onClick={() =>
-              onNavigate(
-                `/activities?${new URLSearchParams({
-                  p: String(latest.probability),
-                  risk: String(lastRisk),
-                }).toString()}`
-              )
-            }
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
-          >
-            View Suggested Activities
-          </button>
+              <button
+                type="button"
+                onClick={() => onNavigate("/daycares")}
+                className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+              >
+                View Suggested Therapy Centers
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onNavigate("/mchat-questionnaire")}
+              className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              Fill M-CHAT to Unlock Suggestions
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={onRetake}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
-          >
-            Retake Assessment
-          </button>
         </div>
+
+        {!mchatCompleted && (
+          <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+            <p className="text-sm font-semibold text-blue-900">
+              Take M-CHAT to determine the state of your child.
+            </p>
+            <p className="mt-1 text-sm text-blue-800">
+              Complete M-CHAT first. Therapist and therapy center recommendations unlock afterward.
+            </p>
+            <button
+              type="button"
+              onClick={() => onNavigate("/mchat-questionnaire")}
+              className="mt-3 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Go to M-CHAT Questionnaire
+            </button>
+          </div>
+        )}
+
+        <div className="mt-5 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
+          Questionnaire locked: this AI questionnaire can only be submitted once.
+        </div>
+
+        {latest?.details && (
+          <div className="mt-8">
+            <h3 className="text-base font-semibold text-slate-900">Submitted Questionnaire Details</h3>
+            <p className="mt-1 text-sm text-slate-500">Values submitted for this AI screening record.</p>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {[
+                ["Child age (months)", latest.details.age_months],
+                ["Sex", latest.details.sex === 1 ? "Male" : latest.details.sex === 0 ? "Female" : "—"],
+                ["Residence", latest.details.residence === 1 ? "Urban" : latest.details.residence === 0 ? "Rural" : "—"],
+                ["Parental education", ({ 0: "No formal", 1: "Primary", 2: "Secondary", 3: "College/University" }[latest.details.parental_education] ?? "—")],
+                ["Family history ASD", latest.details.family_history_asd === 1 ? "Yes" : latest.details.family_history_asd === 0 ? "No" : "—"],
+                ["Pre-eclampsia", latest.details.preeclampsia === 1 ? "Yes" : latest.details.preeclampsia === 0 ? "No" : "—"],
+                ["Preterm birth", latest.details.preterm_birth === 1 ? "Yes" : latest.details.preterm_birth === 0 ? "No" : "—"],
+                ["Birth asphyxia", latest.details.birth_asphyxia === 1 ? "Yes" : latest.details.birth_asphyxia === 0 ? "No" : "—"],
+                ["Low birth weight", latest.details.low_birth_weight === 1 ? "Yes" : latest.details.low_birth_weight === 0 ? "No" : "—"],
+                ["Eye contact age (months)", latest.details.eye_contact_age_months],
+                ["Social smile age (months)", latest.details.social_smile_months],
+                ["Intellectual disability", latest.details.intellectual_disability === 1 ? "Yes" : latest.details.intellectual_disability === 0 ? "No" : "—"],
+                ["Epilepsy", latest.details.epilepsy === 1 ? "Yes" : latest.details.epilepsy === 0 ? "No" : "—"],
+                ["ADHD", latest.details.adhd === 1 ? "Yes" : latest.details.adhd === 0 ? "No" : "—"],
+                ["Language disorder", latest.details.language_disorder === 1 ? "Yes" : latest.details.language_disorder === 0 ? "No" : "—"],
+                ["Motor delay", latest.details.motor_delay === 1 ? "Yes" : latest.details.motor_delay === 0 ? "No" : "—"],
+                ["Screening done before", latest.details.screening_done === 1 ? "Yes" : latest.details.screening_done === 0 ? "No" : "—"],
+                ["Previous screening result", ({ 1: "Positive", 0: "Negative", 2: "Unknown" }[latest.details.screening_result] ?? "Not provided")],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+                  <div className="mt-1 text-sm font-medium text-slate-900">{value ?? "—"}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {!!historyError && (
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
@@ -427,9 +506,7 @@ const LastResultCard = ({
               </table>
             </div>
 
-            <p className="mt-3 text-xs text-slate-500">
-              Tip: Use “Retake Assessment” whenever you want to generate a new screening record.
-            </p>
+            <p className="mt-3 text-xs text-slate-500">One-time rule: additional AI submissions are disabled.</p>
           </div>
         )}
       </div>
@@ -478,7 +555,7 @@ export default function Questionnaire() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState(null);
   const [history, setHistory] = useState([]);
-  const [showForm, setShowForm] = useState(false);
+  const [mchatCompleted, setMchatCompleted] = useState(false);
 
   const [screeningDoneValue, setScreeningDoneValue] = useState("");
 
@@ -644,6 +721,7 @@ export default function Questionnaire() {
         probability: typeof x.probability === "number" ? x.probability : null,
         riskLevel: x.riskLevel || x.risk_level || "",
         createdAt: x.createdAt || x.created_at || x.timestamp || "",
+        details: x.details || null,
       }))
       .filter((x) => typeof x.probability === "number");
 
@@ -658,15 +736,18 @@ export default function Questionnaire() {
         setHistoryLoading(true);
         setHistoryError(null);
 
-        const normalized = await fetchHistory();
+        const [normalized, mchatRes] = await Promise.all([
+          fetchHistory(),
+          api.get("/api/mchat-questionnaire/history", { params: { limit: 1 } }),
+        ]);
         if (!mounted) return;
 
         setHistory(normalized);
-        setShowForm(normalized.length === 0);
+        setMchatCompleted(Array.isArray(mchatRes?.data) && mchatRes.data.length > 0);
       } catch {
         if (!mounted) return;
         setHistoryError("Could not load previous results.");
-        setShowForm(true);
+        setMchatCompleted(false);
       } finally {
         if (mounted) setHistoryLoading(false);
       }
@@ -683,6 +764,8 @@ export default function Questionnaire() {
     return history[0];
   }, [history]);
 
+  const isLocked = Boolean(latest);
+
   const fmtDate = useCallback((iso) => {
     if (!iso) return "";
     const d = new Date(iso);
@@ -690,13 +773,12 @@ export default function Questionnaire() {
     return d.toLocaleString();
   }, []);
 
-  const handleRetake = useCallback(() => {
-    clearAllFields();
-    setShowForm(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [clearAllFields]);
-
   const handlePredict = async () => {
+    if (isLocked) {
+      toast.error("Questionnaire already submitted. New submissions are disabled.");
+      return;
+    }
+
     setServerError(null);
     setPrediction(null);
     setRiskLevel("");
@@ -783,12 +865,66 @@ export default function Questionnaire() {
         // ignore refresh errors
       }
     } catch (err) {
+      if (err?.response?.status === 409) {
+        const data = err?.response?.data || {};
+        const existing = {
+          id: data.recordId || `record-${Date.now()}`,
+          probability: typeof data.probability === "number" ? data.probability : null,
+          riskLevel: data.riskLevel || "",
+          createdAt: data.createdAt || "",
+          details: data.details || null,
+        };
+
+        if (typeof existing.probability === "number") {
+          setHistory([existing]);
+        }
+
+        toast.error(data.message || "AI questionnaire already submitted.");
+        return;
+      }
+
       const data = err?.response?.data;
       setServerError(data || err?.message || "Could not compute prediction.");
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (!isLocked || !latest?.details) return;
+
+    const d = latest.details;
+    const decodeYesNo = (v) => (v === 1 ? "Yes" : "No");
+
+    setRefValue(age_months, d.age_months ?? "");
+    setRefValue(sex, d.sex === 1 ? "Male" : d.sex === 0 ? "Female" : "");
+    setRefValue(residence, d.residence === 1 ? "Urban" : d.residence === 0 ? "Rural" : "");
+    setRefValue(parental_education, ({ 0: "No formal", 1: "Primary", 2: "Secondary", 3: "College/University" }[d.parental_education] || ""));
+    setRefValue(family_history_asd, decodeYesNo(d.family_history_asd));
+
+    setRefValue(preeclampsia, decodeYesNo(d.preeclampsia));
+    setRefValue(preterm_birth, decodeYesNo(d.preterm_birth));
+    setRefValue(birth_asphyxia, decodeYesNo(d.birth_asphyxia));
+    setRefValue(low_birth_weight, decodeYesNo(d.low_birth_weight));
+
+    setRefValue(eye_contact_age_months, d.eye_contact_age_months ?? "");
+    setRefValue(social_smile_months, d.social_smile_months ?? "");
+
+    setRefValue(intellectual_disability, decodeYesNo(d.intellectual_disability));
+    setRefValue(epilepsy, decodeYesNo(d.epilepsy));
+    setRefValue(adhd, decodeYesNo(d.adhd));
+    setRefValue(language_disorder, decodeYesNo(d.language_disorder));
+    setRefValue(motor_delay, decodeYesNo(d.motor_delay));
+
+    const done = d.screening_done === 1 ? "Yes" : "No";
+    setRefValue(screening_done, done);
+    setScreeningDoneValue(done);
+    setRefValue(screening_result, ({ 1: "Positive", 0: "Negative", 2: "Unknown" }[d.screening_result] || ""));
+
+    if (consent.current) {
+      consent.current.checked = true;
+    }
+  }, [isLocked, latest]);
 
   return (
     <div
@@ -810,26 +946,37 @@ export default function Questionnaire() {
         prediction={prediction}
         riskLevel={riskLevel}
         resultQuery={resultQuery}
+        mchatCompleted={mchatCompleted}
         onClose={() => setResultModalOpen(false)}
-        onRetake={handleRetake}
         onNavigate={navigate}
       />
 
       <main className="relative overflow-hidden">
         <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-          {!showForm ? (
-            <LastResultCard
-              historyLoading={historyLoading}
-              historyError={historyError}
-              history={history}
-              latest={latest}
-              computeRiskLevel={computeRiskLevel}
-              fmtDate={fmtDate}
-              onRetake={handleRetake}
-              onNavigate={navigate}
-            />
-          ) : (
+          {historyLoading && (
+            <div className={`${cardBase} p-8`}>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Autism Risk Screening Questionnaire</h1>
+              <p className="mt-3 text-sm text-slate-600">Loading your previous screening history...</p>
+            </div>
+          )}
+
+          {!historyLoading && (
             <>
+              {isLocked && (
+                <LastResultCard
+                  historyLoading={historyLoading}
+                  historyError={historyError}
+                  history={history}
+                  latest={latest}
+                  computeRiskLevel={computeRiskLevel}
+                  fmtDate={fmtDate}
+                  mchatCompleted={mchatCompleted}
+                  onNavigate={navigate}
+                />
+              )}
+
+              {!isLocked && (
+              <>
               <div className={`${cardBase} overflow-hidden`}>
                 <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-6 py-8 text-white md:px-8">
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -852,19 +999,18 @@ export default function Questionnaire() {
                       <button
                         type="button"
                         onClick={handleAutofill}
+                        disabled={isLocked}
                         className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur transition hover:bg-white/20"
                       >
                         Autofill Test Values
                       </button>
 
-                      {history.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setShowForm(false)}
-                          className="rounded-xl border border-white/20 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-blue-50"
-                        >
-                          View History
-                        </button>
+                      {isLocked && (
+                        <>
+                          <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                            Submitted (read-only)
+                          </span>
+                        </>
                       )}
                     </div>
                   </div>
@@ -917,15 +1063,15 @@ export default function Questionnaire() {
 
                       <button
                         type="button"
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || isLocked}
                         onClick={handlePredict}
                         className={`rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition ${
-                          isSubmitting
+                          isSubmitting || isLocked
                             ? "cursor-not-allowed bg-blue-300"
                             : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:-translate-y-0.5 hover:shadow-lg"
                         }`}
                       >
-                        {isSubmitting ? "Submitting..." : "Submit & Predict"}
+                        {isLocked ? "Already Submitted" : isSubmitting ? "Submitting..." : "Submit & Predict"}
                       </button>
                     </div>
                   </div>
@@ -937,6 +1083,7 @@ export default function Questionnaire() {
                   <NumberInputField
                     inputRef={age_months}
                     label="1) Child age (in months)"
+                    disabled={isLocked}
                     placeholder="e.g., 24"
                     min={0}
                     helper="Enter the child's current age in months."
@@ -944,11 +1091,13 @@ export default function Questionnaire() {
                   <SelectField
                     inputRef={sex}
                     label="2) Child biological sex"
+                    disabled={isLocked}
                     options={["Male", "Female"]}
                   />
                   <SelectField
                     inputRef={residence}
                     label="3) Current residence"
+                    disabled={isLocked}
                     options={["Urban", "Rural"]}
                   />
                 </Section>
@@ -960,11 +1109,13 @@ export default function Questionnaire() {
                   <SelectField
                     inputRef={parental_education}
                     label="4) Highest education level of primary caregiver"
+                    disabled={isLocked}
                     options={["No formal", "Primary", "Secondary", "College/University"]}
                   />
                   <SelectField
                     inputRef={family_history_asd}
                     label="5) Family history of ASD"
+                    disabled={isLocked}
                     options={["Yes", "No"]}
                     helper="Includes parents, siblings, or close relatives."
                   />
@@ -974,21 +1125,25 @@ export default function Questionnaire() {
                   <SelectField
                     inputRef={preeclampsia}
                     label="6) Pre-eclampsia during pregnancy"
+                    disabled={isLocked}
                     options={["Yes", "No"]}
                   />
                   <SelectField
                     inputRef={preterm_birth}
                     label="7) Preterm birth (before 37 weeks)"
+                    disabled={isLocked}
                     options={["Yes", "No"]}
                   />
                   <SelectField
                     inputRef={birth_asphyxia}
                     label="8) Birth asphyxia (lack of oxygen at birth)"
+                    disabled={isLocked}
                     options={["Yes", "No"]}
                   />
                   <SelectField
                     inputRef={low_birth_weight}
                     label="9) Low birth weight (less than 2.5 kg)"
+                    disabled={isLocked}
                     options={["Yes", "No"]}
                   />
                 </Section>
@@ -1000,6 +1155,7 @@ export default function Questionnaire() {
                   <NumberInputField
                     inputRef={eye_contact_age_months}
                     label="10) Eye contact age (months)"
+                    disabled={isLocked}
                     placeholder="e.g., 10"
                     min={0}
                     helper="Approximate age when consistent eye contact began."
@@ -1007,6 +1163,7 @@ export default function Questionnaire() {
                   <NumberInputField
                     inputRef={social_smile_months}
                     label="11) Social smile age (months)"
+                    disabled={isLocked}
                     placeholder="e.g., 3"
                     min={0}
                     helper="Approximate age when social smiling began."
@@ -1020,26 +1177,31 @@ export default function Questionnaire() {
                   <SelectField
                     inputRef={intellectual_disability}
                     label="12) Diagnosed intellectual disability"
+                    disabled={isLocked}
                     options={["Yes", "No"]}
                   />
                   <SelectField
                     inputRef={epilepsy}
                     label="13) Diagnosed epilepsy / seizure disorder"
+                    disabled={isLocked}
                     options={["Yes", "No"]}
                   />
                   <SelectField
                     inputRef={adhd}
                     label="14) Diagnosed ADHD"
+                    disabled={isLocked}
                     options={["Yes", "No"]}
                   />
                   <SelectField
                     inputRef={language_disorder}
                     label="15) Language or speech delay"
+                    disabled={isLocked}
                     options={["Yes", "No"]}
                   />
                   <SelectField
                     inputRef={motor_delay}
                     label="16) Motor development delay (e.g., delayed sitting/walking)"
+                    disabled={isLocked}
                     options={["Yes", "No"]}
                   />
                 </Section>
@@ -1051,6 +1213,7 @@ export default function Questionnaire() {
                   <SelectField
                     inputRef={screening_done}
                     label="17) Has the child undergone autism-related developmental screening before?"
+                    disabled={isLocked}
                     options={["Yes", "No"]}
                     onValueChange={(value) => {
                       setScreeningDoneValue(value);
@@ -1064,6 +1227,7 @@ export default function Questionnaire() {
                     <SelectField
                       inputRef={screening_result}
                       label="18) If yes, what was the screening outcome?"
+                      disabled={isLocked}
                       options={["Positive", "Negative", "Unknown"]}
                       placeholder="Select screening outcome"
                       helper="This field appears only when Question 17 is Yes."
@@ -1081,7 +1245,7 @@ export default function Questionnaire() {
                       </p>
 
                       <label className="mt-4 inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm">
-                        <input ref={consent} type="checkbox" className="h-4 w-4 rounded" />
+                        <input ref={consent} type="checkbox" disabled={isLocked} className="h-4 w-4 rounded" />
                         I agree
                       </label>
                     </div>
@@ -1111,19 +1275,21 @@ export default function Questionnaire() {
 
                     <button
                       type="button"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || isLocked}
                       onClick={handlePredict}
                       className={`rounded-2xl px-6 py-3 text-sm font-semibold text-white shadow-md transition ${
-                        isSubmitting
+                        isSubmitting || isLocked
                           ? "cursor-not-allowed bg-blue-300"
                           : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:-translate-y-0.5 hover:shadow-lg"
                       }`}
                     >
-                      {isSubmitting ? "Submitting..." : "Submit & Predict"}
+                      {isLocked ? "Already Submitted" : isSubmitting ? "Submitting..." : "Submit & Predict"}
                     </button>
                   </div>
                 </div>
               </div>
+              </>
+              )}
             </>
           )}
         </div>

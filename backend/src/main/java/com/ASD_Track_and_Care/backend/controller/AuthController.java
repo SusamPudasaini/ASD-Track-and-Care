@@ -21,6 +21,7 @@ import com.ASD_Track_and_Care.backend.model.Role;
 import com.ASD_Track_and_Care.backend.model.User;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
 import com.ASD_Track_and_Care.backend.security.JwtUtil;
+import com.ASD_Track_and_Care.backend.service.AddressGeocodingService;
 import com.ASD_Track_and_Care.backend.service.EmailService;
 
 @RestController
@@ -40,6 +41,9 @@ public class AuthController {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private AddressGeocodingService addressGeocodingService;
+
     @Value("${app.frontend.base-url}")
     private String frontendBaseUrl;
 
@@ -50,6 +54,7 @@ public class AuthController {
             isBlank(request.getLastName()) ||
             isBlank(request.getUsername()) ||
             isBlank(request.getPhoneNumber()) ||
+            isBlank(request.getAddress()) ||
             isBlank(request.getEmail()) ||
             isBlank(request.getPassword())) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("All fields are required.");
@@ -59,6 +64,7 @@ public class AuthController {
         String lastName = request.getLastName().trim();
         String username = request.getUsername().trim();
         String phoneNumber = request.getPhoneNumber().trim();
+        String address = request.getAddress().trim();
         String email = request.getEmail().trim();
         String password = request.getPassword();
 
@@ -82,6 +88,10 @@ public class AuthController {
         String digitsOnlyPhone = phoneNumber.replaceAll("\\D", "");
         if (digitsOnlyPhone.length() < 7 || digitsOnlyPhone.length() > 15) {
             return ResponseEntity.badRequest().body("Enter a valid phone number (7–15 digits).");
+        }
+
+        if (address.length() < 8) {
+            return ResponseEntity.badRequest().body("Address must be at least 8 characters.");
         }
 
         if (password.length() < 6) {
@@ -113,6 +123,16 @@ public class AuthController {
         user.setLastName(lastName);
         user.setUsername(username);
         user.setPhoneNumber(phoneNumber);
+        user.setAddress(address);
+        if (request.getLatitude() != null && request.getLongitude() != null) {
+            user.setLatitude(request.getLatitude());
+            user.setLongitude(request.getLongitude());
+        } else {
+            addressGeocodingService.geocode(address).ifPresent(coords -> {
+                user.setLatitude(coords.latitude());
+                user.setLongitude(coords.longitude());
+            });
+        }
         user.setUserEmail(email);
         user.setPassword(passwordEncoder.encode(password));
         user.setEmailVerified(false);

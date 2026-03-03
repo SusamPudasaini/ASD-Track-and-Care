@@ -45,6 +45,10 @@ public class TherapistApplication {
     @Column(length = 80)
     private String city;
 
+    private Double workplaceLatitude;
+
+    private Double workplaceLongitude;
+
     @Column(length = 1000)
     private String message;
 
@@ -106,6 +110,12 @@ public class TherapistApplication {
 
     public String getCity() { return city; }
     public void setCity(String city) { this.city = city; }
+
+    public Double getWorkplaceLatitude() { return workplaceLatitude; }
+    public void setWorkplaceLatitude(Double workplaceLatitude) { this.workplaceLatitude = workplaceLatitude; }
+
+    public Double getWorkplaceLongitude() { return workplaceLongitude; }
+    public void setWorkplaceLongitude(Double workplaceLongitude) { this.workplaceLongitude = workplaceLongitude; }
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }

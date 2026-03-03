@@ -1,10 +1,15 @@
 package com.ASD_Track_and_Care.backend.service;
 
 import com.ASD_Track_and_Care.backend.dto.BookingResponse;
+import com.ASD_Track_and_Care.backend.dto.BookingChatMessageRequest;
+import com.ASD_Track_and_Care.backend.dto.BookingChatMessageResponse;
 import com.ASD_Track_and_Care.backend.dto.CreateBookingRequest;
 import com.ASD_Track_and_Care.backend.dto.RescheduleBookingRequest;
+import com.ASD_Track_and_Care.backend.dto.SubmitTherapistReviewRequest;
 import com.ASD_Track_and_Care.backend.model.*;
+import com.ASD_Track_and_Care.backend.repository.BookingChatMessageRepository;
 import com.ASD_Track_and_Care.backend.repository.BookingRepository;
+import com.ASD_Track_and_Care.backend.repository.TherapistReviewRepository;
 import com.ASD_Track_and_Care.backend.repository.TherapistTimeSlotRepository;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
@@ -15,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -22,23 +28,68 @@ import java.util.stream.Collectors;
 public class BookingService {
 
     private final BookingRepository bookingRepository;
+    private final BookingChatMessageRepository bookingChatMessageRepository;
     private final UserRepository userRepository;
     private final TherapistTimeSlotRepository timeSlotRepository;
+    private final TherapistReviewRepository therapistReviewRepository;
     private final EmailService emailService;
     private final KhaltiPaymentService khaltiPaymentService;
 
     public BookingService(
             BookingRepository bookingRepository,
+            BookingChatMessageRepository bookingChatMessageRepository,
             UserRepository userRepository,
             TherapistTimeSlotRepository timeSlotRepository,
+            TherapistReviewRepository therapistReviewRepository,
             EmailService emailService,
             KhaltiPaymentService khaltiPaymentService
     ) {
         this.bookingRepository = bookingRepository;
+        this.bookingChatMessageRepository = bookingChatMessageRepository;
         this.userRepository = userRepository;
         this.timeSlotRepository = timeSlotRepository;
+        this.therapistReviewRepository = therapistReviewRepository;
         this.emailService = emailService;
         this.khaltiPaymentService = khaltiPaymentService;
+    }
+
+    @Transactional
+    public BookingResponse submitReview(Authentication auth, Long bookingId, SubmitTherapistReviewRequest req) {
+        User me = getUserFromAuth(auth);
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!booking.getUserId().equals(me.getId())) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new RuntimeException("Cannot review a cancelled booking");
+        }
+
+        if (!isBookingCompleted(booking)) {
+            throw new RuntimeException("You can review only after session completion.");
+        }
+
+        if (therapistReviewRepository.existsByBookingId(bookingId)) {
+            throw new RuntimeException("Review already submitted for this booking.");
+        }
+
+        TherapistReview review = new TherapistReview();
+        review.setBookingId(booking.getId());
+        review.setUserId(booking.getUserId());
+        review.setTherapistId(booking.getTherapistId());
+        review.setRating(req.getRating());
+        review.setComment(req.getComment() == null ? null : req.getComment().trim());
+        therapistReviewRepository.save(review);
+
+        User therapist = userRepository.findById(booking.getTherapistId())
+                .orElseThrow(() -> new RuntimeException("Therapist not found"));
+
+        recalculateTherapistReviewStats(therapist);
+
+        return toResponseForUserView(booking, therapist);
     }
 
     @Transactional
@@ -175,6 +226,75 @@ public class BookingService {
             User booker = userRepository.findById(b.getUserId()).orElse(null);
             return toResponseForTherapistView(b, therapist, booker);
         }).collect(Collectors.toList());
+    }
+
+    public List<BookingChatMessageResponse> bookingChatMessages(Authentication auth, Long bookingId) {
+        User me = getUserFromAuth(auth);
+        Booking booking = getAccessibleBookingForChat(me, bookingId);
+
+        Map<Long, User> users = userRepository.findAllById(List.of(booking.getUserId(), booking.getTherapistId()))
+                .stream()
+                .collect(Collectors.toMap(User::getId, x -> x));
+
+        return bookingChatMessageRepository.findAllByBookingIdOrderBySentAtAsc(bookingId)
+                .stream()
+                .map(msg -> toChatResponse(msg, users.get(msg.getSenderId())))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public BookingChatMessageResponse sendBookingChatMessage(Authentication auth, Long bookingId, BookingChatMessageRequest req) {
+        User me = getUserFromAuth(auth);
+        Booking booking = getAccessibleBookingForChat(me, bookingId);
+
+        String body = req.getMessage() == null ? "" : req.getMessage().trim();
+        if (body.isEmpty()) {
+            throw new RuntimeException("Message is required");
+        }
+
+        BookingChatMessage row = new BookingChatMessage();
+        row.setBookingId(booking.getId());
+        row.setSenderId(me.getId());
+        row.setSenderRole(me.getRole());
+        row.setMessage(body);
+        row.setSentAt(Instant.now());
+        bookingChatMessageRepository.save(row);
+
+        return toChatResponse(row, me);
+    }
+
+    @Transactional
+    public BookingChatMessageResponse sendBookingChatMessage(String username, Long bookingId, BookingChatMessageRequest req) {
+        User me = getUserByUsername(username);
+        Booking booking = getAccessibleBookingForChat(me, bookingId);
+
+        String body = req.getMessage() == null ? "" : req.getMessage().trim();
+        if (body.isEmpty()) {
+            throw new RuntimeException("Message is required");
+        }
+
+        BookingChatMessage row = new BookingChatMessage();
+        row.setBookingId(booking.getId());
+        row.setSenderId(me.getId());
+        row.setSenderRole(me.getRole());
+        row.setMessage(body);
+        row.setSentAt(Instant.now());
+        bookingChatMessageRepository.save(row);
+
+        return toChatResponse(row, me);
+    }
+
+    public List<String> getBookingParticipantUsernames(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        return userRepository.findAllById(List.of(booking.getUserId(), booking.getTherapistId()))
+                .stream()
+                .map(User::getUsername)
+                .filter(Objects::nonNull)
+                .filter(x -> !x.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
     }
 
     public BookingResponse approve(Authentication auth, Long bookingId) {
@@ -372,6 +492,23 @@ public class BookingService {
         );
     }
 
+    private Booking getAccessibleBookingForChat(User me, Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        boolean isUser = booking.getUserId().equals(me.getId());
+        boolean isTherapist = booking.getTherapistId().equals(me.getId());
+        if (!isUser && !isTherapist) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new RuntimeException("Chat is not available for cancelled bookings.");
+        }
+
+        return booking;
+    }
+
     private boolean existsOtherActiveBookingForTherapistSlot(Long bookingId, Long therapistId, LocalDate date, String time) {
         List<Booking> list = bookingRepository.findAllByTherapistIdAndDateAndTime(therapistId, date, time);
         return list.stream().anyMatch(b ->
@@ -466,6 +603,7 @@ public class BookingService {
 
         r.setUserId(b.getUserId());
         r.setTherapistMessage(b.getTherapistMessage());
+        fillReviewMeta(r, b);
 
         return r;
     }
@@ -500,15 +638,51 @@ public class BookingService {
         }
 
         r.setTherapistMessage(b.getTherapistMessage());
+        fillReviewMeta(r, b);
 
         return r;
+    }
+
+    private BookingChatMessageResponse toChatResponse(BookingChatMessage msg, User sender) {
+        BookingChatMessageResponse r = new BookingChatMessageResponse();
+        r.setId(msg.getId());
+        r.setBookingId(msg.getBookingId());
+        r.setSenderId(msg.getSenderId());
+        r.setSenderRole(msg.getSenderRole() == null ? null : msg.getSenderRole().name());
+        r.setMessage(msg.getMessage());
+        r.setSentAt(msg.getSentAt());
+
+        if (sender != null) {
+            String fullName = ((sender.getFirstName() == null ? "" : sender.getFirstName()) + " "
+                    + (sender.getLastName() == null ? "" : sender.getLastName())).trim();
+            r.setSenderName(fullName.isBlank() ? sender.getUsername() : fullName);
+        }
+
+        if (r.getSenderName() == null || r.getSenderName().isBlank()) {
+            r.setSenderName("Participant");
+        }
+
+        return r;
+    }
+
+    private void fillReviewMeta(BookingResponse r, Booking booking) {
+        boolean submitted = therapistReviewRepository.existsByBookingId(booking.getId());
+        r.setReviewSubmitted(submitted);
+
+        if (submitted) {
+            therapistReviewRepository.findByBookingId(booking.getId())
+                    .ifPresent(x -> r.setReviewRating(x.getRating()));
+        }
     }
 
     private User getUserFromAuth(Authentication authentication) {
         if (authentication == null || authentication.getName() == null) {
             throw new RuntimeException("Unauthorized");
         }
-        String username = authentication.getName();
+        return getUserByUsername(authentication.getName());
+    }
+
+    private User getUserByUsername(String username) {
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
@@ -534,5 +708,27 @@ public class BookingService {
 
     private String safeString(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private boolean isBookingCompleted(Booking booking) {
+        if (booking.getStatus() != BookingStatus.CONFIRMED) return false;
+        if (booking.getDate() == null || booking.getTime() == null) return false;
+
+        try {
+            LocalDateTime start = LocalDateTime.of(booking.getDate(), LocalTime.parse(booking.getTime()));
+            LocalDateTime end = start.plusMinutes(30);
+            return end.isBefore(LocalDateTime.now());
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void recalculateTherapistReviewStats(User therapist) {
+        Double avg = therapistReviewRepository.averageRatingByTherapistId(therapist.getId());
+        long count = therapistReviewRepository.countByTherapistId(therapist.getId());
+
+        therapist.setAverageReview(avg == null ? 0.0 : Math.round(avg * 100.0) / 100.0);
+        therapist.setReviewCount((int) count);
+        userRepository.save(therapist);
     }
 }

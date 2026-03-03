@@ -25,6 +25,8 @@ public class BookingResponse {
     private String userProfilePictureUrl;
 
     private String therapistMessage;
+    private boolean reviewSubmitted;
+    private Integer reviewRating;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -79,4 +81,10 @@ public class BookingResponse {
 
     public String getTherapistMessage() { return therapistMessage; }
     public void setTherapistMessage(String therapistMessage) { this.therapistMessage = therapistMessage; }
+
+    public boolean isReviewSubmitted() { return reviewSubmitted; }
+    public void setReviewSubmitted(boolean reviewSubmitted) { this.reviewSubmitted = reviewSubmitted; }
+
+    public Integer getReviewRating() { return reviewRating; }
+    public void setReviewRating(Integer reviewRating) { this.reviewRating = reviewRating; }
 }

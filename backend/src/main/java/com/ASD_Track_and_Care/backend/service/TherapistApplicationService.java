@@ -24,6 +24,7 @@ public class TherapistApplicationService {
     private final TherapistApplicationDocumentRepository docRepo;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final AddressGeocodingService addressGeocodingService;
 
     private final Path uploadRoot = Path.of("uploads", "therapist-applications");
 
@@ -31,12 +32,14 @@ public class TherapistApplicationService {
             TherapistApplicationRepository repo,
             TherapistApplicationDocumentRepository docRepo,
             UserRepository userRepository,
-            EmailService emailService
+            EmailService emailService,
+            AddressGeocodingService addressGeocodingService
     ) {
         this.repo = repo;
         this.docRepo = docRepo;
         this.userRepository = userRepository;
         this.emailService = emailService;
+        this.addressGeocodingService = addressGeocodingService;
     }
 
     @Transactional
@@ -65,6 +68,8 @@ public class TherapistApplicationService {
         app.setSpecialization(req.getSpecialization() == null ? null : req.getSpecialization().trim());
         app.setWorkplace(req.getWorkplace() == null ? null : req.getWorkplace().trim());
         app.setCity(req.getCity() == null ? null : req.getCity().trim());
+        app.setWorkplaceLatitude(req.getWorkplaceLatitude());
+        app.setWorkplaceLongitude(req.getWorkplaceLongitude());
         app.setMessage(req.getMessage() == null ? null : req.getMessage().trim());
 
         app.setStatus(TherapistApplication.Status.PENDING);
@@ -149,6 +154,8 @@ public class TherapistApplicationService {
         appMap.put("specialization", app.getSpecialization());
         appMap.put("workplace", app.getWorkplace());
         appMap.put("city", app.getCity());
+        appMap.put("workplaceLatitude", app.getWorkplaceLatitude());
+        appMap.put("workplaceLongitude", app.getWorkplaceLongitude());
         appMap.put("message", app.getMessage());
         appMap.put("status", app.getStatus().name());
         appMap.put("adminMessage", app.getAdminMessage());
@@ -184,6 +191,23 @@ public class TherapistApplicationService {
 
         User user = userRepository.findByUsername(app.getApplicantUsername())
                 .orElseThrow(() -> new RuntimeException("User not found for applicant: " + app.getApplicantUsername()));
+
+        String workplaceAddress = buildWorkplaceAddress(app.getWorkplace(), app.getCity());
+        if (!workplaceAddress.isBlank()) {
+            user.setWorkplaceAddress(workplaceAddress);
+            if (app.getWorkplaceLatitude() != null && app.getWorkplaceLongitude() != null) {
+                user.setWorkplaceLatitude(app.getWorkplaceLatitude());
+                user.setWorkplaceLongitude(app.getWorkplaceLongitude());
+            } else {
+                addressGeocodingService.geocode(workplaceAddress).ifPresentOrElse(coords -> {
+                    user.setWorkplaceLatitude(coords.latitude());
+                    user.setWorkplaceLongitude(coords.longitude());
+                }, () -> {
+                    user.setWorkplaceLatitude(null);
+                    user.setWorkplaceLongitude(null);
+                });
+            }
+        }
 
         user.setRole(Role.THERAPIST);
         userRepository.save(user);
@@ -265,6 +289,8 @@ public class TherapistApplicationService {
         appMap.put("specialization", app.getSpecialization());
         appMap.put("workplace", app.getWorkplace());
         appMap.put("city", app.getCity());
+        appMap.put("workplaceLatitude", app.getWorkplaceLatitude());
+        appMap.put("workplaceLongitude", app.getWorkplaceLongitude());
         appMap.put("message", app.getMessage());
         appMap.put("status", app.getStatus().name());
         appMap.put("adminMessage", app.getAdminMessage());
@@ -323,6 +349,8 @@ public class TherapistApplicationService {
         appMap.put("specialization", app.getSpecialization());
         appMap.put("workplace", app.getWorkplace());
         appMap.put("city", app.getCity());
+        appMap.put("workplaceLatitude", app.getWorkplaceLatitude());
+        appMap.put("workplaceLongitude", app.getWorkplaceLongitude());
         appMap.put("message", app.getMessage());
         appMap.put("status", app.getStatus().name());
         appMap.put("adminMessage", app.getAdminMessage());
@@ -351,5 +379,14 @@ public class TherapistApplicationService {
     // (you can keep this, but it's risky if JWT subject is username)
     public List<TherapistApplication> listByApplicantEmail(String email) {
         return repo.findByEmailOrderByCreatedAtDesc(email);
+    }
+
+    private String buildWorkplaceAddress(String workplace, String city) {
+        String w = workplace == null ? "" : workplace.trim();
+        String c = city == null ? "" : city.trim();
+        if (w.isBlank() && c.isBlank()) return "";
+        if (w.isBlank()) return c;
+        if (c.isBlank()) return w;
+        return w + ", " + c;
     }
 }

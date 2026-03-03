@@ -3,12 +3,73 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
+import {
+  FaArrowTrendUp,
+  FaArrowsRotate,
+  FaArrowLeft,
+  FaCircleInfo,
+  FaListCheck,
+  FaUser,
+  FaSliders,
+  FaStar,
+} from "react-icons/fa6";
+
+const THERAPIST_UPDATE_ENDPOINT = "/api/users/me/therapist-settings";
 
 const TABS = [
   { key: "PENDING", label: "Pending" },
   { key: "CONFIRMED", label: "Confirmed" },
   { key: "CANCELLED", label: "Cancelled" },
 ];
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function buildTimeSlots() {
+  const slots = [];
+  for (let h = 9; h <= 18; h++) {
+    for (const m of [0, 30]) {
+      if (h === 18 && m !== 0) continue;
+      const hh = String(h).padStart(2, "0");
+      const mm = String(m).padStart(2, "0");
+      slots.push(`${hh}:${mm}`);
+    }
+  }
+  return slots;
+}
+
+const TIME_SLOTS = buildTimeSlots();
+
+function isValidSlotTime(time) {
+  try {
+    const [hh, mm] = String(time).split(":");
+    const h = Number(hh);
+    const m = Number(mm);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
+    if (!(m === 0 || m === 30)) return false;
+    if (h < 9 || h > 18) return false;
+    if (h === 18 && m !== 0) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeAvailability(inMap) {
+  if (!inMap || typeof inMap !== "object") return {};
+  const out = {};
+  for (const [day, times] of Object.entries(inMap)) {
+    if (!day || !Array.isArray(times)) continue;
+    const clean = times
+      .filter((t) => typeof t === "string")
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .filter(isValidSlotTime)
+      .filter((v, i, arr) => arr.indexOf(v) === i)
+      .sort();
+    if (clean.length) out[day] = clean;
+  }
+  return out;
+}
 
 function getErrorMessage(err) {
   const data = err?.response?.data;
@@ -67,8 +128,20 @@ export default function TherapistDashboardBookings() {
 
   const [activeStatus, setActiveStatus] = useState("PENDING");
   const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState([]);
+  const [allBookings, setAllBookings] = useState([]);
   const [actionId, setActionId] = useState(null);
+  const [reviewInsights, setReviewInsights] = useState(null);
+  const [therapistSaving, setTherapistSaving] = useState(false);
+
+  const [therapistForm, setTherapistForm] = useState({
+    pricePerSession: "",
+    qualification: "",
+    experienceYears: "",
+    bio: "",
+    availability: {},
+  });
+  const [selectedDay, setSelectedDay] = useState("Sunday");
+  const [slotsModalOpen, setSlotsModalOpen] = useState(false);
 
   // Details modal
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -84,6 +157,48 @@ export default function TherapistDashboardBookings() {
     [activeStatus]
   );
 
+  const items = useMemo(
+    () => allBookings.filter((b) => String(b?.status || "").toUpperCase() === activeStatus),
+    [allBookings, activeStatus]
+  );
+
+  const bookingStats = useMemo(() => {
+    const totals = { PENDING: 0, CONFIRMED: 0, CANCELLED: 0, COMPLETED: 0 };
+    for (const b of allBookings) {
+      const s = String(b?.status || "").toUpperCase();
+      if (Object.prototype.hasOwnProperty.call(totals, s)) totals[s] += 1;
+    }
+    const sessionsTaken = totals.COMPLETED + totals.CONFIRMED;
+    return {
+      total: allBookings.length,
+      pending: totals.PENDING,
+      approved: totals.CONFIRMED,
+      disapproved: totals.CANCELLED,
+      completed: totals.COMPLETED,
+      sessionsTaken,
+    };
+  }, [allBookings]);
+
+  const daySelectedCount = useMemo(() => {
+    const a = therapistForm.availability || {};
+    return Object.keys(a).filter((d) => (a[d] || []).length > 0).length;
+  }, [therapistForm.availability]);
+
+  const totalSlotsSelected = useMemo(() => {
+    const a = therapistForm.availability || {};
+    return Object.values(a).reduce((acc, arr) => acc + (arr?.length || 0), 0);
+  }, [therapistForm.availability]);
+
+  const selectedTimesForDay = useMemo(
+    () => therapistForm.availability?.[selectedDay] || [],
+    [therapistForm.availability, selectedDay]
+  );
+
+  const activeDays = useMemo(() => {
+    const a = therapistForm.availability || {};
+    return DAYS.filter((d) => (a[d] || []).length > 0);
+  }, [therapistForm.availability]);
+
   const loadAllForTherapist = async (signal) => {
     try {
       setLoading(true);
@@ -91,9 +206,7 @@ export default function TherapistDashboardBookings() {
       // GET /api/bookings/therapist/me
       const res = await api.get("/api/bookings/therapist/me", { signal });
       const arr = Array.isArray(res.data) ? res.data : [];
-
-      const filtered = arr.filter((b) => String(b?.status || "").toUpperCase() === activeStatus);
-      setItems(filtered);
+      setAllBookings(arr);
     } catch (err) {
       if (err?.name === "CanceledError") return;
 
@@ -119,6 +232,46 @@ export default function TherapistDashboardBookings() {
   const refresh = async () => {
     const controller = new AbortController();
     await loadAllForTherapist(controller.signal);
+    await loadReviewInsights(controller.signal);
+    await loadTherapistSettings(controller.signal);
+  };
+
+  const loadReviewInsights = async (signal) => {
+    try {
+      const res = await api.get("/api/therapists/me/reviews", { signal });
+      setReviewInsights(res.data || null);
+    } catch (err) {
+      if (err?.name === "CanceledError") return;
+      console.error("REVIEW INSIGHTS ERROR:", err?.response?.status, err?.response?.data);
+    }
+  };
+
+  const loadTherapistSettings = async (signal) => {
+    try {
+      const res = await api.get("/api/users/me", { signal });
+      const u = res.data || {};
+      const avail = normalizeAvailability(u.availability);
+
+      setTherapistForm({
+        pricePerSession:
+          u.pricePerSession === null || u.pricePerSession === undefined
+            ? ""
+            : String(u.pricePerSession),
+        qualification: u.qualification || "",
+        experienceYears:
+          u.experienceYears === null || u.experienceYears === undefined
+            ? ""
+            : String(u.experienceYears),
+        bio: u.bio || u.about || u.description || "",
+        availability: avail,
+      });
+
+      const firstDayWithSlots = DAYS.find((d) => (avail?.[d] || []).length > 0);
+      setSelectedDay(firstDayWithSlots || "Sunday");
+    } catch (err) {
+      if (err?.name === "CanceledError") return;
+      console.error("THERAPIST SETTINGS LOAD ERROR:", err?.response?.status, err?.response?.data);
+    }
   };
 
   useEffect(() => {
@@ -139,9 +292,116 @@ export default function TherapistDashboardBookings() {
 
     const controller = new AbortController();
     loadAllForTherapist(controller.signal);
+    loadReviewInsights(controller.signal);
+    loadTherapistSettings(controller.signal);
 
     return () => controller.abort();
-  }, [activeStatus, navigate]);
+  }, [navigate]);
+
+  const toggleSlot = (day, time) => {
+    setTherapistForm((p) => {
+      const next = { ...(p.availability || {}) };
+      const set = new Set(next[day] || []);
+      if (set.has(time)) set.delete(time);
+      else set.add(time);
+      const arr = Array.from(set).sort();
+      if (arr.length) next[day] = arr;
+      else delete next[day];
+      return { ...p, availability: next };
+    });
+  };
+
+  const clearDay = (day) => {
+    setTherapistForm((p) => {
+      const next = { ...(p.availability || {}) };
+      delete next[day];
+      return { ...p, availability: next };
+    });
+  };
+
+  const selectDayAll = (day) => {
+    setTherapistForm((p) => {
+      const next = { ...(p.availability || {}) };
+      next[day] = [...TIME_SLOTS];
+      return { ...p, availability: next };
+    });
+  };
+
+  const saveTherapistProfile = async () => {
+    if (therapistSaving) return;
+
+    const price = therapistForm.pricePerSession?.toString().trim();
+    if (!price) return toast.error("Price per session is required.");
+
+    const priceNum = Number(price);
+    if (Number.isNaN(priceNum) || priceNum <= 0) return toast.error("Enter a valid price.");
+
+    const qualification = therapistForm.qualification?.toString().trim() || "";
+    if (qualification.length < 2) return toast.error("Please add your qualification.");
+
+    const bio = therapistForm.bio?.toString().trim() || "";
+    if (bio && bio.length < 10) {
+      return toast.error("Bio should be at least 10 characters or left empty.");
+    }
+
+    const experienceYearsStr = therapistForm.experienceYears?.toString().trim() || "";
+    const experienceYearsNum = experienceYearsStr === "" ? 0 : Number(experienceYearsStr);
+    if (Number.isNaN(experienceYearsNum) || experienceYearsNum < 0) {
+      return toast.error("Experience years must be 0 or more.");
+    }
+
+    try {
+      setTherapistSaving(true);
+      const payload = {
+        pricePerSession: priceNum,
+        qualification,
+        experienceYears: experienceYearsNum,
+        bio,
+        availability: therapistForm.availability || {},
+      };
+
+      let res;
+      try {
+        res = await api.put(THERAPIST_UPDATE_ENDPOINT, payload);
+      } catch (err) {
+        const text = String(err?.response?.data?.message || err?.response?.data || "").toLowerCase();
+        const unknownBio =
+          err?.response?.status === 400 &&
+          text.includes("bio") &&
+          (text.includes("unrecognized") || text.includes("unknown") || text.includes("not allow"));
+
+        if (!unknownBio) throw err;
+
+        // Backward-compatible retry for servers that don't yet accept the bio field.
+        const { bio: _omit, ...legacyPayload } = payload;
+        res = await api.put(THERAPIST_UPDATE_ENDPOINT, legacyPayload);
+        toast("Bio field is not supported by this server yet.", { icon: "i" });
+      }
+
+      const updated = res?.data || {};
+      const avail = normalizeAvailability(updated.availability);
+      setTherapistForm({
+        pricePerSession:
+          updated.pricePerSession === null || updated.pricePerSession === undefined
+            ? ""
+            : String(updated.pricePerSession),
+        qualification: updated.qualification || "",
+        experienceYears:
+          updated.experienceYears === null || updated.experienceYears === undefined
+            ? ""
+            : String(updated.experienceYears),
+        bio: updated.bio || updated.about || updated.description || bio,
+        availability: avail,
+      });
+
+      toast.success("Therapist settings updated.");
+    } catch (err) {
+      console.error("UPDATE THERAPIST ERROR:", err?.response?.status, err?.response?.data);
+      toast.error(getErrorMessage(err));
+    } finally {
+      setTherapistSaving(false);
+    }
+  };
 
   // ---------------- Details ----------------
   const openDetails = (row) => {
@@ -265,15 +525,18 @@ export default function TherapistDashboardBookings() {
   const d = detailsRow;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_30%,_#ffffff)]">
       <Navbar />
 
       <main className="mx-auto max-w-6xl px-6 py-10">
         {/* Header */}
-        <div className="rounded-md border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">Therapist — Booking Requests</h1>
+              <div className="flex items-center gap-2">
+                <FaArrowTrendUp className="text-[#4a6cf7]" />
+                <h1 className="text-2xl font-semibold text-gray-900">Therapist Analytics Dashboard</h1>
+              </div>
               <p className="mt-2 text-sm text-gray-600">
                 Review booking requests. Approve pending requests to confirm sessions, cancel with a reason, or revert using Mark Pending.
               </p>
@@ -283,18 +546,63 @@ export default function TherapistDashboardBookings() {
               <button
                 type="button"
                 onClick={refresh}
-                className="rounded border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
+                <FaArrowsRotate />
                 Refresh
               </button>
 
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className="rounded border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
+                <FaArrowLeft />
                 Back
               </button>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Therapy Sessions"
+              value={bookingStats.sessionsTaken}
+              subtitle={`From ${bookingStats.total} total requests`}
+              tone="purple"
+              tag="TS"
+            />
+            <MetricCard
+              label="Average Rating"
+              value={`${Number(reviewInsights?.averageReview || 0).toFixed(1)} / 5`}
+              subtitle="Current score"
+              tone="amber"
+              tag="AR"
+            />
+            <MetricCard
+              label="Total Reviews"
+              value={reviewInsights?.reviewCount || 0}
+              subtitle="Parent feedback"
+              tone="green"
+              tag="RV"
+            />
+            <MetricCard
+              label="Approval Summary"
+              value={`${bookingStats.approved} / ${bookingStats.disapproved}`}
+              subtitle={`Pending ${bookingStats.pending}`}
+              tone="blue"
+              tag="AP"
+            />
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+            <div className="flex items-start gap-3">
+              <FaCircleInfo className="mt-0.5 text-blue-700" />
+              <div>
+                <div className="font-semibold">Session Requests Control Center</div>
+                <div className="text-blue-800">
+                  Use the tabs to review bookings by status and take actions quickly.
+                </div>
+              </div>
             </div>
           </div>
 
@@ -305,7 +613,7 @@ export default function TherapistDashboardBookings() {
                 key={t.key}
                 type="button"
                 onClick={() => setActiveStatus(t.key)}
-                className={`rounded px-4 py-2 text-sm font-semibold border ${
+                className={`rounded-xl px-4 py-2 text-sm font-semibold border ${
                   activeStatus === t.key
                     ? "border-gray-900 bg-gray-900 text-white"
                     : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
@@ -318,7 +626,12 @@ export default function TherapistDashboardBookings() {
         </div>
 
         {/* Table */}
-        <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <FaListCheck className="text-[#4a6cf7]" />
+            <h2 className="text-lg font-semibold text-gray-900">Booking Requests</h2>
+          </div>
+
           {loading ? (
             <div className="text-sm text-gray-600">Loading {tabLabel.toLowerCase()} bookings...</div>
           ) : items.length === 0 ? (
@@ -359,10 +672,7 @@ export default function TherapistDashboardBookings() {
                               />
                             ) : (
                               <div className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-xs font-bold text-gray-600">
-                                {String(clientName || "U")
-                                  .trim()
-                                  .slice(0, 1)
-                                  .toUpperCase()}
+                                <FaUser />
                               </div>
                             )}
 
@@ -426,6 +736,14 @@ export default function TherapistDashboardBookings() {
                               <>
                                 <button
                                   type="button"
+                                  onClick={() => navigate(`/bookings/${b.id}/chat`)}
+                                  className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                                >
+                                  Open Chat
+                                </button>
+
+                                <button
+                                  type="button"
                                   onClick={() => openCancel(b)}
                                   disabled={actionId === b.id}
                                   className={`rounded px-3 py-2 text-xs font-semibold text-white ${
@@ -480,6 +798,241 @@ export default function TherapistDashboardBookings() {
                 </p>
               )}
             </div>
+          )}
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+              <FaSliders className="text-[#4a6cf7]" /> Therapist Settings
+            </h2>
+            {totalSlotsSelected === 0 ? (
+              <span className="rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700">
+                Not available
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 text-sm text-gray-600">
+            Update your bio, price, qualification, experience, and weekly available slots.
+          </p>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
+              <label className="block text-sm font-semibold text-gray-800">Price per session</label>
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  value={therapistForm.pricePerSession}
+                  onChange={(e) =>
+                    setTherapistForm((p) => ({ ...p, pricePerSession: e.target.value }))
+                  }
+                  placeholder="e.g., 20"
+                  inputMode="decimal"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <span className="text-sm font-semibold text-gray-500">/ session</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 lg:w-[280px]">
+              <MetricCard label="Active days" value={daySelectedCount} compact />
+              <MetricCard label="Total slots" value={totalSlotsSelected} compact />
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-semibold text-gray-800">Qualification</label>
+              <input
+                value={therapistForm.qualification}
+                onChange={(e) =>
+                  setTherapistForm((p) => ({ ...p, qualification: e.target.value }))
+                }
+                placeholder="e.g., MSc Child Psychology"
+                className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-800">Experience (years)</label>
+              <input
+                value={therapistForm.experienceYears}
+                onChange={(e) =>
+                  setTherapistForm((p) => ({ ...p, experienceYears: e.target.value }))
+                }
+                placeholder="e.g., 8"
+                inputMode="numeric"
+                type="number"
+                min="0"
+                className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-semibold text-gray-800">Bio</label>
+            <textarea
+              value={therapistForm.bio}
+              onChange={(e) => setTherapistForm((p) => ({ ...p, bio: e.target.value }))}
+              rows={4}
+              placeholder="Tell parents about your approach, specialties, and the children you support."
+              className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              This appears on your public therapist profile.
+            </p>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <label className="block text-sm font-semibold text-gray-800">Availability</label>
+                <p className="mt-1 text-xs text-gray-500">
+                  Choose a day, then edit the available 30-minute time slots.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={selectedDay}
+                  onChange={(e) => setSelectedDay(e.target.value)}
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  {DAYS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => setSlotsModalOpen(true)}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Edit times
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-gray-900">{selectedDay}</div>
+                <div className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                  {selectedTimesForDay.length} selected
+                </div>
+              </div>
+              {selectedTimesForDay.length === 0 ? (
+                <div className="mt-2 text-sm text-gray-600">No times selected for this day.</div>
+              ) : (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedTimesForDay.map((t) => (
+                    <span
+                      key={t}
+                      className="rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Available days</div>
+              {activeDays.length === 0 ? (
+                <div className="mt-2 text-sm text-gray-600">No active days selected.</div>
+              ) : (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {activeDays.map((d) => (
+                    <span
+                      key={d}
+                      className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700"
+                    >
+                      {d}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={saveTherapistProfile}
+              disabled={therapistSaving}
+              className={`rounded-lg px-5 py-2.5 text-sm font-semibold text-white ${
+                therapistSaving
+                  ? "cursor-not-allowed bg-blue-300"
+                  : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95"
+              }`}
+            >
+              {therapistSaving ? "Saving..." : "Save Therapist Settings"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+              <FaStar className="text-amber-500" /> Reviews and Feedback
+            </h2>
+            <span className="text-xs text-gray-500">Updated from completed sessions</span>
+          </div>
+
+          {!reviewInsights ? (
+            <div className="mt-4 text-sm text-gray-600">No review insights yet.</div>
+          ) : (
+            <>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Average rating</div>
+                  <div className="mt-2 text-2xl font-bold text-gray-900">{Number(reviewInsights.averageReview || 0).toFixed(1)} / 5</div>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total reviews</div>
+                  <div className="mt-2 text-2xl font-bold text-gray-900">{reviewInsights.reviewCount || 0}</div>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">5-star share</div>
+                  <div className="mt-2 text-2xl font-bold text-gray-900">
+                    {reviewInsights.reviewCount > 0
+                      ? `${Math.round(((Number(reviewInsights?.distribution?.["5"] || 0)) / Number(reviewInsights.reviewCount)) * 100)}%`
+                      : "0%"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-5">
+                {["5", "4", "3", "2", "1"].map((star) => (
+                  <div key={star} className="rounded-lg border border-gray-200 bg-white p-3 text-center">
+                    <div className="text-sm font-semibold text-gray-700">{star} star</div>
+                    <div className="mt-1 text-lg font-bold text-gray-900">{Number(reviewInsights?.distribution?.[star] || 0)}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 overflow-x-auto">
+                <table className="w-full min-w-[760px] border-collapse">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="py-2 text-left text-xs font-semibold text-gray-500">Parent</th>
+                      <th className="py-2 text-left text-xs font-semibold text-gray-500">Rating</th>
+                      <th className="py-2 text-left text-xs font-semibold text-gray-500">Comment</th>
+                      <th className="py-2 text-left text-xs font-semibold text-gray-500">Session</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(reviewInsights.recentReviews || []).map((r) => (
+                      <tr key={r.id} className="border-b last:border-b-0">
+                        <td className="py-2 text-sm text-gray-900">{r.reviewerName || "Parent"}</td>
+                        <td className="py-2 text-sm font-semibold text-amber-700">{r.rating}/5</td>
+                        <td className="py-2 text-sm text-gray-700">{r.comment || "-"}</td>
+                        <td className="py-2 text-sm text-gray-600">{r.sessionDate || "-"} {r.sessionTime || ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </main>
@@ -573,16 +1126,25 @@ export default function TherapistDashboardBookings() {
                   </button>
 
                   {String(d?.status || "").toUpperCase() === "CONFIRMED" ? (
-                    <button
-                      type="button"
-                      onClick={() => openCancel(d)}
-                      disabled={actionId === d?.id}
-                      className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                        actionId === d?.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
-                      }`}
-                    >
-                      {actionId === d?.id ? "Working..." : "Cancel"}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/bookings/${d?.id}/chat`)}
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                      >
+                        Open Chat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openCancel(d)}
+                        disabled={actionId === d?.id}
+                        className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                          actionId === d?.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+                        }`}
+                      >
+                        {actionId === d?.id ? "Working..." : "Cancel"}
+                      </button>
+                    </>
                   ) : null}
                 </>
               )}
@@ -653,6 +1215,141 @@ export default function TherapistDashboardBookings() {
           </div>
         </div>
       )}
+
+      {slotsModalOpen && (
+        <SlotsModal
+          day={selectedDay}
+          selectedTimes={new Set(therapistForm.availability?.[selectedDay] || [])}
+          onClose={() => setSlotsModalOpen(false)}
+          onToggle={(time) => toggleSlot(selectedDay, time)}
+          onSelectAll={() => selectDayAll(selectedDay)}
+          onClear={() => clearDay(selectedDay)}
+        />
+      )}
+    </div>
+  );
+}
+
+function MetricCard({ label, value, subtitle, tone = "slate", tag = "ST", compact = false }) {
+  if (compact) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+        <div className="mt-2 text-xl font-bold text-gray-900">{value}</div>
+      </div>
+    );
+  }
+
+  const theme =
+    tone === "purple"
+      ? {
+          wrap: "from-violet-500 to-purple-600",
+          orb: "bg-white/16",
+        }
+      : tone === "amber"
+        ? {
+            wrap: "from-amber-400 to-orange-500",
+            orb: "bg-white/16",
+          }
+        : tone === "green"
+          ? {
+              wrap: "from-emerald-400 to-green-500",
+              orb: "bg-white/16",
+            }
+          : {
+              wrap: "from-blue-500 to-sky-500",
+              orb: "bg-white/16",
+            };
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-lg ${theme.wrap}`}>
+      <div className={`absolute -right-6 -top-6 h-24 w-24 rounded-full ${theme.orb}`} />
+      <div className={`absolute -bottom-8 -left-6 h-24 w-24 rounded-full ${theme.orb}`} />
+
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white/95">
+          {tag}
+        </div>
+      </div>
+
+      <div className="relative z-10 mt-4 text-4xl font-extrabold leading-none tracking-tight">{value}</div>
+      <div className="relative z-10 mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-white/90">
+        {label}
+      </div>
+      <div className="relative z-10 mt-1 text-sm text-white/90">{subtitle}</div>
+    </div>
+  );
+}
+
+function SlotsModal({ day, selectedTimes, onClose, onToggle, onSelectAll, onClear }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-4xl rounded-xl bg-white p-6 shadow-lg">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Edit Availability</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Day: <span className="font-semibold">{day}</span> • {selectedTimes.size} selected
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onSelectAll}
+            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Select all
+          </button>
+          <button
+            type="button"
+            onClick={onClear}
+            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Clear
+          </button>
+          <div className="ml-auto text-xs text-gray-500">Click a time to toggle.</div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+          {TIME_SLOTS.map((t) => {
+            const active = selectedTimes.has(t);
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => onToggle(t)}
+                className={`rounded-lg border px-3 py-2 text-center text-xs font-semibold ${
+                  active
+                    ? "border-green-200 bg-green-50 text-green-700"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {t}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

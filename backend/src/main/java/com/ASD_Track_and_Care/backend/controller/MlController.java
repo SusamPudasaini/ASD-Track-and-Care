@@ -91,6 +91,7 @@ public class MlController {
             response.put("probability", r.getProbability());
             response.put("riskLevel", r.getRiskLevel());
             response.put("createdAt", r.getCreatedAt());
+            response.put("details", buildDetails(r));
 
             return ResponseEntity.ok(response);
 
@@ -130,6 +131,7 @@ public class MlController {
                 m.put("probability", r.getProbability());
                 m.put("riskLevel", r.getRiskLevel());
                 m.put("createdAt", r.getCreatedAt());
+                m.put("details", buildDetails(r));
                 return m;
             }).collect(Collectors.toList());
 
@@ -177,6 +179,20 @@ public class MlController {
                     "message", "Authentication error",
                     "error", e.getClass().getSimpleName() + ": " + e.getMessage()
             ));
+        }
+
+        Optional<QuestionnaireRecord> existing = repo.findTopByUser_IdOrderByIdDesc(user.getId());
+        if (existing.isPresent()) {
+            QuestionnaireRecord r = existing.get();
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("message", "AI questionnaire already submitted. You cannot submit it again.");
+            response.put("alreadySubmitted", true);
+            response.put("recordId", r.getId());
+            response.put("probability", r.getProbability());
+            response.put("riskLevel", r.getRiskLevel());
+            response.put("createdAt", r.getCreatedAt());
+            response.put("details", buildDetails(r));
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         }
 
         QuestionnaireRecord savedRecord;
@@ -335,5 +351,28 @@ public class MlController {
         } catch (Exception e) {
             return String.valueOf(o);
         }
+    }
+
+    private Map<String, Object> buildDetails(QuestionnaireRecord r) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("age_months", r.getAge_months());
+        details.put("sex", r.getSex());
+        details.put("residence", r.getResidence());
+        details.put("parental_education", r.getParental_education());
+        details.put("family_history_asd", r.getFamily_history_asd());
+        details.put("preeclampsia", r.getPreeclampsia());
+        details.put("preterm_birth", r.getPreterm_birth());
+        details.put("birth_asphyxia", r.getBirth_asphyxia());
+        details.put("low_birth_weight", r.getLow_birth_weight());
+        details.put("eye_contact_age_months", r.getEye_contact_age_months());
+        details.put("social_smile_months", r.getSocial_smile_months());
+        details.put("intellectual_disability", r.getIntellectual_disability());
+        details.put("epilepsy", r.getEpilepsy());
+        details.put("adhd", r.getAdhd());
+        details.put("language_disorder", r.getLanguage_disorder());
+        details.put("motor_delay", r.getMotor_delay());
+        details.put("screening_done", r.getScreening_done());
+        details.put("screening_result", r.getScreening_result());
+        return details;
     }
 }

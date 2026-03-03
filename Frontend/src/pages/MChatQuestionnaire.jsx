@@ -164,7 +164,7 @@ export default function MChatQuestionnaire() {
       });
 
       toast.success("M-CHAT questionnaire submitted successfully.");
-      navigate("/mchat-questionnaire/analytics");
+      navigate("/analytics");
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -308,7 +308,7 @@ export default function MChatQuestionnaire() {
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <button
                     type="button"
-                    onClick={() => navigate("/mchat-questionnaire/analytics")}
+                    onClick={() => navigate("/analytics")}
                     className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                   >
                     View Analytics

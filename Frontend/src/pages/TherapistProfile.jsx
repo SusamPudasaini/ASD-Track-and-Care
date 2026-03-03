@@ -3,8 +3,46 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
+import {
+  FaArrowLeft,
+  FaBriefcase,
+  FaCalendarDays,
+  FaEnvelope,
+  FaGlobe,
+  FaLocationDot,
+  FaMoneyBill,
+  FaPhone,
+  FaMagnifyingGlass,
+  FaStar,
+  FaUserDoctor,
+  FaGraduationCap,
+} from "react-icons/fa6";
+import { MapContainer, Marker, TileLayer } from "react-leaflet";
+import L from "leaflet";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
 const CREATE_BOOKING_ENDPOINT = "/api/bookings"; // POST { therapistId, date, time }
+
+const MAP_ICON = new L.Icon({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+if (!L.Icon.Default.prototype._asdTrackPatched) {
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: markerIcon2x,
+    iconUrl: markerIcon,
+    shadowUrl: markerShadow,
+  });
+  L.Icon.Default.prototype._asdTrackPatched = true;
+}
 
 function backendBase() {
   return (import.meta.env.VITE_API_BASE_URL || "http://localhost:8081").replace(/\/api\/?$/, "");
@@ -37,6 +75,27 @@ function getErrorMessage(err) {
   return String(data);
 }
 
+function getBookingPaymentError(err) {
+  const status = err?.response?.status;
+  const data = err?.response?.data;
+  const text =
+    typeof data === "string"
+      ? data
+      : typeof data === "object"
+        ? data?.message || data?.error || data?.title || ""
+        : "";
+
+  if (status >= 500 || /khalti|payment|gateway|pidx/i.test(String(text || ""))) {
+    return "Khalti payment initialization failed. Please try again in a moment.";
+  }
+
+  if (err?.message === "Payment URL not received.") {
+    return "Payment link was not returned by server. Please try booking again.";
+  }
+
+  return getErrorMessage(err) || "Booking failed.";
+}
+
 function todayISO() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -50,6 +109,15 @@ function toCurrencyMaybe(v) {
   if (typeof v === "string") return v;
   if (typeof v === "number") return `Rs. ${v}`;
   return String(v);
+}
+
+function toNumberOrNull(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
 }
 
 /**
@@ -79,11 +147,16 @@ function StarRow({ rating, reviews }) {
   const r = Number(rating);
   const safeRating = Number.isFinite(r) ? r.toFixed(1) : null;
   const safeReviews = Number.isFinite(Number(reviews)) ? Number(reviews) : null;
+  const stars = Math.round(Number.isFinite(r) ? r : 0);
 
   return (
     <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
-      <span className="text-yellow-500">★</span>
       <span className="font-semibold text-gray-900">{safeRating ?? "—"}</span>
+      <span className="inline-flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((idx) => (
+          <FaStar key={idx} className={idx <= stars ? "text-sky-500" : "text-slate-300"} />
+        ))}
+      </span>
       <span className="text-gray-500">({safeReviews !== null ? `${safeReviews} reviews` : "no reviews"})</span>
     </div>
   );
@@ -95,6 +168,13 @@ function Pill({ children }) {
       {children}
     </span>
   );
+}
+
+function prettyDay(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default function TherapistProfile() {
@@ -139,8 +219,30 @@ export default function TherapistProfile() {
     return toCurrencyMaybe(therapist?.pricePerSession ?? therapist?.sessionPrice ?? therapist?.price ?? "—");
   }, [therapist]);
 
-  const rating = therapist?.rating ?? therapist?.avgRating ?? therapist?.stars;
-  const reviews = therapist?.reviewsCount ?? therapist?.reviewCount ?? therapist?.reviews;
+  const experience = useMemo(() => {
+    return therapist?.experienceYears ?? therapist?.experience ?? therapist?.yearsExperience ?? therapist?.years ?? "—";
+  }, [therapist]);
+
+  const workplaceAddress = useMemo(() => {
+    return therapist?.workplaceAddress || therapist?.workplace || therapist?.address || therapist?.location || "—";
+  }, [therapist]);
+
+  const workplaceLatitude = useMemo(() => {
+    return toNumberOrNull(
+      therapist?.workplaceLatitude ?? therapist?.latitude ?? therapist?.workplaceLat ?? therapist?.lat
+    );
+  }, [therapist]);
+
+  const workplaceLongitude = useMemo(() => {
+    return toNumberOrNull(
+      therapist?.workplaceLongitude ?? therapist?.longitude ?? therapist?.workplaceLng ?? therapist?.lng
+    );
+  }, [therapist]);
+
+  const canShowWorkplaceMap = workplaceLatitude !== null && workplaceLongitude !== null;
+
+  const rating = therapist?.averageReview ?? therapist?.rating ?? therapist?.avgRating ?? therapist?.stars;
+  const reviews = therapist?.reviewCount ?? therapist?.reviewsCount ?? therapist?.reviews;
 
   const image = useMemo(() => {
     const raw = therapist?.profilePictureUrl || therapist?.avatarUrl || therapist?.imageUrl || "";
@@ -253,13 +355,18 @@ export default function TherapistProfile() {
 
     try {
       setBooking(true);
-      await api.post(CREATE_BOOKING_ENDPOINT, { therapistId, date, time });
-      toast.success("Booking placed!");
-      closeBook();
-      navigate("/bookings");
+
+      const res = await api.post(CREATE_BOOKING_ENDPOINT, { therapistId, date, time });
+      const paymentUrl = res?.data?.paymentUrl;
+      if (!paymentUrl) {
+        throw new Error("Payment URL not received.");
+      }
+
+      toast.success("Redirecting to Khalti...");
+      window.location.href = paymentUrl;
     } catch (err) {
       console.error("CREATE BOOKING ERROR:", err?.response?.status, err?.response?.data);
-      toast.error(getErrorMessage(err) || "Booking failed.");
+      toast.error(getBookingPaymentError(err));
     } finally {
       setBooking(false);
     }
@@ -276,18 +383,22 @@ export default function TherapistProfile() {
     return [];
   }, [therapist]);
 
+  const phone = therapist?.phoneNumber || therapist?.phone || "Not provided";
+  const email = therapist?.userEmail || therapist?.email || "Not provided";
+  const site = therapist?.website || therapist?.site || "Not provided";
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_30%,_#ffffff)]">
       <Navbar />
 
-      <main className="mx-auto max-w-5xl px-6 py-10">
-        <div className="flex items-center justify-between gap-4">
+      <main className="mx-auto max-w-6xl px-4 py-10">
+        <div className="mb-4 flex items-center justify-between gap-4">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
-            ← Back
+            <FaArrowLeft /> Back
           </button>
 
           <button
@@ -300,82 +411,156 @@ export default function TherapistProfile() {
         </div>
 
         {loading ? (
-          <div className="mt-8 text-sm text-gray-600">Loading therapist profile...</div>
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
+            Loading therapist profile...
+          </div>
         ) : !therapist ? (
-          <div className="mt-8 rounded-xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
             Therapist not found.
           </div>
         ) : (
           <>
-            <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="h-20 w-20 overflow-hidden rounded-2xl border border-gray-200 bg-gray-50">
+            <div className="overflow-hidden rounded-3xl border border-white/70 bg-white/90 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur">
+
+              <div className="grid gap-0 lg:grid-cols-[260px_1fr]">
+                <aside className="border-b border-slate-100 px-5 py-6 lg:border-b-0 lg:border-r lg:border-slate-100">
+                  <div className="mx-auto h-44 w-full max-w-[190px] overflow-hidden rounded-sm border border-slate-200 bg-slate-100">
                     {image ? (
                       <img src={image} alt={name} className="h-full w-full object-cover" />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">No image</div>
+                      <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-slate-500">
+                        No image
+                      </div>
                     )}
                   </div>
 
-                  <div className="min-w-0">
-                    <h1 className="truncate text-2xl font-semibold text-gray-900">{name}</h1>
-                    <p className="mt-1 truncate text-sm text-gray-600">{role}</p>
-                    <StarRow rating={rating} reviews={reviews} />
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Pill>Qualification: {qualification}</Pill>
-                      <Pill>Price: <span className="ml-1 text-[#4a6cf7]">{price}</span></Pill>
-                      <Pill>Status: {unavailable ? "Unavailable" : "Available"}</Pill>
+                  <div className="mt-6 border-t border-slate-200 pt-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Work</div>
+                    <div className="mt-3 space-y-3 text-sm text-slate-700">
+                      <InfoLine icon={FaGraduationCap} label="Qualification" value={qualification} />
+                      <InfoLine
+                        icon={FaBriefcase}
+                        label="Experience"
+                        value={experience === "—" ? "—" : `${experience} years`}
+                      />
+                      <InfoLine icon={FaMoneyBill} label="Price" value={price} />
                     </div>
                   </div>
-                </div>
 
-                <div className="flex flex-col gap-2 sm:min-w-[220px]">
-                  <button
-                    onClick={openBook}
-                    disabled={unavailable}
-                    className={`w-full rounded-xl px-4 py-3 text-sm font-semibold text-white ${
-                      unavailable ? "cursor-not-allowed bg-gray-300" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
-                    }`}
-                  >
-                    {unavailable ? "Currently Unavailable" : "Book Now"}
-                  </button>
+                  <div className="mt-6 border-t border-slate-200 pt-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Availability</div>
+                    {availableDays.length === 0 ? (
+                      <p className="mt-3 text-xs text-slate-500">No availability shared.</p>
+                    ) : (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {availableDays.map((d) => (
+                          <Pill key={d}>{prettyDay(d)}</Pill>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </aside>
 
-                  <button
-                    onClick={() => navigate("/bookings")}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                  >
-                    View My Bookings
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-8 grid gap-6 sm:grid-cols-2">
-                <div className="rounded-2xl border border-gray-100 bg-white p-5">
-                  <h2 className="text-base font-semibold text-gray-900">About</h2>
-                  <p className="mt-2 text-sm text-gray-600">
-                    {therapist?.bio || therapist?.about || therapist?.description || "No bio added yet."}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-gray-100 bg-white p-5">
-                  <h2 className="text-base font-semibold text-gray-900">Availability</h2>
-
-                  {availableDays.length === 0 ? (
-                    <p className="mt-2 text-sm text-gray-600">No availability shared.</p>
-                  ) : (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {availableDays.map((d) => (
-                        <Pill key={d}>{String(d)}</Pill>
-                      ))}
+                <section className="px-5 py-6 md:px-8">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h1 className="text-3xl font-semibold text-slate-800">{name}</h1>
+                      <p className="mt-1 inline-flex items-center gap-2 text-sm text-slate-500">
+                        <FaLocationDot className="text-slate-400" /> {workplaceAddress}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-sky-600">{role}</p>
+                      <StarRow rating={rating} reviews={reviews} />
                     </div>
-                  )}
 
-                  <p className="mt-3 text-xs text-gray-500">
-                    Pick a date while booking to see exact available time slots.
-                  </p>
-                </div>
+                    <div className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {unavailable ? "Unavailable" : "Available"}
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-4">
+                    <button
+                      onClick={openBook}
+                      disabled={unavailable}
+                      className={`rounded px-4 py-2 text-sm font-semibold text-white ${
+                        unavailable ? "cursor-not-allowed bg-slate-300" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+                      }`}
+                    >
+                      {unavailable ? "Currently Unavailable" : "Book Now"}
+                    </button>
+                    <button
+                      onClick={() => navigate("/bookings")}
+                      className="rounded border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      View My Bookings
+                    </button>
+                  </div>
+
+                  <div className="mt-4 border-b border-slate-200">
+                    <div className="flex gap-6 text-sm">
+                      <span className="border-b-2 border-[#4a6cf7] pb-2 font-semibold text-slate-800">About</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-6 md:grid-cols-2">
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Contact Information
+                      </div>
+                      <div className="mt-3 space-y-3 text-sm text-slate-700">
+                        <InfoLine icon={FaPhone} label="Phone" value={phone} />
+                        <InfoLine icon={FaLocationDot} label="Workplace Address" value={workplaceAddress} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Basic Information
+                      </div>
+                      <div className="mt-3 space-y-3 text-sm text-slate-700">
+                        <InfoLine icon={FaMoneyBill} label="Price Per Session" value={price} />
+                        <InfoLine
+                          icon={FaBriefcase}
+                          label="Experience"
+                          value={experience === "—" ? "—" : `${experience} years`}
+                        />
+  
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 rounded border border-slate-200 bg-slate-50 p-4">
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-700">About</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      {therapist?.bio || therapist?.about || therapist?.description || "No bio added yet."}
+                    </p>
+                  </div>
+
+                  <div className="mt-6 rounded border border-slate-200 bg-slate-50 p-4">
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Workplace Location</h2>
+                    <p className="mt-2 text-sm text-slate-600">{workplaceAddress}</p>
+
+                    {canShowWorkplaceMap ? (
+                      <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                        <div className="h-56 w-full">
+                          <MapContainer
+                            center={[workplaceLatitude, workplaceLongitude]}
+                            zoom={14}
+                            scrollWheelZoom={false}
+                            className="h-full w-full"
+                          >
+                            <TileLayer
+                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            />
+                            <Marker position={[workplaceLatitude, workplaceLongitude]} icon={MAP_ICON} />
+                          </MapContainer>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs text-slate-500">Workplace map location is not available.</p>
+                    )}
+                  </div>
+                </section>
               </div>
             </div>
 
@@ -397,6 +582,30 @@ export default function TherapistProfile() {
           </>
         )}
       </main>
+    </div>
+  );
+}
+
+function InfoLine({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-start gap-2">
+      <Icon className="mt-0.5 text-slate-400" />
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+        <div className="text-sm text-slate-800">{value || "—"}</div>
+      </div>
+    </div>
+  );
+}
+
+function InfoStat({ icon: Icon, label, value, accent = "text-blue-600" }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white">
+        <Icon className={accent} />
+      </div>
+      <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-1 text-base font-bold text-slate-900">{value}</div>
     </div>
   );
 }

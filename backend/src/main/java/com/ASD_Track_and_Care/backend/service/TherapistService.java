@@ -4,6 +4,7 @@ import com.ASD_Track_and_Care.backend.dto.TherapistCardResponse;
 import com.ASD_Track_and_Care.backend.dto.UpdateTherapistSettingsRequest;
 import com.ASD_Track_and_Care.backend.model.*;
 import com.ASD_Track_and_Care.backend.repository.BookingRepository;
+import com.ASD_Track_and_Care.backend.repository.TherapistReviewRepository;
 import com.ASD_Track_and_Care.backend.repository.TherapistTimeSlotRepository;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
@@ -21,39 +22,84 @@ public class TherapistService {
     private final UserRepository userRepository;
     private final TherapistTimeSlotRepository timeSlotRepository;
     private final BookingRepository bookingRepository;
+    private final TherapistReviewRepository therapistReviewRepository;
 
     public TherapistService(
             UserRepository userRepository,
             TherapistTimeSlotRepository timeSlotRepository,
-            BookingRepository bookingRepository
+            BookingRepository bookingRepository,
+            TherapistReviewRepository therapistReviewRepository
     ) {
         this.userRepository = userRepository;
         this.timeSlotRepository = timeSlotRepository;
         this.bookingRepository = bookingRepository;
+        this.therapistReviewRepository = therapistReviewRepository;
+    }
+
+    public Map<String, Object> myReviewInsights(Authentication authentication) {
+        User me = requireAuth(authentication);
+
+        if (me.getRole() != Role.THERAPIST) {
+            throw new RuntimeException("Only therapists can view review insights.");
+        }
+
+        List<TherapistReview> reviews = therapistReviewRepository.findAllByTherapistIdOrderByCreatedAtDesc(me.getId());
+
+        double avg = me.getAverageReview() == null ? 0.0 : me.getAverageReview();
+        long total = me.getReviewCount() == null ? reviews.size() : me.getReviewCount();
+
+        Map<String, Long> distribution = new LinkedHashMap<>();
+        for (int i = 5; i >= 1; i--) {
+            distribution.put(String.valueOf(i), therapistReviewRepository.countByTherapistIdAndRating(me.getId(), i));
+        }
+
+        Set<Long> bookingIds = reviews.stream().map(TherapistReview::getBookingId).collect(Collectors.toSet());
+        Map<Long, Booking> bookingMap = bookingRepository.findAllById(bookingIds).stream()
+                .collect(Collectors.toMap(Booking::getId, b -> b));
+
+        Set<Long> userIds = reviews.stream().map(TherapistReview::getUserId).collect(Collectors.toSet());
+        Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        List<Map<String, Object>> recent = reviews.stream().limit(12).map(r -> {
+            Booking b = bookingMap.get(r.getBookingId());
+            User u = userMap.get(r.getUserId());
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", r.getId());
+            row.put("rating", r.getRating());
+            row.put("comment", r.getComment());
+            row.put("createdAt", r.getCreatedAt());
+            row.put("bookingId", r.getBookingId());
+            row.put("sessionDate", b == null ? null : b.getDate());
+            row.put("sessionTime", b == null ? null : b.getTime());
+            row.put("reviewerName", u == null ? "Parent" : (u.getFirstName() + " " + u.getLastName()).trim());
+            return row;
+        }).toList();
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("averageReview", Math.round(avg * 100.0) / 100.0);
+        out.put("reviewCount", total);
+        out.put("distribution", distribution);
+        out.put("recentReviews", recent);
+        return out;
     }
 
     public List<TherapistCardResponse> listTherapists() {
         List<User> therapists = userRepository.findAllByRole(Role.THERAPIST);
 
-        return therapists.stream().map(u -> {
-            String name = (u.getFirstName() + " " + u.getLastName()).trim();
-            String qualification = (u.getQualification() == null || u.getQualification().isBlank())
-                    ? "—" : u.getQualification();
+        return therapists.stream().map(this::toCardResponse).collect(Collectors.toList());
+    }
 
-            // ✅ REAL availability from slot table
-            long slotCount = timeSlotRepository.countByTherapistId(u.getId());
-            boolean available = slotCount > 0;
+    public TherapistCardResponse getTherapistById(Long therapistId) {
+        User therapist = userRepository.findById(therapistId)
+                .orElseThrow(() -> new RuntimeException("Therapist not found"));
 
-            return new TherapistCardResponse(
-                    u.getId(),
-                    name,
-                    qualification,
-                    u.getPricePerSession(),
-                    u.getProfilePictureUrl(),
-                    slotCount,
-                    available
-            );
-        }).collect(Collectors.toList());
+        if (therapist.getRole() != Role.THERAPIST) {
+            throw new RuntimeException("Selected user is not a therapist.");
+        }
+
+        return toCardResponse(therapist);
     }
 
     @Transactional
@@ -72,6 +118,15 @@ public class TherapistService {
         int totalSlots = normalized.values().stream().mapToInt(List::size).sum();
 
         me.setPricePerSession(req.getPricePerSession());
+
+        if (req.getQualification() != null) {
+            String qualification = req.getQualification().trim();
+            me.setQualification(qualification.isEmpty() ? null : qualification);
+        }
+
+        if (req.getExperienceYears() != null) {
+            me.setExperienceYears(req.getExperienceYears());
+        }
 
         timeSlotRepository.deleteAllByTherapistId(me.getId());
 
@@ -236,4 +291,42 @@ public class TherapistService {
             return false;
         }
     }
+
+        private TherapistCardResponse toCardResponse(User u) {
+        String name = (u.getFirstName() + " " + u.getLastName()).trim();
+        String qualification = (u.getQualification() == null || u.getQualification().isBlank())
+            ? "—" : u.getQualification();
+
+        long slotCount = timeSlotRepository.countByTherapistId(u.getId());
+        boolean available = slotCount > 0;
+
+        List<Booking> bookings = bookingRepository.findAllByTherapistIdOrderByCreatedAtDesc(u.getId());
+        long confirmedCount = bookings.stream().filter(b -> b.getStatus() == BookingStatus.CONFIRMED).count();
+
+        int reviewCount = (u.getReviewCount() == null || u.getReviewCount() < 0)
+            ? (int) confirmedCount
+            : u.getReviewCount();
+
+        double averageReview = (u.getAverageReview() == null || u.getAverageReview() <= 0)
+            ? (reviewCount == 0 ? 0.0 : 4.0)
+            : Math.max(0.0, Math.min(5.0, u.getAverageReview()));
+
+        String publicAddress = (u.getWorkplaceAddress() == null || u.getWorkplaceAddress().isBlank())
+            ? u.getAddress()
+            : u.getWorkplaceAddress();
+
+        return new TherapistCardResponse(
+            u.getId(),
+            name,
+            qualification,
+            u.getExperienceYears(),
+            averageReview,
+            reviewCount,
+            publicAddress,
+            u.getPricePerSession(),
+            u.getProfilePictureUrl(),
+            slotCount,
+            available
+        );
+        }
 }

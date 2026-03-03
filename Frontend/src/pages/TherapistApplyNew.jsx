@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
+import MapLocationPicker from "../components/map/MapLocationPicker";
 
 const ACCEPTED_DOC_TYPES = [
   "application/pdf",
@@ -50,6 +51,8 @@ export default function TherapistApplyNew() {
     specialization: "",
     workplace: "",
     city: "",
+    workplaceLatitude: null,
+    workplaceLongitude: null,
     message: "",
   });
 
@@ -169,6 +172,12 @@ export default function TherapistApplyNew() {
     if (!form.phone.trim()) return toast.error("Phone is required.");
     if (!form.qualification.trim()) {
       return toast.error("Qualification is required.");
+    }
+    if (!form.workplace.trim()) {
+      return toast.error("Workplace is required.");
+    }
+    if (typeof form.workplaceLatitude !== "number" || typeof form.workplaceLongitude !== "number") {
+      return toast.error("Please select your workplace location on the map.");
     }
 
     if (!validateDocuments()) return;
@@ -322,6 +331,19 @@ export default function TherapistApplyNew() {
                 onChange={(v) => onChange("specialization", v)}
               />
             </TwoCol>
+
+            <div className="mt-5">
+              <MapLocationPicker
+                label="Workplace map location"
+                hint="Click the exact workplace location so distance calculations are accurate after admin approval."
+                latitude={form.workplaceLatitude}
+                longitude={form.workplaceLongitude}
+                onChange={(lat, lng) => {
+                  onChange("workplaceLatitude", lat);
+                  onChange("workplaceLongitude", lng);
+                }}
+              />
+            </div>
           </Section>
 
           <Section

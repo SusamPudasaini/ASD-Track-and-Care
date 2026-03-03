@@ -32,4 +32,9 @@ public class MChatQuestionnaireController {
     public ResponseEntity<?> myHistory(Authentication authentication) {
         return ResponseEntity.ok(questionnaireService.myHistory(authentication));
     }
+
+    @GetMapping("/last")
+    public ResponseEntity<?> myLatest(Authentication authentication) {
+        return ResponseEntity.ok(questionnaireService.myLatest(authentication));
+    }
 }
