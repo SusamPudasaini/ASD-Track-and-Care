@@ -3,30 +3,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../api/axios";
 
 /**
- * Desktop: unchanged (same links + avatar dropdown)
- * Mobile: ONE hamburger that toggles a single compiled menu:
+ * Desktop:
  *   Home
- *   Questionnaire
+ *   AI Questionnaire
+ *   M-CHAT
  *   Therapists
  *   Bookings
  *   Activities
- *   ----
- *   (profile row with avatar + username)
- *   Edit Profile
- *   Activities Hub
- *   Analytics
- *   Admin Panel / Therapist Dashboard (role-based)
- *   ----
- *   Logout
  *
- * No "Close" button. Hamburger toggles open/close with animation.
+ * Mobile:
+ *   one hamburger with compiled menu
  */
 export default function Navbar() {
   const navigate = useNavigate();
   const isLoggedIn = !!localStorage.getItem("token");
 
-  const [menuOpen, setMenuOpen] = useState(false); // desktop avatar dropdown
-  const [mobileOpen, setMobileOpen] = useState(false); // mobile compiled menu
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef(null);
 
   const [me, setMe] = useState(() => {
@@ -45,7 +38,6 @@ export default function Navbar() {
     return r;
   }, [me]);
 
-  // ✅ Backend base (strip trailing "/api" if present)
   const backendBase = useMemo(() => {
     const raw = (import.meta.env.VITE_API_BASE_URL || "").trim();
     if (!raw) return "http://localhost:8081";
@@ -66,7 +58,6 @@ export default function Navbar() {
     return `${backendBase}/${raw}`;
   }, [me, backendBase]);
 
-  // refresh user info
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -96,7 +87,6 @@ export default function Navbar() {
     };
   }, [isLoggedIn]);
 
-  // close desktop dropdown on outside click
   useEffect(() => {
     const onDocClick = (e) => {
       if (!menuRef.current) return;
@@ -106,8 +96,6 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  // close mobile on route change (optional safety)
-  // also close on Esc
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") setMobileOpen(false);
@@ -125,10 +113,9 @@ export default function Navbar() {
   const toggleMobile = () => setMobileOpen((s) => !s);
 
   return (
-    <header className="sticky top-0 z-[9999] w-full bg-white/95 backdrop-blur border-b border-gray-100">
+    <header className="sticky top-0 z-[9999] w-full border-b border-gray-100 bg-white/95 backdrop-blur">
       <div className="mx-auto max-w-6xl px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* logo */}
           <Link
             to="/"
             className="flex items-center"
@@ -137,13 +124,16 @@ export default function Navbar() {
             <img src="/images/logo/asd-logo.png" alt="ASD" className="h-10" />
           </Link>
 
-          {/* center nav (DESKTOP ONLY - unchanged) */}
-          <nav className="hidden md:flex items-center gap-10 text-base font-medium text-gray-700">
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-8 text-base font-medium text-gray-700">
             <Link to="/" className="hover:text-gray-900">
               Home
             </Link>
             <Link to="/questionnaire" className="hover:text-gray-900">
-              Questionnaire
+              AI Questionnaire
+            </Link>
+            <Link to="/mchat-questionnaire" className="hover:text-gray-900">
+              M-CHAT
             </Link>
             <Link to="/therapists" className="hover:text-gray-900">
               Therapists
@@ -156,17 +146,14 @@ export default function Navbar() {
             </Link>
           </nav>
 
-          {/* right side */}
           <div className="flex items-center gap-4">
-            {/* ✅ MOBILE: hamburger toggles the compiled menu */}
             <button
               type="button"
               aria-label="Toggle menu"
               aria-expanded={mobileOpen}
               onClick={toggleMobile}
-              className="md:hidden inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 hover:bg-gray-50"
+              className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 hover:bg-gray-50 md:hidden"
             >
-              {/* animated hamburger -> X */}
               <div className="flex h-5 w-6 flex-col justify-between">
                 <span
                   className={[
@@ -189,7 +176,6 @@ export default function Navbar() {
               </div>
             </button>
 
-            {/* DESKTOP auth / avatar (unchanged) */}
             <div className="hidden md:flex items-center gap-6">
               {!isLoggedIn ? (
                 <>
@@ -205,7 +191,6 @@ export default function Navbar() {
                 </>
               ) : (
                 <div className="relative" ref={menuRef}>
-                  {/* Avatar button */}
                   <button
                     type="button"
                     onClick={() => setMenuOpen((s) => !s)}
@@ -228,16 +213,15 @@ export default function Navbar() {
                       )}
                     </div>
 
-                    <span className="hidden sm:block text-sm font-semibold text-gray-700">
+                    <span className="hidden text-sm font-semibold text-gray-700 sm:block">
                       {me?.username || "User"}
                     </span>
 
-                    <span className="hidden sm:block text-gray-400">▾</span>
+                    <span className="hidden text-gray-400 sm:block">▾</span>
                   </button>
 
-                  {/* Desktop dropdown (unchanged) */}
                   {menuOpen && (
-                    <div className="absolute right-0 mt-2 w-52 rounded-lg border border-gray-100 bg-white shadow-lg z-[10000]">
+                    <div className="absolute right-0 z-[10000] mt-2 w-60 rounded-lg border border-gray-100 bg-white shadow-lg">
                       <button
                         onClick={() => go("/profile")}
                         className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
@@ -256,16 +240,31 @@ export default function Navbar() {
                         onClick={() => go("/analytics")}
                         className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
                       >
-                        Analytics
+                        Game Analytics
+                      </button>
+
+                      <button
+                        onClick={() => go("/mchat-questionnaire/analytics")}
+                        className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        M-CHAT Analytics
                       </button>
 
                       {role === "ADMIN" && (
-                        <button
-                          onClick={() => go("/admin/request")}
-                          className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                        >
-                          Admin Panel
-                        </button>
+                        <>
+                          <button
+                            onClick={() => go("/admin/request")}
+                            className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                          >
+                            Admin Panel
+                          </button>
+                          <button
+                            onClick={() => go("/admin/mchat-questions")}
+                            className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                          >
+                            Manage M-CHAT Questions
+                          </button>
+                        </>
                       )}
 
                       {role === "THERAPIST" && (
@@ -293,32 +292,34 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* ✅ MOBILE COMPILED MENU (animated open/close, no close button) */}
+        {/* Mobile compiled menu */}
         <div
           className={[
-            "md:hidden overflow-hidden transition-all duration-300 ease-out",
-            mobileOpen ? "max-h-[520px] opacity-100 mt-4" : "max-h-0 opacity-0 mt-0",
+            "overflow-hidden transition-all duration-300 ease-out md:hidden",
+            mobileOpen ? "mt-4 max-h-[720px] opacity-100" : "mt-0 max-h-0 opacity-0",
           ].join(" ")}
         >
           <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
-            {/* Normal menu links */}
             <div className="p-2">
               <MobileItem onClick={() => go("/")}>Home</MobileItem>
               <MobileItem onClick={() => go("/questionnaire")}>
-                Questionnaire
+                AI Questionnaire
+              </MobileItem>
+              <MobileItem onClick={() => go("/mchat-questionnaire")}>
+                M-CHAT Questionnaire
+              </MobileItem>
+              <MobileItem onClick={() => go("/mchat-questionnaire/analytics")}>
+                M-CHAT Analytics
               </MobileItem>
               <MobileItem onClick={() => go("/therapists")}>Therapists</MobileItem>
               <MobileItem onClick={() => go("/bookings")}>Bookings</MobileItem>
               <MobileItem onClick={() => go("/activities")}>Activities</MobileItem>
             </div>
 
-            {/* Divider */}
             <div className="h-px bg-gray-100" />
 
-            {/* Profile section (only when logged in) */}
             {isLoggedIn ? (
               <>
-                {/* profile row */}
                 <div className="flex items-center gap-3 px-4 py-4">
                   <div className="h-10 w-10 overflow-hidden rounded-full bg-gray-100">
                     {avatarUrl ? (
@@ -344,10 +345,15 @@ export default function Navbar() {
                   </div>
                 </div>
 
-                {/* dropdown actions compiled */}
                 <div className="px-2 pb-2">
-                  <MobileItem onClick={() => go("/profile")}>
-                    Edit Profile
+                  <MobileItem onClick={() => go("/profile")}>Edit Profile</MobileItem>
+
+                  <MobileItem onClick={() => go("/analytics")}>
+                    Game Analytics
+                  </MobileItem>
+
+                  <MobileItem onClick={() => go("/mchat-questionnaire/analytics")}>
+                    M-CHAT Analytics
                   </MobileItem>
 
                   {role === "THERAPIST" && (
@@ -357,16 +363,17 @@ export default function Navbar() {
                   )}
 
                   {role === "ADMIN" && (
-                    <MobileItem onClick={() => go("/admin/request")}>
-                      Admin Panel
-                    </MobileItem>
+                    <>
+                      <MobileItem onClick={() => go("/admin/request")}>
+                        Admin Panel
+                      </MobileItem>
+                      <MobileItem onClick={() => go("/admin/mchat-questions")}>
+                        Manage M-CHAT Questions
+                      </MobileItem>
+                    </>
                   )}
 
-                  <MobileItem onClick={() => go("/analytics")}>
-                    Analytics
-                  </MobileItem>
-
-                  <div className="h-px bg-gray-100 my-2" />
+                  <div className="my-2 h-px bg-gray-100" />
 
                   <button
                     onClick={() => go("/logout")}
@@ -377,7 +384,6 @@ export default function Navbar() {
                 </div>
               </>
             ) : (
-              /* logged out actions */
               <div className="p-2">
                 <MobileItem onClick={() => go("/login")}>Sign in</MobileItem>
                 <button

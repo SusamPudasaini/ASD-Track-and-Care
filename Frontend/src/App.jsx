@@ -32,6 +32,10 @@ import Analytics from "./pages/Analytics";
 
 import TherapistProfile from "./pages/TherapistProfile";
 
+import MChatQuestionnaire from "./pages/MChatQuestionnaire";
+import MChatQuestionnaireAnalytics from "./pages/MChatQuestionnaireAnalytics";
+import AdminMChatQuestionnaireQuestions from "./pages/AdminMChatQuestionnaireQuestions";
+
 
 import Home from "./pages/Home";
 
@@ -89,6 +93,10 @@ export default function App() {
           <Route path="/analytics" element={<Analytics />} />          
           <Route path="/payment-success" element={<PaymentSuccess />} />
 
+          <Route path="/mchat-questionnaire" element={<MChatQuestionnaire />} />
+          <Route path="/mchat-questionnaire/analytics" element={<MChatQuestionnaireAnalytics />} />
+          
+
           {/* ✅ Activities */}
           <Route path="/activities" element={<ActivitiesHub />} />
           <Route path="/activities/reaction-time" element={<ReactionTime />} />
@@ -124,6 +132,14 @@ export default function App() {
               </RoleRoute>
             }
           />
+                  <Route
+          path="/admin/mchat-questions"
+          element={
+            <RoleRoute allow={["ADMIN"]}>
+              <AdminMChatQuestionnaireQuestions />
+            </RoleRoute>
+          }
+        />
 
           {/* THERAPIST routes */}
           <Route
