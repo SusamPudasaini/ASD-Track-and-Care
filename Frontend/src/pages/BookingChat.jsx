@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Client } from "@stomp/stompjs";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
-
+   
 export default function BookingChat() {
   const { id } = useParams();
   const navigate = useNavigate();

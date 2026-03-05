@@ -23,7 +23,7 @@ import {
   FaComments,
   FaStar,
 } from "react-icons/fa6";
-   
+    
 const MY_BOOKINGS_ENDPOINT = "/api/bookings/me"; // GET
 const RESCHEDULE_ENDPOINT = (id) => `/api/bookings/${id}/reschedule`; // PUT { date, time }
 const CANCEL_ENDPOINT = (id) => `/api/bookings/${id}`; // DELETE
