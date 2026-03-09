@@ -52,6 +52,26 @@ function prettyLabel(v) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function TooltipLabel({ label, tip }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span>{label}</span>
+      <div className="group relative inline-flex">
+        <button
+          type="button"
+          className="flex h-5 w-5 items-center justify-center rounded-full border border-gray-300 text-[11px] font-bold text-gray-500 hover:bg-gray-50"
+        >
+          ?
+        </button>
+
+        <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-72 -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-3 text-xs font-normal leading-5 text-gray-600 shadow-lg group-hover:block">
+          {tip}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminMChatQuestionnaireQuestions() {
   const navigate = useNavigate();
 
@@ -219,7 +239,12 @@ export default function AdminMChatQuestionnaireQuestions() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Answer Type</label>
+              <label className="block text-sm font-medium text-gray-700">
+                <TooltipLabel
+                  label="Answer Type"
+                  tip="YES_NO gives the user only two choices: Yes or No. SCALE_5 gives a frequency scale: Never, Rarely, Sometimes, Often, Always."
+                />
+              </label>
               <select
                 value={form.answerType}
                 onChange={(e) => setForm((p) => ({ ...p, answerType: e.target.value }))}
@@ -234,7 +259,12 @@ export default function AdminMChatQuestionnaireQuestions() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Weight</label>
+              <label className="block text-sm font-medium text-gray-700">
+                <TooltipLabel
+                  label="Weight"
+                  tip="Weight controls how strongly this question affects the final scores. A higher weight means this question has more influence on development and concern calculations."
+                />
+              </label>
               <input
                 type="number"
                 min="1"
@@ -244,14 +274,17 @@ export default function AdminMChatQuestionnaireQuestions() {
               />
             </div>
 
-            <div className="flex items-center gap-6 pt-8">
+            <div className="flex flex-wrap items-center gap-6 pt-8">
               <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
                   checked={form.reverseScored}
                   onChange={(e) => setForm((p) => ({ ...p, reverseScored: e.target.checked }))}
                 />
-                Reverse Scored
+                <TooltipLabel
+                  label="Reverse Scored"
+                  tip="Use this when higher answers mean better development rather than more concern. The system flips the score direction automatically so analytics stay consistent."
+                />
               </label>
 
               <label className="inline-flex items-center gap-2 text-sm text-gray-700">
@@ -260,7 +293,7 @@ export default function AdminMChatQuestionnaireQuestions() {
                   checked={form.active}
                   onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))}
                 />
-                Active
+                <span>Active</span>
               </label>
             </div>
           </div>
