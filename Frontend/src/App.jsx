@@ -37,6 +37,11 @@ import MChatQuestionnaireAnalytics from "./pages/MChatQuestionnaireAnalytics";
 import AdminMChatQuestionnaireQuestions from "./pages/AdminMChatQuestionnaireQuestions";
 
 
+import ResourceHub from "./pages/ResourceHub";
+import ResourceDetail from "./pages/ResourceDetail";
+import AdminResources from "./pages/AdminResources";
+
+
 import Home from "./pages/Home";
 
 import { Toaster } from "react-hot-toast";
@@ -95,6 +100,9 @@ export default function App() {
 
           <Route path="/mchat-questionnaire" element={<MChatQuestionnaire />} />
           <Route path="/mchat-questionnaire/analytics" element={<MChatQuestionnaireAnalytics />} />
+
+          <Route path="/resources" element={<ResourceHub />} />
+          <Route path="/resources/:id" element={<ResourceDetail />} />
           
 
           {/* ✅ Activities */}
@@ -137,6 +145,15 @@ export default function App() {
           element={
             <RoleRoute allow={["ADMIN"]}>
               <AdminMChatQuestionnaireQuestions />
+            </RoleRoute>
+          }
+        />
+
+                <Route
+          path="/admin/resources"
+          element={
+            <RoleRoute allow={["ADMIN"]}>
+              <AdminResources />
             </RoleRoute>
           }
         />

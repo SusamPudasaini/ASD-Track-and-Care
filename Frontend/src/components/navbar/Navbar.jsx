@@ -7,6 +7,7 @@ import api from "../../api/axios";
  *   Home
  *   AI Questionnaire
  *   M-CHAT
+ *   Resource Hub
  *   Therapists
  *   Bookings
  *   Activities
@@ -135,6 +136,9 @@ export default function Navbar() {
             <Link to="/mchat-questionnaire" className="hover:text-gray-900">
               M-CHAT
             </Link>
+            <Link to="/resources" className="hover:text-gray-900">
+              Resource Hub
+            </Link>
             <Link to="/therapists" className="hover:text-gray-900">
               Therapists
             </Link>
@@ -237,6 +241,13 @@ export default function Navbar() {
                       </button>
 
                       <button
+                        onClick={() => go("/resources")}
+                        className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Resource Hub
+                      </button>
+
+                      <button
                         onClick={() => go("/analytics")}
                         className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
                       >
@@ -257,6 +268,12 @@ export default function Navbar() {
                             className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
                           >
                             Admin Panel
+                          </button>
+                          <button
+                            onClick={() => go("/admin/resources")}
+                            className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                          >
+                            Manage Resources
                           </button>
                           <button
                             onClick={() => go("/admin/mchat-questions")}
@@ -296,7 +313,7 @@ export default function Navbar() {
         <div
           className={[
             "overflow-hidden transition-all duration-300 ease-out md:hidden",
-            mobileOpen ? "mt-4 max-h-[720px] opacity-100" : "mt-0 max-h-0 opacity-0",
+            mobileOpen ? "mt-4 max-h-[760px] opacity-100" : "mt-0 max-h-0 opacity-0",
           ].join(" ")}
         >
           <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -307,6 +324,9 @@ export default function Navbar() {
               </MobileItem>
               <MobileItem onClick={() => go("/mchat-questionnaire")}>
                 M-CHAT Questionnaire
+              </MobileItem>
+              <MobileItem onClick={() => go("/resources")}>
+                Resource Hub
               </MobileItem>
               <MobileItem onClick={() => go("/mchat-questionnaire/analytics")}>
                 M-CHAT Analytics
@@ -348,6 +368,10 @@ export default function Navbar() {
                 <div className="px-2 pb-2">
                   <MobileItem onClick={() => go("/profile")}>Edit Profile</MobileItem>
 
+                  <MobileItem onClick={() => go("/resources")}>
+                    Resource Hub
+                  </MobileItem>
+
                   <MobileItem onClick={() => go("/analytics")}>
                     Game Analytics
                   </MobileItem>
@@ -366,6 +390,9 @@ export default function Navbar() {
                     <>
                       <MobileItem onClick={() => go("/admin/request")}>
                         Admin Panel
+                      </MobileItem>
+                      <MobileItem onClick={() => go("/admin/resources")}>
+                        Manage Resources
                       </MobileItem>
                       <MobileItem onClick={() => go("/admin/mchat-questions")}>
                         Manage M-CHAT Questions
