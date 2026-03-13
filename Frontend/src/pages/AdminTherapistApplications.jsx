@@ -1,6 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import {
+  FaUserDoctor,
+  FaClock,
+  FaCircleCheck,
+  FaCircleXmark,
+  FaArrowsRotate,
+  FaArrowLeft,
+  FaEye,
+  FaCheck,
+  FaXmark,
+  FaRotateLeft,
+  FaEnvelope,
+  FaPhone,
+  FaLocationDot,
+  FaBuilding,
+  FaGraduationCap,
+  FaIdCard,
+  FaBriefcase,
+  FaFileLines,
+  FaDownload,
+  FaUpRightFromSquare,
+  FaUser,
+} from "react-icons/fa6";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 
@@ -10,7 +33,6 @@ const TABS = [
   { key: "REJECTED", label: "Rejected" },
 ];
 
-// ✅ Always convert backend errors to a string
 function getErrorMessage(err) {
   const data = err?.response?.data;
 
@@ -23,7 +45,6 @@ function getErrorMessage(err) {
     if (data.error) return data.error;
     if (data.title) return data.title;
 
-    // Spring default error keys: timestamp/status/error/path
     if (data.status && data.path) {
       return `${data.error || "Request failed"} (${data.status})`;
     }
@@ -55,6 +76,35 @@ function isProbablyPdf(type = "") {
   return type === "application/pdf";
 }
 
+function StatBadge({ children, color = "gray" }) {
+  const styles = {
+    green: "bg-green-100 text-green-700",
+    red: "bg-red-100 text-red-700",
+    blue: "bg-blue-100 text-blue-700",
+    yellow: "bg-yellow-100 text-yellow-700",
+    gray: "bg-gray-100 text-gray-700",
+    purple: "bg-purple-100 text-purple-700",
+  };
+
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${styles[color]}`}>
+      {children}
+    </span>
+  );
+}
+
+function SectionTitle({ icon, title, subtitle }) {
+  return (
+    <div className="mb-5 flex items-start gap-3">
+      <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">{icon}</div>
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        {subtitle ? <p className="text-sm text-gray-500">{subtitle}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminTherapistApplications() {
   const navigate = useNavigate();
 
@@ -63,15 +113,13 @@ export default function AdminTherapistApplications() {
   const [items, setItems] = useState([]);
   const [actionId, setActionId] = useState(null);
 
-  // Details modal
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [details, setDetails] = useState(null); // { application, documents }
-  const [detailsRow, setDetailsRow] = useState(null); // fallback row
+  const [details, setDetails] = useState(null);
+  const [detailsRow, setDetailsRow] = useState(null);
 
-  // Decision modal
   const [decisionOpen, setDecisionOpen] = useState(false);
-  const [decisionType, setDecisionType] = useState(null); // "approve" | "reject" | "markPending"
+  const [decisionType, setDecisionType] = useState(null);
   const [decisionApp, setDecisionApp] = useState(null);
   const [adminMessage, setAdminMessage] = useState("");
 
@@ -136,7 +184,6 @@ export default function AdminTherapistApplications() {
     await loadByStatus(activeStatus, controller.signal);
   };
 
-  // ---------------- Details ----------------
   const openDetails = async (row) => {
     setDetailsRow(row);
     setDetails(null);
@@ -145,8 +192,6 @@ export default function AdminTherapistApplications() {
     try {
       setDetailsLoading(true);
 
-      // expects: GET /api/admin/therapist-applications/{id}
-      // return: { application: {...}, documents: [...] }
       const res = await api.get(`/api/admin/therapist-applications/${row.id}`);
       const data = res.data;
 
@@ -173,7 +218,6 @@ export default function AdminTherapistApplications() {
     setDetailsLoading(false);
   };
 
-  // ---------------- Documents (JWT download) ----------------
   const downloadDocument = async (doc) => {
     const docId = doc?.id;
     if (!docId) return toast.error("Document id missing.");
@@ -190,7 +234,6 @@ export default function AdminTherapistApplications() {
       const a = document.createElement("a");
       a.href = url;
 
-      // Try to create a clean filename
       const safeTitle = (doc?.title || `document-${docId}`).replace(/[^\w\-]+/g, "_");
       const ext = isProbablyPdf(contentType)
         ? ".pdf"
@@ -224,16 +267,13 @@ export default function AdminTherapistApplications() {
 
       const url = window.URL.createObjectURL(blob);
       window.open(url, "_blank", "noopener,noreferrer");
-
-      // note: don't revoke immediately or the tab may lose the blob
-      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
     } catch (err) {
       console.error("PREVIEW ERROR:", err?.response?.status, err?.response?.data);
       toast.error(getErrorMessage(err));
     }
   };
 
-  // ---------------- Decision ----------------
   const openDecision = (type, app) => {
     setDecisionType(type);
     setDecisionApp(app);
@@ -299,164 +339,209 @@ export default function AdminTherapistApplications() {
   const detailsApp = details?.application || detailsRow || null;
   const detailsDocs = Array.isArray(details?.documents) ? details.documents : [];
 
+  const pendingCount = useMemo(
+    () => (activeStatus === "PENDING" ? items.length : 0),
+    [activeStatus, items]
+  );
+  const approvedCount = useMemo(
+    () => (activeStatus === "APPROVED" ? items.length : 0),
+    [activeStatus, items]
+  );
+  const rejectedCount = useMemo(
+    () => (activeStatus === "REJECTED" ? items.length : 0),
+    [activeStatus, items]
+  );
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        {/* Header */}
-        <div className="rounded-md border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <main className="ml-72 px-6 py-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 flex flex-col gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">Admin — Therapist Applications</h1>
-              <p className="mt-2 text-sm text-gray-600">
-                Review applications by status. View full details + documents, approve/reject, or revert to pending.
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+                Admin Therapist Applications
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Review therapist applications, inspect uploaded documents, and approve, reject, or revert applications.
               </p>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={refresh}
-                className="rounded border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Refresh
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="rounded border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Back
-              </button>
+            <div className="flex flex-wrap gap-3">
+              <StatBadge color="yellow">
+                {activeStatus === "PENDING" ? pendingCount : 0} Pending
+              </StatBadge>
+              <StatBadge color="green">
+                {activeStatus === "APPROVED" ? approvedCount : 0} Approved
+              </StatBadge>
+              <StatBadge color="red">
+                {activeStatus === "REJECTED" ? rejectedCount : 0} Rejected
+              </StatBadge>
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setActiveStatus(t.key)}
-                className={`rounded px-4 py-2 text-sm font-semibold border ${
-                  activeStatus === t.key
-                    ? "border-gray-900 bg-gray-900 text-white"
-                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+            <SectionTitle
+              icon={<FaUserDoctor />}
+              title="Application Review"
+              subtitle="Filter therapist applications by status and take review actions."
+            />
 
-        {/* Table */}
-        <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
-          {loading ? (
-            <div className="text-sm text-gray-600">Loading {tabLabel.toLowerCase()} applications...</div>
-          ) : items.length === 0 ? (
-            <div className="text-sm text-gray-600">No {tabLabel.toLowerCase()} applications.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              {/* ✅ EXACT columns requested */}
-              <table className="w-full min-w-[900px] border-collapse">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">ID</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Full Name</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Submitted</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Qualification</th>
-                    <th className="py-3 text-right text-xs font-semibold text-gray-500">Actions</th>
-                  </tr>
-                </thead>
+            <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-wrap gap-2">
+                {TABS.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setActiveStatus(t.key)}
+                    className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                      activeStatus === t.key
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
 
-                <tbody>
-                  {items.map((a) => (
-                    <tr key={a.id} className="border-b last:border-b-0">
-                      <td className="py-3 text-sm text-gray-900">{a.id ?? "-"}</td>
-                      <td className="py-3 text-sm text-gray-900">{a.fullName ?? "-"}</td>
-                      <td className="py-3 text-sm text-gray-700">{fmtDate(a.createdAt)}</td>
-                      <td className="py-3 text-sm text-gray-700">{a.qualification ?? "-"}</td>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={refresh}
+                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  <FaArrowsRotate />
+                  Refresh
+                </button>
 
-                      <td className="py-3">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openDetails(a)}
-                            className="rounded border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                          >
-                            View Details
-                          </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  <FaArrowLeft />
+                  Back
+                </button>
+              </div>
+            </div>
 
-                          {activeStatus === "PENDING" ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => openDecision("approve", a)}
-                                disabled={actionId === a.id}
-                                className={`rounded px-3 py-2 text-xs font-semibold text-white ${
-                                  actionId === a.id ? "bg-green-300 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
-                                }`}
-                              >
-                                {actionId === a.id ? "Working..." : "Approve"}
-                              </button>
+            {loading ? (
+              <div className="rounded-xl bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                Loading {tabLabel.toLowerCase()} applications...
+              </div>
+            ) : items.length === 0 ? (
+              <div className="rounded-xl bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                No {tabLabel.toLowerCase()} applications.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[980px] text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="py-3 font-semibold text-gray-700">ID</th>
+                      <th className="py-3 font-semibold text-gray-700">Full Name</th>
+                      <th className="py-3 font-semibold text-gray-700">Submitted</th>
+                      <th className="py-3 font-semibold text-gray-700">Qualification</th>
+                      <th className="py-3 text-right font-semibold text-gray-700">Actions</th>
+                    </tr>
+                  </thead>
 
-                              <button
-                                type="button"
-                                onClick={() => openDecision("reject", a)}
-                                disabled={actionId === a.id}
-                                className={`rounded px-3 py-2 text-xs font-semibold text-white ${
-                                  actionId === a.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
-                                }`}
-                              >
-                                {actionId === a.id ? "Working..." : "Reject"}
-                              </button>
-                            </>
-                          ) : (
+                  <tbody>
+                    {items.map((a) => (
+                      <tr key={a.id} className="border-b align-top last:border-b-0">
+                        <td className="py-4 font-medium text-gray-900">{a.id ?? "-"}</td>
+                        <td className="py-4 text-gray-900">{a.fullName ?? "-"}</td>
+                        <td className="py-4 text-gray-700">{fmtDate(a.createdAt)}</td>
+                        <td className="py-4 text-gray-700">{a.qualification ?? "-"}</td>
+
+                        <td className="py-4">
+                          <div className="flex justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => openDecision("markPending", a)}
-                              disabled={actionId === a.id}
-                              className={`rounded px-3 py-2 text-xs font-semibold text-white ${
-                                actionId === a.id ? "bg-gray-300 cursor-not-allowed" : "bg-gray-700 hover:bg-gray-800"
-                              }`}
+                              onClick={() => openDetails(a)}
+                              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
                             >
-                              {actionId === a.id ? "Working..." : "Mark as Pending"}
+                              <FaEye />
+                              View Details
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
 
-              {activeStatus === "PENDING" ? (
-                <p className="mt-4 text-xs text-gray-500">
-                  Note: Approving will promote the user role to <span className="font-semibold">THERAPIST</span>. Approve/Reject
-                  saves your message and sends an email.
-                </p>
-              ) : (
-                <p className="mt-4 text-xs text-gray-500">
-                  Tip: If an action was done by mistake, use <span className="font-semibold">Mark as Pending</span> to revert.
-                </p>
-              )}
-            </div>
-          )}
+                            {activeStatus === "PENDING" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => openDecision("approve", a)}
+                                  disabled={actionId === a.id}
+                                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 font-medium text-white ${
+                                    actionId === a.id
+                                      ? "cursor-not-allowed bg-green-300"
+                                      : "bg-green-600 hover:bg-green-700"
+                                  }`}
+                                >
+                                  <FaCheck />
+                                  {actionId === a.id ? "Working..." : "Approve"}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => openDecision("reject", a)}
+                                  disabled={actionId === a.id}
+                                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 font-medium text-white ${
+                                    actionId === a.id
+                                      ? "cursor-not-allowed bg-red-300"
+                                      : "bg-red-600 hover:bg-red-700"
+                                  }`}
+                                >
+                                  <FaXmark />
+                                  {actionId === a.id ? "Working..." : "Reject"}
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openDecision("markPending", a)}
+                                disabled={actionId === a.id}
+                                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 font-medium text-white ${
+                                  actionId === a.id
+                                    ? "cursor-not-allowed bg-gray-300"
+                                    : "bg-gray-700 hover:bg-gray-800"
+                                }`}
+                              >
+                                <FaRotateLeft />
+                                {actionId === a.id ? "Working..." : "Mark as Pending"}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {activeStatus === "PENDING" ? (
+                  <p className="mt-4 text-xs text-gray-500">
+                    Note: Approving will promote the user role to <span className="font-semibold">THERAPIST</span>. Approve or Reject also saves your message and sends an email.
+                  </p>
+                ) : (
+                  <p className="mt-4 text-xs text-gray-500">
+                    Tip: Use <span className="font-semibold">Mark as Pending</span> if you need to revert a previous decision.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
-      {/* DETAILS MODAL */}
       {detailsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-lg">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-base font-semibold text-gray-900">Application Details</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Application Details</h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  {detailsApp?.fullName || "-"} <span className="text-gray-400">•</span> Status:{" "}
+                  {detailsApp?.fullName || "-"} <span className="text-gray-400">•</span> Status{" "}
                   <span className="font-semibold">{detailsApp?.status || activeStatus}</span>
                 </p>
               </div>
@@ -464,108 +549,115 @@ export default function AdminTherapistApplications() {
               <button
                 type="button"
                 onClick={closeDetails}
-                className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+                className="rounded-lg px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100"
               >
                 ✕
               </button>
             </div>
 
             {detailsLoading ? (
-              <div className="mt-5 text-sm text-gray-600">Loading details...</div>
+              <div className="mt-5 rounded-xl bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                Loading details...
+              </div>
             ) : (
-              <div className="mt-5 grid gap-5 md:grid-cols-2">
-                <Info label="Application ID" value={detailsApp?.id} />
-                <Info label="Applicant Username" value={detailsApp?.applicantUsername} />
-                <Info label="Email" value={detailsApp?.email} />
-                <Info label="Phone" value={detailsApp?.phone} />
-                <Info label="City" value={detailsApp?.city} />
-                <Info label="Workplace" value={detailsApp?.workplace} />
-                <Info label="Qualification" value={detailsApp?.qualification} />
-                <Info label="License Number" value={detailsApp?.licenseNumber} />
-                <Info label="Years Experience" value={detailsApp?.yearsExperience} />
-                <Info label="Specialization" value={detailsApp?.specialization} />
-                <Info label="Submitted" value={fmtDate(detailsApp?.createdAt)} />
-                <Info label="Reviewed By" value={detailsApp?.reviewedBy} />
-                <Info label="Reviewed At" value={fmtDate(detailsApp?.reviewedAt)} />
-
-                <div className="md:col-span-2">
-                  <div className="text-sm font-semibold text-gray-900">Applicant Message</div>
-                  <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm text-gray-700">
-                    {detailsApp?.message ? detailsApp.message : <span className="text-gray-400">—</span>}
-                  </div>
+              <>
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  <Info icon={<FaFileLines />} label="Application ID" value={detailsApp?.id} />
+                  <Info icon={<FaUser />} label="Applicant Username" value={detailsApp?.applicantUsername} />
+                  <Info icon={<FaEnvelope />} label="Email" value={detailsApp?.email} />
+                  <Info icon={<FaPhone />} label="Phone" value={detailsApp?.phone} />
+                  <Info icon={<FaLocationDot />} label="City" value={detailsApp?.city} />
+                  <Info icon={<FaBuilding />} label="Workplace" value={detailsApp?.workplace} />
+                  <Info icon={<FaGraduationCap />} label="Qualification" value={detailsApp?.qualification} />
+                  <Info icon={<FaIdCard />} label="License Number" value={detailsApp?.licenseNumber} />
+                  <Info icon={<FaBriefcase />} label="Years Experience" value={detailsApp?.yearsExperience} />
+                  <Info icon={<FaUserDoctor />} label="Specialization" value={detailsApp?.specialization} />
+                  <Info icon={<FaClock />} label="Submitted" value={fmtDate(detailsApp?.createdAt)} />
+                  <Info icon={<FaUser />} label="Reviewed By" value={detailsApp?.reviewedBy} />
+                  <Info icon={<FaClock />} label="Reviewed At" value={fmtDate(detailsApp?.reviewedAt)} />
                 </div>
 
-                <div className="md:col-span-2">
-                  <div className="text-sm font-semibold text-gray-900">Admin Message</div>
-                  <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm text-gray-700">
-                    {detailsApp?.adminMessage ? detailsApp.adminMessage : <span className="text-gray-400">—</span>}
-                  </div>
-                </div>
-
-                <div className="md:col-span-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-gray-900">Uploaded Documents</div>
-                    <div className="text-xs text-gray-500">{detailsDocs.length} file(s)</div>
-                  </div>
-
-                  {detailsDocs.length === 0 ? (
-                    <div className="mt-2 rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-600">
-                      No documents uploaded.
+                <div className="mt-6 grid gap-5">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">Applicant Message</div>
+                    <div className="mt-2 rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
+                      {detailsApp?.message ? detailsApp.message : <span className="text-gray-400">—</span>}
                     </div>
-                  ) : (
-                    <div className="mt-3 space-y-2">
-                      {detailsDocs.map((d) => {
-                        const label = d.title || d.fileName || d.originalName || `Document ${d.id}`;
-                        const type = d.fileType || d.contentType || "";
+                  </div>
 
-                        const canPreview = isProbablyPdf(type) || isProbablyImage(type);
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">Admin Message</div>
+                    <div className="mt-2 rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
+                      {detailsApp?.adminMessage ? detailsApp.adminMessage : <span className="text-gray-400">—</span>}
+                    </div>
+                  </div>
 
-                        return (
-                          <div
-                            key={d.id || label}
-                            className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3"
-                          >
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-semibold text-gray-900">{label}</div>
-                              <div className="truncate text-xs text-gray-500">
-                                {type || "file"}
-                                {d.uploadedAt ? ` • ${fmtDate(d.uploadedAt)}` : ""}
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-gray-900">Uploaded Documents</div>
+                      <div className="text-xs text-gray-500">{detailsDocs.length} file(s)</div>
+                    </div>
+
+                    {detailsDocs.length === 0 ? (
+                      <div className="mt-3 rounded-2xl border border-dashed border-gray-200 p-5 text-sm text-gray-600">
+                        No documents uploaded.
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-3">
+                        {detailsDocs.map((d) => {
+                          const label = d.title || d.fileName || d.originalName || `Document ${d.id}`;
+                          const type = d.fileType || d.contentType || "";
+                          const canPreview = isProbablyPdf(type) || isProbablyImage(type);
+
+                          return (
+                            <div
+                              key={d.id || label}
+                              className="flex items-center justify-between gap-3 rounded-2xl border border-gray-100 p-4"
+                            >
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-semibold text-gray-900">{label}</div>
+                                <div className="truncate text-xs text-gray-500">
+                                  {type || "file"}
+                                  {d.uploadedAt ? ` • ${fmtDate(d.uploadedAt)}` : ""}
+                                </div>
                               </div>
-                            </div>
 
-                            <div className="flex shrink-0 gap-2">
-                              {canPreview ? (
+                              <div className="flex shrink-0 gap-2">
+                                {canPreview ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => previewDocument(d)}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                                  >
+                                    <FaUpRightFromSquare />
+                                    Preview
+                                  </button>
+                                ) : null}
+
                                 <button
                                   type="button"
-                                  onClick={() => previewDocument(d)}
-                                  className="rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                                  onClick={() => downloadDocument(d)}
+                                  className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black"
                                 >
-                                  Preview
+                                  <FaDownload />
+                                  Download
                                 </button>
-                              ) : null}
-
-                              <button
-                                type="button"
-                                onClick={() => downloadDocument(d)}
-                                className="rounded-md bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-black"
-                              >
-                                Download
-                              </button>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             <div className="mt-6 flex justify-end">
               <button
                 type="button"
                 onClick={closeDetails}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
                 Close
               </button>
@@ -574,13 +666,12 @@ export default function AdminTherapistApplications() {
         </div>
       )}
 
-      {/* DECISION MODAL */}
       {decisionOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg">
+          <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-base font-semibold text-gray-900">
+                <h2 className="text-lg font-semibold text-gray-900">
                   {decisionType === "approve"
                     ? "Approve Application"
                     : decisionType === "reject"
@@ -595,29 +686,31 @@ export default function AdminTherapistApplications() {
               <button
                 type="button"
                 onClick={closeDecision}
-                className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+                className="rounded-lg px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100"
               >
                 ✕
               </button>
             </div>
 
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700">Message to user (optional)</label>
+            <div className="mt-5">
+              <label className="block text-sm font-medium text-gray-700">
+                Message to user (optional)
+              </label>
               <textarea
                 value={adminMessage}
                 onChange={(e) => setAdminMessage(e.target.value)}
                 rows={5}
-                className="mt-2 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 placeholder="This message will be visible to the user on the site and included in the email."
               />
               <p className="mt-2 text-xs text-gray-500">Keep it short and clear.</p>
             </div>
 
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={closeDecision}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
@@ -626,17 +719,17 @@ export default function AdminTherapistApplications() {
                 type="button"
                 onClick={confirmDecision}
                 disabled={actionId === decisionApp?.id}
-                className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
+                className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
                   decisionType === "approve"
                     ? actionId === decisionApp?.id
-                      ? "bg-green-300 cursor-not-allowed"
+                      ? "cursor-not-allowed bg-green-300"
                       : "bg-green-600 hover:bg-green-700"
                     : decisionType === "reject"
                     ? actionId === decisionApp?.id
-                      ? "bg-red-300 cursor-not-allowed"
+                      ? "cursor-not-allowed bg-red-300"
                       : "bg-red-600 hover:bg-red-700"
                     : actionId === decisionApp?.id
-                    ? "bg-gray-300 cursor-not-allowed"
+                    ? "cursor-not-allowed bg-gray-300"
                     : "bg-gray-700 hover:bg-gray-800"
                 }`}
               >
@@ -656,12 +749,16 @@ export default function AdminTherapistApplications() {
   );
 }
 
-function Info({ label, value }) {
+function Info({ icon, label, value }) {
   const show = value === 0 ? "0" : value ? String(value) : "—";
+
   return (
-    <div>
-      <div className="text-xs font-semibold text-gray-500">{label}</div>
-      <div className="mt-1 text-sm text-gray-900">{show}</div>
+    <div className="rounded-2xl border border-gray-100 bg-white p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+        <span className="text-gray-400">{icon}</span>
+        {label}
+      </div>
+      <div className="mt-2 text-sm text-gray-900">{show}</div>
     </div>
   );
 }

@@ -41,6 +41,10 @@ import ResourceHub from "./pages/ResourceHub";
 import ResourceDetail from "./pages/ResourceDetail";
 import AdminResources from "./pages/AdminResources";
 
+import DayCareFinder from "./pages/DayCareFinder";
+import DayCareDetail from "./pages/DayCareDetail";
+import AdminDayCares from "./pages/AdminDayCares";
+
 
 import Home from "./pages/Home";
 
@@ -103,6 +107,9 @@ export default function App() {
 
           <Route path="/resources" element={<ResourceHub />} />
           <Route path="/resources/:id" element={<ResourceDetail />} />
+
+          <Route path="/daycares" element={<DayCareFinder />} />
+          <Route path="/daycares/:id" element={<DayCareDetail />} />
           
 
           {/* ✅ Activities */}
@@ -148,6 +155,15 @@ export default function App() {
             </RoleRoute>
           }
         />
+
+        <Route
+  path="/admin/daycares"
+  element={
+    <RoleRoute allow={["ADMIN"]}>
+      <AdminDayCares />
+    </RoleRoute>
+  }
+/>
 
                 <Route
           path="/admin/resources"

@@ -23,11 +23,18 @@ public class DayCareCenter {
 
     @Column(nullable = false, length = 500)
     private String address;
+    
+    @Column(nullable = false)
+    private Double googleRating = 0.0;
 
     @Column(nullable = false)
+    private Integer googleReviewCount = 0;
+
+    // optional for now
+    @Column
     private Double latitude;
 
-    @Column(nullable = false)
+    @Column
     private Double longitude;
 
     @Column(length = 50)
@@ -41,6 +48,9 @@ public class DayCareCenter {
 
     @Column(length = 1000)
     private String imageUrl;
+
+    @Column(length = 1000)
+    private String googleMapsUrl;
 
     @Column(length = 255)
     private String googlePlaceId;
@@ -99,6 +109,9 @@ public class DayCareCenter {
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 
+    public String getGoogleMapsUrl() { return googleMapsUrl; }
+    public void setGoogleMapsUrl(String googleMapsUrl) { this.googleMapsUrl = googleMapsUrl; }
+
     public String getGooglePlaceId() { return googlePlaceId; }
     public void setGooglePlaceId(String googlePlaceId) { this.googlePlaceId = googlePlaceId; }
 
@@ -116,4 +129,10 @@ public class DayCareCenter {
 
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    
+    public Double getGoogleRating() { return googleRating; }
+    public void setGoogleRating(Double googleRating) { this.googleRating = googleRating; }
+
+    public Integer getGoogleReviewCount() { return googleReviewCount; }
+    public void setGoogleReviewCount(Integer googleReviewCount) { this.googleReviewCount = googleReviewCount; }
 }

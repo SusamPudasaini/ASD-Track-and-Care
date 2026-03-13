@@ -16,6 +16,7 @@ public class DayCareCenterResponse {
     private String email;
     private String websiteUrl;
     private String imageUrl;
+    private String googleMapsUrl;
     private String googlePlaceId;
     private Double averageRating;
     private Integer totalReviews;
@@ -55,6 +56,9 @@ public class DayCareCenterResponse {
 
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+
+    public String getGoogleMapsUrl() { return googleMapsUrl; }
+    public void setGoogleMapsUrl(String googleMapsUrl) { this.googleMapsUrl = googleMapsUrl; }
 
     public String getGooglePlaceId() { return googlePlaceId; }
     public void setGooglePlaceId(String googlePlaceId) { this.googlePlaceId = googlePlaceId; }

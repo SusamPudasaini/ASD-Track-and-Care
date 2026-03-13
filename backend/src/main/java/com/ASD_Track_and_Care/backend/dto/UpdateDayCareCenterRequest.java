@@ -18,16 +18,14 @@ public class UpdateDayCareCenterRequest {
     @NotBlank
     private String address;
 
-    @NotNull
     private Double latitude;
-
-    @NotNull
     private Double longitude;
 
     private String phone;
     private String email;
     private String websiteUrl;
     private String imageUrl;
+    private String googleMapsUrl;
     private String googlePlaceId;
 
     @NotNull
@@ -62,6 +60,9 @@ public class UpdateDayCareCenterRequest {
 
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+
+    public String getGoogleMapsUrl() { return googleMapsUrl; }
+    public void setGoogleMapsUrl(String googleMapsUrl) { this.googleMapsUrl = googleMapsUrl; }
 
     public String getGooglePlaceId() { return googlePlaceId; }
     public void setGooglePlaceId(String googlePlaceId) { this.googlePlaceId = googlePlaceId; }

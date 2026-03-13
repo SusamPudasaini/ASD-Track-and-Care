@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import {
+  FaClipboardQuestion,
+  FaLayerGroup,
+  FaScaleBalanced,
+  FaRotate,
+  FaToggleOn,
+  FaPlus,
+  FaPenToSquare,
+  FaArrowsRotate,
+  FaCircleCheck,
+  FaCircleXmark,
+  FaQuestion,
+  FaCheck,
+} from "react-icons/fa6";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 
@@ -61,12 +75,41 @@ function TooltipLabel({ label, tip }) {
           type="button"
           className="flex h-5 w-5 items-center justify-center rounded-full border border-gray-300 text-[11px] font-bold text-gray-500 hover:bg-gray-50"
         >
-          ?
+          <FaQuestion className="text-[10px]" />
         </button>
 
-        <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-72 -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-3 text-xs font-normal leading-5 text-gray-600 shadow-lg group-hover:block">
+        <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-72 -translate-x-1/2 rounded-xl border border-gray-200 bg-white p-3 text-xs font-normal leading-5 text-gray-600 shadow-lg group-hover:block">
           {tip}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function StatBadge({ children, color = "gray" }) {
+  const styles = {
+    green: "bg-green-100 text-green-700",
+    red: "bg-red-100 text-red-700",
+    blue: "bg-blue-100 text-blue-700",
+    yellow: "bg-yellow-100 text-yellow-700",
+    gray: "bg-gray-100 text-gray-700",
+    purple: "bg-purple-100 text-purple-700",
+  };
+
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${styles[color]}`}>
+      {children}
+    </span>
+  );
+}
+
+function SectionTitle({ icon, title, subtitle }) {
+  return (
+    <div className="mb-5 flex items-start gap-3">
+      <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">{icon}</div>
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        {subtitle ? <p className="text-sm text-gray-500">{subtitle}</p> : null}
       </div>
     </div>
   );
@@ -173,223 +216,281 @@ export default function AdminMChatQuestionnaireQuestions() {
   };
 
   const activeCount = useMemo(() => items.filter((x) => x.active).length, [items]);
+  const inactiveCount = items.length - activeCount;
+  const reverseCount = useMemo(() => items.filter((x) => x.reverseScored).length, [items]);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <main className="ml-72 px-6 py-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 flex flex-col gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Admin — M-CHAT Questions</h1>
-              <p className="mt-2 text-sm text-gray-600">
-                Create, edit, enable, and disable M-CHAT questionnaire questions.
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+                Admin M-CHAT Question Management
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Create, edit, enable, and manage M-CHAT questionnaire questions.
               </p>
             </div>
 
-            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-              Active Questions: <span className="font-semibold">{activeCount}</span> / {items.length}
+            <div className="flex flex-wrap gap-3">
+              <StatBadge color="blue">{items.length} Total Questions</StatBadge>
+              <StatBadge color="green">{activeCount} Active</StatBadge>
+              <StatBadge color="red">{inactiveCount} Inactive</StatBadge>
+              <StatBadge color="purple">{reverseCount} Reverse Scored</StatBadge>
             </div>
           </div>
-        </div>
 
-        <form onSubmit={submit} className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {editingId ? "Edit Question" : "Create Question"}
-            </h2>
+          <form
+            onSubmit={submit}
+            className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100"
+          >
+            <SectionTitle
+              icon={<FaClipboardQuestion />}
+              title={editingId ? "Edit Question" : "Create Question"}
+              subtitle="Configure how each M-CHAT question contributes to screening and analytics."
+            />
 
-            {editingId ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Question Text
+                </label>
+                <div className="rounded-xl border bg-white px-4 py-3">
+                  <textarea
+                    value={form.questionText}
+                    onChange={(e) => setForm((p) => ({ ...p, questionText: e.target.value }))}
+                    rows={4}
+                    className="w-full resize-none bg-transparent text-sm outline-none"
+                    placeholder="Enter question..."
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Category</label>
+                <div className="flex items-center rounded-xl border bg-white px-3">
+                  <FaLayerGroup className="mr-3 text-gray-400" />
+                  <select
+                    value={form.category}
+                    onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
+                    className="w-full bg-transparent py-3 text-sm outline-none"
+                  >
+                    {CATEGORY_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {prettyLabel(opt)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <TooltipLabel
+                    label="Answer Type"
+                    tip="YES_NO gives the user only two choices: Yes or No. SCALE_5 gives a frequency scale: Never, Rarely, Sometimes, Often, Always."
+                  />
+                </label>
+                <div className="flex items-center rounded-xl border bg-white px-3">
+                  <FaClipboardQuestion className="mr-3 text-gray-400" />
+                  <select
+                    value={form.answerType}
+                    onChange={(e) => setForm((p) => ({ ...p, answerType: e.target.value }))}
+                    className="w-full bg-transparent py-3 text-sm outline-none"
+                  >
+                    {ANSWER_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {prettyLabel(opt)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <TooltipLabel
+                    label="Weight"
+                    tip="Weight controls how strongly this question affects the final scores. A higher weight means this question has more influence on development and concern calculations."
+                  />
+                </label>
+                <div className="flex items-center rounded-xl border bg-white px-3">
+                  <FaScaleBalanced className="mr-3 text-gray-400" />
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.weight}
+                    onChange={(e) => setForm((p) => ({ ...p, weight: e.target.value }))}
+                    className="w-full bg-transparent py-3 text-sm outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-6 rounded-xl border bg-gray-50 px-4 py-3">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.reverseScored}
+                    onChange={(e) => setForm((p) => ({ ...p, reverseScored: e.target.checked }))}
+                  />
+                  <span className="inline-flex items-center gap-2">
+                    <FaRotate className="text-gray-500" />
+                    <TooltipLabel
+                      label="Reverse Scored"
+                      tip="Use this when higher answers mean better development rather than more concern. The system flips the score direction automatically so analytics stay consistent."
+                    />
+                  </span>
+                </label>
+
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.active}
+                    onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))}
+                  />
+                  <span className="inline-flex items-center gap-2">
+                    <FaToggleOn className="text-gray-500" />
+                    Active
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={saving}
+                className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 font-semibold text-white ${
+                  saving ? "cursor-not-allowed bg-blue-300" : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {editingId ? <FaPenToSquare /> : <FaPlus />}
+                {saving ? "Saving..." : editingId ? "Update Question" : "Create Question"}
+              </button>
+
+              {editingId ? (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  <FaCircleXmark />
+                  Cancel Edit
+                </button>
+              ) : null}
+            </div>
+          </form>
+
+          <div className="mt-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+            <SectionTitle
+              icon={<FaClipboardQuestion />}
+              title="All Questions"
+              subtitle="Review all configured M-CHAT questions and quickly enable or disable them."
+            />
+
+            <div className="mb-4 flex justify-end">
               <button
                 type="button"
-                onClick={resetForm}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                onClick={load}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
-                Cancel Edit
+                <FaArrowsRotate />
+                Refresh
               </button>
-            ) : null}
-          </div>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Question Text</label>
-              <textarea
-                value={form.questionText}
-                onChange={(e) => setForm((p) => ({ ...p, questionText: e.target.value }))}
-                rows={3}
-                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                placeholder="Enter question..."
-              />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Category</label>
-              <select
-                value={form.category}
-                onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
-                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              >
-                {CATEGORY_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {prettyLabel(opt)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                <TooltipLabel
-                  label="Answer Type"
-                  tip="YES_NO gives the user only two choices: Yes or No. SCALE_5 gives a frequency scale: Never, Rarely, Sometimes, Often, Always."
-                />
-              </label>
-              <select
-                value={form.answerType}
-                onChange={(e) => setForm((p) => ({ ...p, answerType: e.target.value }))}
-                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              >
-                {ANSWER_TYPE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {prettyLabel(opt)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                <TooltipLabel
-                  label="Weight"
-                  tip="Weight controls how strongly this question affects the final scores. A higher weight means this question has more influence on development and concern calculations."
-                />
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={form.weight}
-                onChange={(e) => setForm((p) => ({ ...p, weight: e.target.value }))}
-                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-6 pt-8">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={form.reverseScored}
-                  onChange={(e) => setForm((p) => ({ ...p, reverseScored: e.target.checked }))}
-                />
-                <TooltipLabel
-                  label="Reverse Scored"
-                  tip="Use this when higher answers mean better development rather than more concern. The system flips the score direction automatically so analytics stay consistent."
-                />
-              </label>
-
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))}
-                />
-                <span>Active</span>
-              </label>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <button
-              type="submit"
-              disabled={saving}
-              className={`rounded-xl px-5 py-3 text-sm font-semibold text-white ${
-                saving ? "cursor-not-allowed bg-blue-300" : "bg-blue-600 hover:bg-blue-700"
-              }`}
-            >
-              {saving ? "Saving..." : editingId ? "Update Question" : "Create Question"}
-            </button>
-          </div>
-        </form>
-
-        <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-gray-900">All Questions</h2>
-            <button
-              type="button"
-              onClick={load}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              Refresh
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="mt-4 text-sm text-gray-600">Loading questions...</div>
-          ) : items.length === 0 ? (
-            <div className="mt-4 text-sm text-gray-600">No questions found.</div>
-          ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[980px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">ID</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Question</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Category</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Answer Type</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Weight</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Reverse</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Status</th>
-                    <th className="py-3 text-right text-xs font-semibold text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {items.map((row) => (
-                    <tr key={row.id} className="border-b last:border-b-0">
-                      <td className="py-3 text-gray-900">{row.id}</td>
-                      <td className="py-3 text-gray-900">{row.questionText}</td>
-                      <td className="py-3 text-gray-700">{prettyLabel(row.category)}</td>
-                      <td className="py-3 text-gray-700">{prettyLabel(row.answerType)}</td>
-                      <td className="py-3 text-gray-700">{row.weight}</td>
-                      <td className="py-3 text-gray-700">{row.reverseScored ? "Yes" : "No"}</td>
-                      <td className="py-3">
-                        <span
-                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
-                            row.active
-                              ? "border-green-200 bg-green-50 text-green-700"
-                              : "border-gray-200 bg-gray-50 text-gray-700"
-                          }`}
-                        >
-                          {row.active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="py-3">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => editRow(row)}
-                            className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => toggleActive(row)}
-                            className={`rounded-lg px-3 py-2 text-xs font-semibold text-white ${
-                              row.active ? "bg-gray-700 hover:bg-gray-800" : "bg-green-600 hover:bg-green-700"
-                            }`}
-                          >
-                            {row.active ? "Disable" : "Enable"}
-                          </button>
-                        </div>
-                      </td>
+            {loading ? (
+              <div className="rounded-xl bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                Loading questions...
+              </div>
+            ) : items.length === 0 ? (
+              <div className="rounded-xl bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                No questions found.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1080px] text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="py-3 font-semibold text-gray-700">ID</th>
+                      <th className="py-3 font-semibold text-gray-700">Question</th>
+                      <th className="py-3 font-semibold text-gray-700">Category</th>
+                      <th className="py-3 font-semibold text-gray-700">Answer Type</th>
+                      <th className="py-3 font-semibold text-gray-700">Weight</th>
+                      <th className="py-3 font-semibold text-gray-700">Reverse</th>
+                      <th className="py-3 font-semibold text-gray-700">Status</th>
+                      <th className="py-3 text-right font-semibold text-gray-700">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+
+                  <tbody>
+                    {items.map((row) => (
+                      <tr key={row.id} className="border-b align-top last:border-b-0">
+                        <td className="py-4 font-medium text-gray-900">{row.id}</td>
+                        <td className="py-4 text-gray-900">{row.questionText}</td>
+                        <td className="py-4">
+                          <StatBadge color="purple">{prettyLabel(row.category)}</StatBadge>
+                        </td>
+                        <td className="py-4 text-gray-700">{prettyLabel(row.answerType)}</td>
+                        <td className="py-4 text-gray-700">{row.weight}</td>
+                        <td className="py-4">
+                          {row.reverseScored ? (
+                            <StatBadge color="yellow">Yes</StatBadge>
+                          ) : (
+                            <StatBadge color="gray">No</StatBadge>
+                          )}
+                        </td>
+                        <td className="py-4">
+                          {row.active ? (
+                            <StatBadge color="green">Active</StatBadge>
+                          ) : (
+                            <StatBadge color="gray">Inactive</StatBadge>
+                          )}
+                        </td>
+                        <td className="py-4">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => editRow(row)}
+                              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                              <FaPenToSquare />
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleActive(row)}
+                              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 font-medium text-white ${
+                                row.active
+                                  ? "bg-gray-700 hover:bg-gray-800"
+                                  : "bg-green-600 hover:bg-green-700"
+                              }`}
+                            >
+                              {row.active ? (
+                                <>
+                                  <FaCircleXmark />
+                                  Disable
+                                </>
+                              ) : (
+                                <>
+                                  <FaCircleCheck />
+                                  Enable
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

@@ -92,6 +92,7 @@ public class DayCareCenterService {
         item.setEmail(trimToNull(req.getEmail()));
         item.setWebsiteUrl(trimToNull(req.getWebsiteUrl()));
         item.setImageUrl(trimToNull(req.getImageUrl()));
+        item.setGoogleMapsUrl(trimToNull(req.getGoogleMapsUrl()));
         item.setGooglePlaceId(trimToNull(req.getGooglePlaceId()));
         item.setPublished(Boolean.TRUE.equals(req.getPublished()));
     }
@@ -107,6 +108,7 @@ public class DayCareCenterService {
         item.setEmail(trimToNull(req.getEmail()));
         item.setWebsiteUrl(trimToNull(req.getWebsiteUrl()));
         item.setImageUrl(trimToNull(req.getImageUrl()));
+        item.setGoogleMapsUrl(trimToNull(req.getGoogleMapsUrl()));
         item.setGooglePlaceId(trimToNull(req.getGooglePlaceId()));
         item.setPublished(Boolean.TRUE.equals(req.getPublished()));
     }
@@ -130,6 +132,7 @@ public class DayCareCenterService {
         dto.setEmail(item.getEmail());
         dto.setWebsiteUrl(item.getWebsiteUrl());
         dto.setImageUrl(item.getImageUrl());
+        dto.setGoogleMapsUrl(item.getGoogleMapsUrl());
         dto.setGooglePlaceId(item.getGooglePlaceId());
         dto.setAverageRating(item.getAverageRating());
         dto.setTotalReviews(item.getTotalReviews());
