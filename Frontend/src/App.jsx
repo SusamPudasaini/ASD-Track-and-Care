@@ -48,6 +48,15 @@ import AdminDayCares from "./pages/AdminDayCares";
 
 import Home from "./pages/Home";
 
+
+import AacBoard from "./pages/AacBoard";
+import AdminAacCards from "./pages/AdminAacCards";
+
+import FirstThenBoard from "./pages/FirstThenBoard";
+
+import AdminMatchingSorting from "./pages/AdminMatchingSorting";
+import MatchingSortingActivity from "./pages/MatchingSortingActivity";
+
 import { Toaster } from "react-hot-toast";
 import TherapistDashboardBookings from "./pages/TherapistsBookingApplcations";
 
@@ -120,6 +129,10 @@ export default function App() {
           <Route path="/activities/visual-memory" element={<VisualMemory />} />
           <Route path="/activities/sound-therapy" element={<SoundTherapy />} />
 
+          <Route path="/aac-board" element={<AacBoard />} />
+          <Route path="/first-then" element={<FirstThenBoard />} />
+          <Route path="/activities/matching-sorting" element={<MatchingSortingActivity />} />
+
           {/* USER routes */}
           <Route
             path="/therapist/apply"
@@ -147,6 +160,15 @@ export default function App() {
               </RoleRoute>
             }
           />
+
+          <Route
+  path="/admin/matching-sorting"
+  element={
+    <RoleRoute allow={["ADMIN"]}>
+      <AdminMatchingSorting />
+    </RoleRoute>
+  }
+/>
                   <Route
           path="/admin/mchat-questions"
           element={
@@ -155,6 +177,15 @@ export default function App() {
             </RoleRoute>
           }
         />
+
+        <Route
+  path="/admin/aac-cards"
+  element={
+    <RoleRoute allow={["ADMIN"]}>
+      <AdminAacCards />
+    </RoleRoute>
+  }
+/>
 
         <Route
   path="/admin/daycares"

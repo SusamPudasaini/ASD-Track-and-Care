@@ -10,6 +10,8 @@ import {
   FaBarsProgress,
   FaAnglesLeft,
   FaAnglesRight,
+  FaComments,
+  FaGamepad,
 } from "react-icons/fa6";
 import api from "../../api/axios";
 
@@ -127,6 +129,9 @@ export default function Navbar() {
     { label: "Bookings", path: "/bookings" },
     { label: "Activities", path: "/activities" },
     { label: "Day Care Finder", path: "/daycares" },
+    { label: "AAC Board", path: "/aac-board" },
+    { label: "First-Then Board", path: "/first-then" },
+      { label: "Matching & Sorting", path: "/activities/matching-sorting" },
   ];
 
   const therapistLinks = [
@@ -143,6 +148,9 @@ export default function Navbar() {
     { label: "Manage Resources", path: "/admin/resources", icon: FaBookOpen },
     { label: "Manage M-CHAT Questions", path: "/admin/mchat-questions", icon: FaCircleQuestion },
     { label: "Manage Day Cares", path: "/admin/daycares", icon: FaSchool },
+  { label: "Manage AAC Cards", path: "/admin/aac-cards", icon: FaComments },
+  { label: "Manage Matching & Sorting", path: "/admin/matching-sorting", icon: FaGamepad },
+
   ];
 
   const desktopLinks =
