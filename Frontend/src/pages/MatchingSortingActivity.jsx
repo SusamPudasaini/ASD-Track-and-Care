@@ -5,13 +5,16 @@ import api from "../api/axios";
 import {
   FaGamepad,
   FaPuzzlePiece,
-  FaLayerGroup,
   FaImage,
   FaRotateLeft,
   FaArrowRight,
+  FaArrowLeft,
   FaCheck,
   FaXmark,
   FaBullseye,
+  FaFilter,
+  FaPlay,
+  FaLayerGroup,
 } from "react-icons/fa6";
 
 const TYPE_OPTIONS = ["ALL", "MATCHING", "SORTING"];
@@ -79,10 +82,10 @@ function TypeButton({ active, children, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
+      className={`rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
         active
-          ? "border-blue-600 bg-blue-600 text-white"
-          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+          ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+          : "border-gray-200 bg-white text-gray-700 hover:border-blue-200 hover:bg-blue-50"
       }`}
     >
       {children}
@@ -90,16 +93,33 @@ function TypeButton({ active, children, onClick }) {
   );
 }
 
-function ImageCard({ item, onClick, selected = false, disabled = false }) {
+function ImageCard({
+  item,
+  onClick,
+  selected = false,
+  disabled = false,
+  correct = false,
+  wrong = false,
+  draggable = false,
+  onDragStart,
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      draggable={draggable}
+      onDragStart={onDragStart}
       className={`group overflow-hidden rounded-3xl border bg-white shadow-sm transition ${
-        disabled ? "cursor-not-allowed opacity-70" : "hover:-translate-y-1 hover:shadow-md"
+        disabled ? "cursor-not-allowed opacity-80" : "hover:-translate-y-1 hover:shadow-md"
       } ${
-        selected ? "border-blue-500 ring-2 ring-blue-200" : "border-gray-100 hover:border-blue-200"
+        correct
+          ? "border-green-400 ring-2 ring-green-200"
+          : wrong
+          ? "border-red-400 ring-2 ring-red-200"
+          : selected
+          ? "border-blue-500 ring-2 ring-blue-200"
+          : "border-gray-100 hover:border-blue-200"
       }`}
     >
       <div className="aspect-[4/3] w-full bg-gray-100">
@@ -119,7 +139,7 @@ function ImageCard({ item, onClick, selected = false, disabled = false }) {
         )}
       </div>
 
-      <div className="p-4">
+      <div className="p-4 text-center">
         <div className="text-base font-semibold text-gray-900 group-hover:text-blue-600">
           {item?.label || "Untitled"}
         </div>
@@ -128,44 +148,138 @@ function ImageCard({ item, onClick, selected = false, disabled = false }) {
   );
 }
 
-function ActivityPicker({ activities, selectedId, onSelect }) {
-  if (activities.length === 0) {
-    return (
-      <div className="rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
-        No activities available for this filter.
+function ActivityCard({ activity, selected, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md ${
+        selected
+          ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100"
+          : "border-gray-100 bg-white hover:border-blue-200"
+      }`}
+    >
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <StatBadge color="purple">{prettyLabel(activity.type)}</StatBadge>
+        <StatBadge color="blue">
+          {(activity.items || []).length} Item{(activity.items || []).length !== 1 ? "s" : ""}
+        </StatBadge>
       </div>
-    );
-  }
+
+      <div className="text-lg font-semibold text-gray-900">{activity.title}</div>
+
+      {activity.description ? (
+        <div className="mt-2 line-clamp-3 text-sm text-gray-600">{activity.description}</div>
+      ) : null}
+    </button>
+  );
+}
+
+function StepProgress({ currentStep }) {
+  const steps = [
+    { id: 1, label: "Choose Type" },
+    { id: 2, label: "Choose Activity" },
+    { id: 3, label: "Play Activity" },
+  ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {activities.map((activity) => (
-        <button
-          key={activity.id}
-          type="button"
-          onClick={() => onSelect(activity.id)}
-          className={`rounded-3xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md ${
-            String(selectedId) === String(activity.id)
-              ? "border-blue-500 ring-2 ring-blue-200"
-              : "border-gray-100 hover:border-blue-200"
-          }`}
-        >
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <StatBadge color="purple">{prettyLabel(activity.type)}</StatBadge>
-            <StatBadge color="blue">
-              {(activity.items || []).length} Item{(activity.items || []).length !== 1 ? "s" : ""}
-            </StatBadge>
+    <div className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="grid gap-3 md:grid-cols-3">
+        {steps.map((step) => {
+          const active = currentStep === step.id;
+          const completed = currentStep > step.id;
+
+          return (
+            <div
+              key={step.id}
+              className={`rounded-2xl border px-4 py-3 ${
+                active
+                  ? "border-blue-300 bg-blue-50"
+                  : completed
+                  ? "border-green-200 bg-green-50"
+                  : "border-gray-100 bg-gray-50"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
+                    completed
+                      ? "bg-green-100 text-green-700"
+                      : active
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-200 text-gray-600"
+                  }`}
+                >
+                  {completed ? <FaCheck /> : step.id}
+                </div>
+                <div className="text-sm font-semibold text-gray-800">{step.label}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ScreenCard({ title, description, children }) {
+  return (
+    <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+      <div className="mb-6">
+        <h2 className="text-2xl font-semibold text-gray-900">{title}</h2>
+        {description ? <p className="mt-2 text-sm text-gray-500">{description}</p> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function BucketDropZone({ bucket, onDropItem, isActive }) {
+  return (
+    <div
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        const itemId = e.dataTransfer.getData("text/plain");
+        if (itemId) onDropItem(itemId, bucket);
+      }}
+      className={`rounded-[2rem] border-2 border-dashed p-6 text-center transition ${
+        isActive
+          ? "border-blue-500 bg-blue-100"
+          : "border-blue-200 bg-blue-50 hover:border-blue-400 hover:bg-blue-100"
+      }`}
+    >
+      <div className="mb-3 flex justify-center text-3xl text-blue-600">
+        <FaLayerGroup />
+      </div>
+      <div className="text-xs font-bold uppercase tracking-wider text-blue-600">Bucket</div>
+      <div className="mt-2 text-lg font-bold text-blue-900">{prettyLabel(bucket)}</div>
+      <div className="mt-2 text-sm text-blue-700">Drag item here</div>
+    </div>
+  );
+}
+
+function ShuffleAnimationCard() {
+  return (
+    <div className="rounded-3xl border border-yellow-200 bg-gradient-to-br from-yellow-50 to-orange-50 p-8">
+      <div className="mb-4 text-center">
+        <div className="text-lg font-semibold text-yellow-800">Shuffling cards...</div>
+        <p className="mt-1 text-sm text-yellow-700">
+          Watch carefully and remember the image.
+        </p>
+      </div>
+
+      <div className="relative mx-auto h-56 w-72">
+        <div className="absolute left-8 top-8 h-40 w-28 animate-pulse rounded-2xl border border-white/70 bg-white shadow-md rotate-[-12deg]" />
+        <div className="absolute left-20 top-4 h-40 w-28 animate-bounce rounded-2xl border border-white/70 bg-white shadow-md rotate-[8deg]" />
+        <div className="absolute left-32 top-10 h-40 w-28 animate-pulse rounded-2xl border border-white/70 bg-white shadow-md rotate-[18deg]" />
+
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="rounded-full bg-yellow-100 px-4 py-2 text-sm font-semibold text-yellow-800 shadow-sm">
+            Mixing choices...
           </div>
-
-          <div className="text-lg font-semibold text-gray-900">{activity.title}</div>
-
-          {activity.description ? (
-            <div className="mt-2 line-clamp-3 text-sm text-gray-600">{activity.description}</div>
-          ) : null}
-
-          <div className="mt-4 text-sm font-semibold text-blue-600">Play Activity →</div>
-        </button>
-      ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -175,17 +289,22 @@ export default function MatchingSortingActivity() {
   const [activities, setActivities] = useState([]);
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [selectedActivityId, setSelectedActivityId] = useState("");
+  const [currentStep, setCurrentStep] = useState(1);
 
   const [score, setScore] = useState(0);
 
-  // matching state
+  // matching
   const [matchingRounds, setMatchingRounds] = useState([]);
   const [matchingIndex, setMatchingIndex] = useState(0);
+  const [matchingPhase, setMatchingPhase] = useState("PROMPT"); // PROMPT | SHUFFLING | ANSWER
   const [matchingAnswered, setMatchingAnswered] = useState(false);
+  const [matchingSelectedOptionId, setMatchingSelectedOptionId] = useState(null);
+  const [matchingWasCorrect, setMatchingWasCorrect] = useState(null);
 
-  // sorting state
+  // sorting
   const [sortingItems, setSortingItems] = useState([]);
-  const [selectedSortingItemId, setSelectedSortingItemId] = useState(null);
+  const [sortingFeedback, setSortingFeedback] = useState(null);
+  const [draggingItemId, setDraggingItemId] = useState(null);
 
   useEffect(() => {
     loadActivities("ALL");
@@ -205,8 +324,7 @@ export default function MatchingSortingActivity() {
       setActivities(rows);
 
       if (rows.length > 0) {
-        const nextSelected = rows[0].id;
-        setSelectedActivityId(String(nextSelected));
+        setSelectedActivityId(String(rows[0].id));
       } else {
         setSelectedActivityId("");
       }
@@ -230,7 +348,8 @@ export default function MatchingSortingActivity() {
     if (!selectedActivity) return;
 
     setScore(0);
-    setSelectedSortingItemId(null);
+    setSortingFeedback(null);
+    setDraggingItemId(null);
 
     if (selectedActivity.type === "MATCHING") {
       initializeMatching(selectedActivity);
@@ -267,7 +386,10 @@ export default function MatchingSortingActivity() {
 
     setMatchingRounds(shuffleArray(rounds));
     setMatchingIndex(0);
+    setMatchingPhase("PROMPT");
     setMatchingAnswered(false);
+    setMatchingSelectedOptionId(null);
+    setMatchingWasCorrect(null);
   }
 
   function initializeSorting(activity) {
@@ -280,52 +402,85 @@ export default function MatchingSortingActivity() {
     );
 
     setSortingItems(normalized);
-    setSelectedSortingItemId(null);
+    setSortingFeedback(null);
+    setDraggingItemId(null);
   }
 
-  async function handleTypeFilter(nextType) {
+  async function handleTypeChange(nextType) {
     setTypeFilter(nextType);
     await loadActivities(nextType);
   }
 
-  function handleSelectActivity(id) {
-    setSelectedActivityId(String(id));
+  function handleNextStep() {
+    if (currentStep === 1) {
+      setCurrentStep(2);
+      return;
+    }
+
+    if (currentStep === 2) {
+      if (!selectedActivity) {
+        toast.error("Please select an activity first.");
+        return;
+      }
+      setCurrentStep(3);
+    }
+  }
+
+  function handlePrevStep() {
+    if (currentStep > 1) {
+      setCurrentStep((prev) => prev - 1);
+    }
   }
 
   function restartCurrentActivity() {
     if (!selectedActivity) return;
-
     setScore(0);
+
     if (selectedActivity.type === "MATCHING") {
       initializeMatching(selectedActivity);
-    } else if (selectedActivity.type === "SORTING") {
+    } else {
       initializeSorting(selectedActivity);
     }
   }
 
-  // MATCHING LOGIC
+  // matching logic
   const currentMatchingRound =
     selectedActivity?.type === "MATCHING" ? matchingRounds[matchingIndex] || null : null;
 
+  function revealMatchingAnswers() {
+    if (!currentMatchingRound) return;
+
+    setMatchingPhase("SHUFFLING");
+
+    setTimeout(() => {
+      setMatchingPhase("ANSWER");
+    }, 1400);
+  }
+
   function handleMatchingSelect(option) {
-    if (!currentMatchingRound || matchingAnswered) return;
+    if (!currentMatchingRound || matchingAnswered || matchingPhase !== "ANSWER") return;
 
     const isCorrect = (option.matchKey || "") === currentMatchingRound.correctMatchKey;
 
+    setMatchingSelectedOptionId(option.id);
+    setMatchingWasCorrect(isCorrect);
     setMatchingAnswered(true);
 
     if (isCorrect) {
       setScore((prev) => prev + 1);
       toast.success("Correct match!");
     } else {
-      toast.error("Try the next one.");
+      toast.error("Not quite right.");
     }
   }
 
   function goToNextMatchingRound() {
     if (matchingIndex < matchingRounds.length - 1) {
       setMatchingIndex((prev) => prev + 1);
+      setMatchingPhase("PROMPT");
       setMatchingAnswered(false);
+      setMatchingSelectedOptionId(null);
+      setMatchingWasCorrect(null);
     } else {
       toast.success("Matching activity completed!");
     }
@@ -337,19 +492,13 @@ export default function MatchingSortingActivity() {
     matchingIndex === matchingRounds.length - 1 &&
     matchingAnswered;
 
-  // SORTING LOGIC
+  // sorting logic
   const sortingCategories = useMemo(() => {
     if (selectedActivity?.type !== "SORTING") return [];
 
-    const keys = Array.from(
-      new Set(
-        (selectedActivity.items || [])
-          .map((item) => item.categoryKey)
-          .filter(Boolean)
-      )
+    return Array.from(
+      new Set((selectedActivity.items || []).map((item) => item.categoryKey).filter(Boolean))
     );
-
-    return keys;
   }, [selectedActivity]);
 
   const sortingRemaining = sortingItems.filter((x) => !x.placed);
@@ -359,310 +508,408 @@ export default function MatchingSortingActivity() {
     sortingItems.length > 0 &&
     sortingItems.every((x) => x.placed);
 
-  function handleSelectSortingItem(itemId) {
-    setSelectedSortingItemId(itemId);
-  }
+  function handleDropToBucket(itemId, bucket) {
+    const chosenItem = sortingItems.find((item) => String(item.id) === String(itemId));
+    if (!chosenItem) return;
 
-  function handleChooseBucket(categoryKey) {
-    const chosenItem = sortingItems.find(
-      (item) => String(item.id) === String(selectedSortingItemId)
-    );
-
-    if (!chosenItem) {
-      toast.error("Select an item first.");
-      return;
-    }
-
-    const isCorrect = (chosenItem.categoryKey || "") === categoryKey;
+    const isCorrect = (chosenItem.categoryKey || "") === bucket;
 
     if (isCorrect) {
       setSortingItems((prev) =>
         prev.map((item) =>
-          String(item.id) === String(chosenItem.id)
-            ? { ...item, placed: true }
-            : item
+          String(item.id) === String(itemId) ? { ...item, placed: true } : item
         )
       );
-      setSelectedSortingItemId(null);
+      setSortingFeedback({
+        type: "success",
+        text: `"${chosenItem.label}" was placed in the correct bucket.`,
+      });
       setScore((prev) => prev + 1);
       toast.success("Correct category!");
     } else {
-      toast.error("That bucket is not correct.");
+      setSortingFeedback({
+        type: "error",
+        text: `"${chosenItem.label}" does not belong in ${prettyLabel(bucket)}.`,
+      });
+      toast.error("Wrong bucket.");
     }
+
+    setDraggingItemId(null);
   }
 
   const titleCount = filteredActivities.length;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
 
       <main className="mx-auto max-w-7xl px-6 py-10">
-        <div className="rounded-3xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-blue-100 p-3 text-blue-600">
-              <FaGamepad />
-            </div>
-            <div>
-              <h1 className="text-3xl font-semibold text-gray-900">
-                Matching & Sorting Activities
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm text-gray-600">
-                Interactive visual activities to help children practice matching, categorization,
-                and sorting skills in a structured way.
-              </p>
-            </div>
-          </div>
+        <div className="rounded-3xl border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-indigo-50 p-6 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="rounded-2xl bg-blue-100 p-4 text-2xl text-blue-600">
+                <FaGamepad />
+              </div>
+              <div>
+                <h1 className="text-3xl font-semibold text-gray-900">
+                  Matching & Sorting Activities
+                </h1>
+                <p className="mt-2 max-w-3xl text-sm text-gray-600">
+                  Guided activities with visual memory matching and drag-and-drop sorting.
+                </p>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            {TYPE_OPTIONS.map((opt) => (
-              <TypeButton
-                key={opt}
-                active={typeFilter === opt}
-                onClick={() => handleTypeFilter(opt)}
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <StatBadge color="blue">
+                    {titleCount} Activit{titleCount === 1 ? "y" : "ies"}
+                  </StatBadge>
+                  {selectedActivity ? (
+                    <>
+                      <StatBadge color="purple">{prettyLabel(selectedActivity.type)}</StatBadge>
+                      <StatBadge color="green">Score: {score}</StatBadge>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {currentStep === 3 && selectedActivity ? (
+              <button
+                type="button"
+                onClick={restartCurrentActivity}
+                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
-                {prettyLabel(opt)}
-              </TypeButton>
-            ))}
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <StatBadge color="blue">
-              {titleCount} Activit{titleCount === 1 ? "y" : "ies"}
-            </StatBadge>
-
-            {selectedActivity ? (
-              <>
-                <StatBadge color="purple">{prettyLabel(selectedActivity.type)}</StatBadge>
-                <StatBadge color="green">Score: {score}</StatBadge>
-              </>
+                <FaRotateLeft />
+                Restart Activity
+              </button>
             ) : null}
           </div>
         </div>
 
-        <section className="mt-8">
-          <div className="mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Choose Activity</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Select an active matching or sorting set created by the admin.
-            </p>
-          </div>
+        <div className="mt-8">
+          <StepProgress currentStep={currentStep} />
+        </div>
 
-          {loading ? (
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
-              Loading activities...
-            </div>
-          ) : (
-            <ActivityPicker
-              activities={filteredActivities}
-              selectedId={selectedActivityId}
-              onSelect={handleSelectActivity}
-            />
-          )}
-        </section>
-
-        {selectedActivity ? (
-          <section className="mt-10 space-y-8">
-            <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <StatBadge color="purple">{prettyLabel(selectedActivity.type)}</StatBadge>
-                    <StatBadge color="blue">
-                      {(selectedActivity.items || []).length} Item
-                      {(selectedActivity.items || []).length !== 1 ? "s" : ""}
-                    </StatBadge>
-                  </div>
-
-                  <h2 className="text-2xl font-semibold text-gray-900">
-                    {selectedActivity.title}
-                  </h2>
-
-                  {selectedActivity.description ? (
-                    <p className="mt-2 max-w-3xl text-sm text-gray-600">
-                      {selectedActivity.description}
-                    </p>
-                  ) : null}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={restartCurrentActivity}
-                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  <FaRotateLeft />
-                  Restart Activity
-                </button>
+        <div className="mt-8">
+          {currentStep === 1 && (
+            <ScreenCard
+              title="Step 1: Choose Activity Type"
+              description="Select which type of activity you want to browse."
+            >
+              <div className="flex flex-wrap gap-3">
+                {TYPE_OPTIONS.map((opt) => (
+                  <TypeButton
+                    key={opt}
+                    active={typeFilter === opt}
+                    onClick={() => handleTypeChange(opt)}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <FaFilter />
+                      {prettyLabel(opt)}
+                    </span>
+                  </TypeButton>
+                ))}
               </div>
-            </div>
+            </ScreenCard>
+          )}
 
-            {selectedActivity.type === "MATCHING" ? (
-              <section className="space-y-6">
-                <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Visual Matching</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Find the image that matches the prompt card.
-                      </p>
-                    </div>
+          {currentStep === 2 && (
+            <ScreenCard
+              title="Step 2: Choose Activity"
+              description="Pick one activity from the list below."
+            >
+              {loading ? (
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-6 text-sm text-gray-600">
+                  Loading activities...
+                </div>
+              ) : filteredActivities.length === 0 ? (
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-6 text-sm text-gray-600">
+                  No activities available for this type.
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {filteredActivities.map((activity) => (
+                    <ActivityCard
+                      key={activity.id}
+                      activity={activity}
+                      selected={String(selectedActivityId) === String(activity.id)}
+                      onClick={() => setSelectedActivityId(String(activity.id))}
+                    />
+                  ))}
+                </div>
+              )}
+            </ScreenCard>
+          )}
 
-                    <div className="flex flex-wrap gap-2">
+          {currentStep === 3 && (
+            <ScreenCard
+              title="Step 3: Play Activity"
+              description="Complete the selected activity one action at a time."
+            >
+              {!selectedActivity ? (
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-6 text-sm text-gray-600">
+                  No activity selected.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="rounded-3xl border border-gray-100 bg-slate-50 p-5">
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <StatBadge color="purple">{prettyLabel(selectedActivity.type)}</StatBadge>
                       <StatBadge color="blue">
-                        {Math.min(matchingIndex + 1, matchingRounds.length)} / {matchingRounds.length}
+                        {(selectedActivity.items || []).length} Item
+                        {(selectedActivity.items || []).length !== 1 ? "s" : ""}
                       </StatBadge>
-                      <StatBadge color="green">Score: {score}</StatBadge>
                     </div>
+
+                    <h2 className="text-2xl font-semibold text-gray-900">
+                      {selectedActivity.title}
+                    </h2>
+
+                    {selectedActivity.description ? (
+                      <p className="mt-2 text-sm text-gray-600">{selectedActivity.description}</p>
+                    ) : null}
                   </div>
 
-                  {!currentMatchingRound ? (
-                    <div className="rounded-2xl border border-gray-100 bg-gray-50 p-6 text-sm text-gray-600">
-                      No valid matching rounds found for this activity.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="mb-6">
-                        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-blue-700">
-                          <FaBullseye />
-                          Prompt Card
+                  {selectedActivity.type === "MATCHING" && (
+                    <section className="space-y-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">Visual Matching</h3>
+                          <p className="mt-1 text-sm text-gray-500">
+                            First remember the image, then choose it again after the shuffle.
+                          </p>
                         </div>
 
-                        <div className="max-w-sm">
-                          <ImageCard item={currentMatchingRound.prompt} disabled />
+                        <div className="flex flex-wrap gap-2">
+                          <StatBadge color="blue">
+                            {Math.min(matchingIndex + 1, matchingRounds.length)} /{" "}
+                            {matchingRounds.length}
+                          </StatBadge>
+                          <StatBadge color="green">Score: {score}</StatBadge>
                         </div>
                       </div>
 
-                      <div>
-                        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                          <FaPuzzlePiece />
-                          Choose the matching image
+                      {!currentMatchingRound ? (
+                        <div className="rounded-2xl border border-gray-100 bg-gray-50 p-6 text-sm text-gray-600">
+                          No valid matching rounds found for this activity.
+                        </div>
+                      ) : (
+                        <>
+                          {matchingPhase === "PROMPT" && (
+                            <div className="rounded-3xl border border-blue-100 bg-blue-50 p-6">
+                              <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-blue-700">
+                                <FaBullseye />
+                                Remember This Image
+                              </div>
+
+                              <div className="mx-auto max-w-sm">
+                                <ImageCard item={currentMatchingRound.prompt} disabled />
+                              </div>
+
+                              <div className="mt-6 flex justify-center">
+                                <button
+                                  type="button"
+                                  onClick={revealMatchingAnswers}
+                                  className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
+                                >
+                                  <FaArrowRight />
+                                  Shuffle Cards
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {matchingPhase === "SHUFFLING" && <ShuffleAnimationCard />}
+
+                          {matchingPhase === "ANSWER" && (
+                            <>
+                              <div className="rounded-3xl border border-gray-100 bg-white p-5">
+                                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                  <FaPuzzlePiece />
+                                  Which image did you see before?
+                                </div>
+
+                                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                  {currentMatchingRound.options.map((option, index) => {
+                                    const isSelected =
+                                      String(matchingSelectedOptionId) === String(option.id);
+
+                                    return (
+                                      <ImageCard
+                                        key={`${option.id}-${index}`}
+                                        item={option}
+                                        disabled={matchingAnswered}
+                                        selected={isSelected}
+                                        correct={false}
+                                        wrong={matchingAnswered && isSelected && !matchingWasCorrect}
+                                        onClick={() => handleMatchingSelect(option)}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              <div className="rounded-2xl bg-gray-50 p-4">
+                                {!matchingAnswered ? (
+                                  <div className="text-sm font-medium text-gray-600">
+                                    Tap the image that was shown earlier.
+                                  </div>
+                                ) : matchingWasCorrect ? (
+                                  <div className="inline-flex items-center gap-2 rounded-xl bg-green-100 px-4 py-3 text-sm font-semibold text-green-700">
+                                    <FaCheck />
+                                    Great job. You remembered correctly.
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center gap-2 rounded-xl bg-red-100 px-4 py-3 text-sm font-semibold text-red-700">
+                                    <FaXmark />
+                                    That was not the correct image.
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex flex-wrap gap-3">
+                                {matchingAnswered ? (
+                                  <button
+                                    type="button"
+                                    onClick={goToNextMatchingRound}
+                                    className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
+                                  >
+                                    <FaArrowRight />
+                                    {matchingCompleted ? "Finish Activity" : "Next Question"}
+                                  </button>
+                                ) : (
+                                  <div className="rounded-xl bg-gray-100 px-4 py-3 text-sm text-gray-600">
+                                    Choose one answer to continue.
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </section>
+                  )}
+
+                  {selectedActivity.type === "SORTING" && (
+                    <section className="space-y-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">Sorting Activity</h3>
+                          <p className="mt-1 text-sm text-gray-500">
+                            Drag an item card and drop it into the correct bucket.
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <StatBadge color="blue">
+                            {sortingCompletedCount} / {sortingItems.length} Sorted
+                          </StatBadge>
+                          <StatBadge color="green">Score: {score}</StatBadge>
+                        </div>
+                      </div>
+
+                      <div className="rounded-3xl border border-gray-100 bg-white p-5">
+                        <div className="mb-4 text-sm font-semibold text-gray-700">
+                          Draggable Items
+                        </div>
+
+                        {sortingRemaining.length === 0 ? (
+                          <div className="rounded-2xl border border-green-100 bg-green-50 p-6 text-sm text-green-700">
+                            All items have been sorted successfully.
+                          </div>
+                        ) : (
+                          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            {sortingRemaining.map((item) => (
+                              <ImageCard
+                                key={item.id}
+                                item={item}
+                                draggable
+                                onDragStart={(e) => {
+                                  e.dataTransfer.setData("text/plain", String(item.id));
+                                  setDraggingItemId(String(item.id));
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="rounded-3xl border border-blue-100 bg-blue-50 p-5">
+                        <div className="mb-4 text-sm font-semibold text-blue-700">
+                          Drag Into a Bucket
                         </div>
 
                         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                          {currentMatchingRound.options.map((option, index) => (
-                            <ImageCard
-                              key={`${option.id}-${index}`}
-                              item={option}
-                              disabled={matchingAnswered}
-                              onClick={() => handleMatchingSelect(option)}
+                          {sortingCategories.map((bucket) => (
+                            <BucketDropZone
+                              key={bucket}
+                              bucket={bucket}
+                              isActive={Boolean(draggingItemId)}
+                              onDropItem={handleDropToBucket}
                             />
                           ))}
                         </div>
                       </div>
 
-                      <div className="mt-6 flex flex-wrap gap-3">
-                        {matchingAnswered ? (
-                          <button
-                            type="button"
-                            onClick={goToNextMatchingRound}
-                            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
-                          >
-                            <FaArrowRight />
-                            {matchingCompleted ? "Finish Activity" : "Next"}
-                          </button>
+                      <div className="rounded-2xl bg-gray-50 p-4">
+                        {sortingAllDone ? (
+                          <div className="inline-flex items-center gap-2 rounded-xl bg-green-100 px-4 py-3 text-sm font-semibold text-green-700">
+                            <FaCheck />
+                            Sorting activity completed!
+                          </div>
+                        ) : sortingFeedback?.type === "success" ? (
+                          <div className="inline-flex items-center gap-2 rounded-xl bg-green-100 px-4 py-3 text-sm font-semibold text-green-700">
+                            <FaCheck />
+                            {sortingFeedback.text}
+                          </div>
+                        ) : sortingFeedback?.type === "error" ? (
+                          <div className="inline-flex items-center gap-2 rounded-xl bg-red-100 px-4 py-3 text-sm font-semibold text-red-700">
+                            <FaXmark />
+                            {sortingFeedback.text}
+                          </div>
                         ) : (
-                          <div className="rounded-xl bg-gray-100 px-4 py-3 text-sm text-gray-600">
-                            Select one answer to continue.
+                          <div className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-600">
+                            Drag a card into one of the buckets.
                           </div>
                         )}
                       </div>
-                    </>
+                    </section>
                   )}
                 </div>
-              </section>
-            ) : null}
+              )}
+            </ScreenCard>
+          )}
+        </div>
 
-            {selectedActivity.type === "SORTING" ? (
-              <section className="space-y-6">
-                <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Sorting Activity</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Select an item, then click the correct category bucket.
-                      </p>
-                    </div>
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={handlePrevStep}
+            disabled={currentStep === 1}
+            className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 font-semibold ${
+              currentStep === 1
+                ? "cursor-not-allowed bg-gray-100 text-gray-400"
+                : "bg-white text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            <FaArrowLeft />
+            Back
+          </button>
 
-                    <div className="flex flex-wrap gap-2">
-                      <StatBadge color="blue">
-                        {sortingCompletedCount} / {sortingItems.length} Sorted
-                      </StatBadge>
-                      <StatBadge color="green">Score: {score}</StatBadge>
-                    </div>
-                  </div>
-
-                  <div className="mb-6">
-                    <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                      <FaLayerGroup />
-                      Items to Sort
-                    </div>
-
-                    {sortingRemaining.length === 0 ? (
-                      <div className="rounded-2xl border border-green-100 bg-green-50 p-6 text-sm text-green-700">
-                        All items have been sorted successfully.
-                      </div>
-                    ) : (
-                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                        {sortingRemaining.map((item) => (
-                          <ImageCard
-                            key={item.id}
-                            item={item}
-                            selected={String(selectedSortingItemId) === String(item.id)}
-                            onClick={() => handleSelectSortingItem(item.id)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                      <FaBullseye />
-                      Category Buckets
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                      {sortingCategories.map((bucket) => (
-                        <button
-                          key={bucket}
-                          type="button"
-                          onClick={() => handleChooseBucket(bucket)}
-                          className="rounded-3xl border border-dashed border-blue-200 bg-blue-50 p-6 text-center transition hover:border-blue-400 hover:bg-blue-100"
-                        >
-                          <div className="text-sm font-semibold uppercase tracking-wide text-blue-600">
-                            Bucket
-                          </div>
-                          <div className="mt-2 text-lg font-bold text-blue-900">
-                            {prettyLabel(bucket)}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-6">
-                    {sortingAllDone ? (
-                      <div className="inline-flex items-center gap-2 rounded-xl bg-green-100 px-4 py-3 text-sm font-semibold text-green-700">
-                        <FaCheck />
-                        Sorting activity completed!
-                      </div>
-                    ) : selectedSortingItemId ? (
-                      <div className="inline-flex items-center gap-2 rounded-xl bg-blue-100 px-4 py-3 text-sm font-semibold text-blue-700">
-                        <FaCheck />
-                        Item selected. Now choose the correct bucket.
-                      </div>
-                    ) : (
-                      <div className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-600">
-                        <FaXmark />
-                        Select an item first.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-            ) : null}
-          </section>
-        ) : null}
+          {currentStep < 3 ? (
+            <button
+              type="button"
+              onClick={handleNextStep}
+              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
+            >
+              {currentStep === 2 ? <FaPlay /> : <FaArrowRight />}
+              {currentStep === 2 ? "Start Activity" : "Next"}
+            </button>
+          ) : (
+            <div className="rounded-2xl bg-green-100 px-5 py-3 text-sm font-semibold text-green-700">
+              You are now in the activity screen
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
