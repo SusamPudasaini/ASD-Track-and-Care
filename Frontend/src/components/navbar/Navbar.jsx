@@ -12,6 +12,14 @@ import {
   FaAnglesRight,
   FaComments,
   FaGamepad,
+  FaChevronDown,
+  FaBars,
+  FaXmark,
+  FaHouse,
+  FaClipboardList,
+  FaUserDoctor,
+  FaPuzzlePiece,
+  FaToolbox,
 } from "react-icons/fa6";
 import api from "../../api/axios";
 
@@ -42,7 +50,12 @@ export default function Navbar() {
   const isLoggedIn = !!localStorage.getItem("token");
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [openDesktopDropdown, setOpenDesktopDropdown] = useState(null);
+  const [openMobileGroup, setOpenMobileGroup] = useState(null);
+
   const menuRef = useRef(null);
+  const desktopNavRef = useRef(null);
 
   const [me, setMe] = useState(getStoredMe);
   const [adminCollapsed, setAdminCollapsed] = useState(false);
@@ -102,16 +115,28 @@ export default function Navbar() {
 
   useEffect(() => {
     const onDocClick = (e) => {
-      if (!menuRef.current) return;
-      if (!menuRef.current.contains(e.target)) setMenuOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+      if (desktopNavRef.current && !desktopNavRef.current.contains(e.target)) {
+        setOpenDesktopDropdown(null);
+      }
     };
 
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
+  useEffect(() => {
+    setMobileNavOpen(false);
+    setOpenMobileGroup(null);
+    setOpenDesktopDropdown(null);
+  }, [location.pathname]);
+
   const go = (path) => {
     setMenuOpen(false);
+    setMobileNavOpen(false);
+    setOpenDesktopDropdown(null);
     navigate(path);
   };
 
@@ -120,18 +145,51 @@ export default function Navbar() {
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
-  const userLinks = [
-    { label: "Home", path: "/" },
-    { label: "AI Questionnaire", path: "/questionnaire" },
-    { label: "M-CHAT", path: "/mchat-questionnaire" },
-    { label: "Resource Hub", path: "/resources" },
-    { label: "Therapists", path: "/therapists" },
-    { label: "Bookings", path: "/bookings" },
-    { label: "Activities", path: "/activities" },
-    { label: "Day Care Finder", path: "/daycares" },
-    { label: "AAC Board", path: "/aac-board" },
-    { label: "First-Then Board", path: "/first-then" },
-      { label: "Matching & Sorting", path: "/activities/matching-sorting" },
+  const userMenuGroups = [
+    {
+      label: "Home",
+      icon: FaHouse,
+      type: "single",
+      path: "/",
+    },
+    {
+      label: "Assessments",
+      icon: FaClipboardList,
+      type: "group",
+      items: [
+        { label: "AI Questionnaire", path: "/questionnaire" },
+        { label: "M-CHAT", path: "/mchat-questionnaire" },
+      ],
+    },
+    {
+      label: "Support",
+      icon: FaUserDoctor,
+      type: "group",
+      items: [
+        { label: "Resource Hub", path: "/resources" },
+        { label: "Therapists", path: "/therapists" },
+        { label: "Bookings", path: "/bookings" },
+        { label: "Day Care Finder", path: "/daycares" },
+      ],
+    },
+    {
+      label: "Activities",
+      icon: FaPuzzlePiece,
+      type: "group",
+      items: [
+        { label: "Activities Hub", path: "/activities" },
+        { label: "Matching & Sorting", path: "/activities/matching-sorting" },
+      ],
+    },
+    {
+      label: "Tools",
+      icon: FaToolbox,
+      type: "group",
+      items: [
+        { label: "AAC Board", path: "/aac-board" },
+        { label: "First-Then Board", path: "/first-then" },
+      ],
+    },
   ];
 
   const therapistLinks = [
@@ -148,9 +206,8 @@ export default function Navbar() {
     { label: "Manage Resources", path: "/admin/resources", icon: FaBookOpen },
     { label: "Manage M-CHAT Questions", path: "/admin/mchat-questions", icon: FaCircleQuestion },
     { label: "Manage Day Cares", path: "/admin/daycares", icon: FaSchool },
-  { label: "Manage AAC Cards", path: "/admin/aac-cards", icon: FaComments },
-  { label: "Manage Matching & Sorting", path: "/admin/matching-sorting", icon: FaGamepad },
-
+    { label: "Manage AAC Cards", path: "/admin/aac-cards", icon: FaComments },
+    { label: "Manage Matching & Sorting", path: "/admin/matching-sorting", icon: FaGamepad },
   ];
 
   const desktopLinks =
@@ -158,7 +215,7 @@ export default function Navbar() {
       ? therapistLinks
       : role === "ADMIN" && isLoggedIn
       ? []
-      : userLinks;
+      : userMenuGroups;
 
   const sidebarWidth = adminCollapsed ? 96 : 288;
 
@@ -166,6 +223,8 @@ export default function Navbar() {
     role === "ADMIN" && isLoggedIn
       ? "sticky top-0 z-[9997] h-16 border-b border-slate-200 bg-white"
       : "sticky top-0 z-[9999] w-full border-b border-slate-100 bg-white/95 backdrop-blur";
+
+  const isGroupActive = (items = []) => items.some((item) => isActive(item.path));
 
   return (
     <>
@@ -306,34 +365,123 @@ export default function Navbar() {
           <div className="flex items-center justify-between gap-4">
             <Link
               to={role === "ADMIN" && isLoggedIn ? "/admin/request" : "/"}
-              className="flex items-center"
+              className="flex shrink-0 items-center"
             >
               {!(role === "ADMIN" && isLoggedIn) && (
-                <img src="/images/logo/asd-logo.png" alt="ASD" className="h-10" />
+                <img src="/images/logo/asd-logo.png" alt="ASD" className="h-10 md:h-11" />
               )}
             </Link>
 
             {!(role === "ADMIN" && isLoggedIn) && (
-              <nav className="hidden items-center gap-6 text-sm font-medium text-slate-700 md:flex">
-                {desktopLinks.map((item) => (
-                  <button
-                    key={item.path}
-                    type="button"
-                    onClick={() => go(item.path)}
-                    className={`transition ${
-                      isActive(item.path)
-                        ? "font-semibold text-[#4a6cf7]"
-                        : "hover:text-slate-900"
-                    }`}
+              <>
+                {role === "USER" ? (
+                  <nav
+                    ref={desktopNavRef}
+                    className="hidden items-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-2 py-2 shadow-sm md:flex"
                   >
-                    {item.label}
-                  </button>
-                ))}
-              </nav>
+                    {desktopLinks.map((item) => {
+                      if (item.type === "single") {
+                        return (
+                          <button
+                            key={item.path}
+                            type="button"
+                            onClick={() => go(item.path)}
+                            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                              isActive(item.path)
+                                ? "bg-indigo-50 text-indigo-700"
+                                : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      }
+
+                      const active = isGroupActive(item.items);
+                      const opened = openDesktopDropdown === item.label;
+
+                      return (
+                        <div key={item.label} className="relative">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenDesktopDropdown((prev) =>
+                                prev === item.label ? null : item.label
+                              )
+                            }
+                            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                              active || opened
+                                ? "bg-indigo-50 text-indigo-700"
+                                : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                            }`}
+                          >
+                            <span>{item.label}</span>
+                            <FaChevronDown
+                              className={`text-xs transition-transform ${
+                                opened ? "rotate-180" : ""
+                              }`}
+                            />
+                          </button>
+
+                          {opened && (
+                            <div className="absolute left-0 top-full z-[10000] mt-3 w-64 overflow-hidden rounded-2xl border border-slate-100 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.14)]">
+                              <div className="mb-1 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                                {item.label}
+                              </div>
+
+                              {item.items.map((subItem) => (
+                                <button
+                                  key={subItem.path}
+                                  type="button"
+                                  onClick={() => go(subItem.path)}
+                                  className={`flex w-full items-center rounded-xl px-3 py-3 text-left text-sm font-medium transition ${
+                                    isActive(subItem.path)
+                                      ? "bg-indigo-50 text-indigo-700"
+                                      : "text-slate-700 hover:bg-slate-50"
+                                  }`}
+                                >
+                                  {subItem.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </nav>
+                ) : (
+                  <nav className="hidden items-center gap-6 text-sm font-medium text-slate-700 md:flex">
+                    {desktopLinks.map((item) => (
+                      <button
+                        key={item.path}
+                        type="button"
+                        onClick={() => go(item.path)}
+                        className={`transition ${
+                          isActive(item.path)
+                            ? "font-semibold text-[#4a6cf7]"
+                            : "hover:text-slate-900"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </nav>
+                )}
+              </>
             )}
 
             {!(role === "ADMIN" && isLoggedIn) && (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                {role === "USER" && (
+                  <button
+                    type="button"
+                    onClick={() => setMobileNavOpen((s) => !s)}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 md:hidden"
+                  >
+                    {mobileNavOpen ? <FaXmark /> : <FaBars />}
+                  </button>
+                )}
+
                 {!isLoggedIn ? (
                   <>
                     <Link to="/login" className="text-sm font-semibold text-slate-700">
@@ -449,6 +597,85 @@ export default function Navbar() {
               </div>
             )}
           </div>
+
+          {!(role === "ADMIN" && isLoggedIn) && role === "USER" && mobileNavOpen && (
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:hidden">
+              <div className="space-y-2">
+                {userMenuGroups.map((group) => {
+                  if (group.type === "single") {
+                    return (
+                      <button
+                        key={group.path}
+                        type="button"
+                        onClick={() => go(group.path)}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${
+                          isActive(group.path)
+                            ? "bg-indigo-50 text-indigo-700"
+                            : "text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        <group.icon className="text-sm" />
+                        <span>{group.label}</span>
+                      </button>
+                    );
+                  }
+
+                  const expanded = openMobileGroup === group.label;
+                  const active = isGroupActive(group.items);
+
+                  return (
+                    <div
+                      key={group.label}
+                      className="overflow-hidden rounded-xl border border-slate-100"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenMobileGroup((prev) =>
+                            prev === group.label ? null : group.label
+                          )
+                        }
+                        className={`flex w-full items-center justify-between px-3 py-3 text-left text-sm font-semibold transition ${
+                          active || expanded
+                            ? "bg-indigo-50 text-indigo-700"
+                            : "bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="flex items-center gap-3">
+                          <group.icon className="text-sm" />
+                          {group.label}
+                        </span>
+                        <FaChevronDown
+                          className={`text-xs transition-transform ${
+                            expanded ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+
+                      {expanded && (
+                        <div className="border-t border-slate-100 bg-slate-50/60 p-2">
+                          {group.items.map((item) => (
+                            <button
+                              key={item.path}
+                              type="button"
+                              onClick={() => go(item.path)}
+                              className={`flex w-full rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                                isActive(item.path)
+                                  ? "bg-white font-semibold text-indigo-700"
+                                  : "text-slate-700 hover:bg-white"
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </header>
     </>

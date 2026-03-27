@@ -38,7 +38,16 @@ public class SecurityConfig {
                 // allow preflight
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // ✅ allow serving uploaded images publicly
+                // Swagger / OpenAPI
+                .requestMatchers(
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/v3/api-docs/**",
+                    "/v3/api-docs",
+                    "/webjars/**"
+                ).permitAll()
+
+                // allow serving uploaded images publicly
                 .requestMatchers("/uploads/**").permitAll()
 
                 // spring default error endpoint
@@ -50,7 +59,7 @@ public class SecurityConfig {
                 // ADMIN ONLY
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                // THERAPIST ONLY (for therapist actions later)
+                // THERAPIST ONLY
                 .requestMatchers("/api/therapist/**").hasRole("THERAPIST")
 
                 // Any logged-in user
@@ -71,8 +80,9 @@ public class SecurityConfig {
         config.setAllowCredentials(true);
 
         config.setAllowedOriginPatterns(List.of(
-                "http://localhost:*",
-                "http://127.0.0.1:*"
+            "http://localhost:*",
+            "http://127.0.0.1:*",
+            "https://kaley-vellicative-lucca.ngrok-free.dev:*"
         ));
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
