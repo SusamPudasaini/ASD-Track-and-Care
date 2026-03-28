@@ -11,7 +11,6 @@ import com.ASD_Track_and_Care.backend.model.User;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
 
-    boolean existsByUsername(String username);
     boolean existsByUserEmail(String userEmail);
 
     Optional<User> findByVerificationToken(String verificationToken);
@@ -21,6 +20,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
  
     List<User> findAllByRole(Role role);
 
-
-
+    boolean existsByUsername(String username);
+    boolean existsByUserEmailIgnoreCase(String userEmail);
+    boolean existsByPhoneNumber(String phoneNumber);
 }

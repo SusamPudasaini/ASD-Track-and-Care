@@ -1,6 +1,8 @@
 package com.ASD_Track_and_Care.backend.controller;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,10 +28,17 @@ import com.ASD_Track_and_Care.backend.service.EmailService;
 @CrossOrigin(origins = "http://localhost:5173")
 public class AuthController {
 
-    @Autowired private UserRepository userRepository;
-    @Autowired private PasswordEncoder passwordEncoder;
-    @Autowired private JwtUtil jwtUtil;
-    @Autowired private EmailService emailService;
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private EmailService emailService;
 
     @Value("${app.frontend.base-url}")
     private String frontendBaseUrl;
@@ -46,33 +55,69 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("All fields are required.");
         }
 
+        String firstName = request.getFirstName().trim();
+        String lastName = request.getLastName().trim();
         String username = request.getUsername().trim();
+        String phoneNumber = request.getPhoneNumber().trim();
         String email = request.getEmail().trim();
+        String password = request.getPassword();
+
+        if (firstName.length() < 2) {
+            return ResponseEntity.badRequest().body("First name must be at least 2 characters.");
+        }
+
+        if (lastName.length() < 2) {
+            return ResponseEntity.badRequest().body("Last name must be at least 2 characters.");
+        }
+
+        if (!username.matches("^[a-zA-Z0-9_]{3,20}$")) {
+            return ResponseEntity.badRequest()
+                    .body("Username must be 3–20 characters using letters, numbers or underscore.");
+        }
+
+        if (!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            return ResponseEntity.badRequest().body("Please enter a valid email address.");
+        }
+
+        String digitsOnlyPhone = phoneNumber.replaceAll("\\D", "");
+        if (digitsOnlyPhone.length() < 7 || digitsOnlyPhone.length() > 15) {
+            return ResponseEntity.badRequest().body("Enter a valid phone number (7–15 digits).");
+        }
+
+        if (password.length() < 6) {
+            return ResponseEntity.badRequest().body("Password must be at least 6 characters.");
+        }
+
+        if (!password.matches(".*[!@#$%^&*(),.?\":{}|<>].*")) {
+            return ResponseEntity.badRequest()
+                    .body("Password must contain at least one special character.");
+        }
 
         if (userRepository.existsByUsername(username)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Username is already taken.");
         }
-        if (userRepository.existsByUserEmail(email)) {
+
+        if (userRepository.existsByUserEmailIgnoreCase(email)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Email is already registered.");
+        }
+
+        if (userRepository.existsByPhoneNumber(phoneNumber)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Phone number is already registered.");
         }
 
         String token = UUID.randomUUID().toString();
         LocalDateTime expiry = LocalDateTime.now().plusMinutes(30);
 
         User user = new User();
-        user.setFirstName(request.getFirstName().trim());
-        user.setLastName(request.getLastName().trim());
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
         user.setUsername(username);
-        user.setPhoneNumber(request.getPhoneNumber().trim());
+        user.setPhoneNumber(phoneNumber);
         user.setUserEmail(email);
-
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-
+        user.setPassword(passwordEncoder.encode(password));
         user.setEmailVerified(false);
         user.setVerificationToken(token);
         user.setVerificationTokenExpiry(expiry);
-
-        // ✅ default role for new users
         user.setRole(Role.USER);
 
         userRepository.save(user);
@@ -82,6 +127,44 @@ public class AuthController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body("Signup successful. Please verify your email before logging in.");
+    }
+
+    @GetMapping("/check-availability")
+    public ResponseEntity<?> checkAvailability(
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String phoneNumber) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        if (username != null && !username.trim().isEmpty()) {
+            String cleanUsername = username.trim();
+            boolean usernameExists = userRepository.existsByUsername(cleanUsername);
+
+            response.put("usernameAvailable", !usernameExists);
+            response.put("usernameMessage",
+                    usernameExists ? "Username is already taken." : "Username is available.");
+        }
+
+        if (email != null && !email.trim().isEmpty()) {
+            String cleanEmail = email.trim();
+            boolean emailExists = userRepository.existsByUserEmailIgnoreCase(cleanEmail);
+
+            response.put("emailAvailable", !emailExists);
+            response.put("emailMessage",
+                    emailExists ? "Email is already registered." : "Email is available.");
+        }
+
+        if (phoneNumber != null && !phoneNumber.trim().isEmpty()) {
+            String cleanPhoneNumber = phoneNumber.trim();
+            boolean phoneExists = userRepository.existsByPhoneNumber(cleanPhoneNumber);
+
+            response.put("phoneAvailable", !phoneExists);
+            response.put("phoneMessage",
+                    phoneExists ? "Phone number is already registered." : "Phone number is available.");
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/verify")
@@ -124,27 +207,20 @@ public class AuthController {
 
         User user = userOpt.get();
 
-        // ✅ 1) CHECK PASSWORD FIRST
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("Invalid username or password");
         }
 
-        // ✅ 2) THEN CHECK EMAIL VERIFIED
         if (!user.isEmailVerified()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("EMAIL_NOT_VERIFIED");
         }
 
-        // ✅ include role in JWT
         String roleName = (user.getRole() == null) ? "USER" : user.getRole().name();
         String token = jwtUtil.generateToken(user.getUsername(), roleName);
 
         return ResponseEntity.ok(new LoginResponse(token));
-    }
-
-    private boolean isBlank(String s) {
-        return s == null || s.trim().isEmpty();
     }
 
     @PostMapping("/resend-verification")
@@ -155,7 +231,9 @@ public class AuthController {
         }
 
         Optional<User> userOpt = userRepository.findByUsername(req.getUsername().trim());
-        if (userOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found.");
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found.");
+        }
 
         User user = userOpt.get();
 
@@ -163,9 +241,9 @@ public class AuthController {
             return ResponseEntity.ok("Email already verified. You can login.");
         }
 
-        String token = java.util.UUID.randomUUID().toString();
+        String token = UUID.randomUUID().toString();
         user.setVerificationToken(token);
-        user.setVerificationTokenExpiry(java.time.LocalDateTime.now().plusMinutes(30));
+        user.setVerificationTokenExpiry(LocalDateTime.now().plusMinutes(30));
         userRepository.save(user);
 
         String verifyLink = frontendBaseUrl + "/verify-email?token=" + token;
@@ -184,16 +262,15 @@ public class AuthController {
         String email = req.getEmail().trim();
         Optional<User> userOpt = userRepository.findByUserEmail(email);
 
-        // Security: always return OK so attackers can't guess emails
         if (userOpt.isEmpty()) {
             return ResponseEntity.ok("If that email exists, a reset link was sent.");
         }
 
         User user = userOpt.get();
 
-        String token = java.util.UUID.randomUUID().toString();
+        String token = UUID.randomUUID().toString();
         user.setResetToken(token);
-        user.setResetTokenExpiry(java.time.LocalDateTime.now().plusMinutes(30));
+        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(30));
         userRepository.save(user);
 
         String resetLink = frontendBaseUrl + "/reset-password?token=" + token;
@@ -208,9 +285,11 @@ public class AuthController {
         if (req.getToken() == null || req.getToken().trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Reset token is required.");
         }
+
         if (req.getNewPassword() == null || req.getNewPassword().trim().isEmpty()) {
             return ResponseEntity.badRequest().body("New password is required.");
         }
+
         if (req.getNewPassword().length() < 6) {
             return ResponseEntity.badRequest().body("Password must be at least 6 characters.");
         }
@@ -223,8 +302,9 @@ public class AuthController {
         User user = userOpt.get();
 
         if (user.getResetTokenExpiry() == null ||
-            user.getResetTokenExpiry().isBefore(java.time.LocalDateTime.now())) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Reset token expired. Please request again.");
+            user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Reset token expired. Please request again.");
         }
 
         user.setPassword(passwordEncoder.encode(req.getNewPassword()));
@@ -233,5 +313,9 @@ public class AuthController {
         userRepository.save(user);
 
         return ResponseEntity.ok("Password reset successful. You can login now.");
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
     }
 }
