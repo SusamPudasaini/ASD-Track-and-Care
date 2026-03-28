@@ -12,8 +12,6 @@ import {
   faArrowRight,
   faArrowLeft,
   faCircleCheck,
-  faEye,
-  faEyeSlash,
   faIdBadge,
   faSpinner,
 } from "@fortawesome/free-solid-svg-icons";
@@ -68,7 +66,7 @@ function Input({
         className={`flex items-center rounded-2xl border bg-white px-4 transition ${
           error
             ? "border-red-400 ring-1 ring-red-100"
-            : "border-gray-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100"
+            : "border-gray-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500"
         }`}
       >
         <FontAwesomeIcon icon={icon} className="mr-3 text-sm text-gray-400" />
@@ -375,22 +373,22 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-white">
       <Navbar />
 
       <main className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-[-120px] top-20 h-72 w-72 rounded-full bg-blue-100/60 blur-3xl" />
-          <div className="absolute right-[-120px] bottom-10 h-80 w-80 rounded-full bg-indigo-100/60 blur-3xl" />
+          <div className="absolute left-[-120px] top-[30%] h-[300px] w-[300px] rotate-12 bg-blue-50" />
+          <div className="absolute right-[-150px] bottom-[20%] h-[350px] w-[350px] -rotate-12 bg-blue-50" />
         </div>
 
-        <div className="relative z-10 mx-auto flex min-h-[calc(100vh-90px)] items-center justify-center px-4 py-10 sm:px-6">
-          <div className="w-full max-w-4xl rounded-[28px] border border-white/70 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8 md:p-10">
+        <div className="relative z-10 mx-auto flex min-h-[calc(100vh-90px)] max-w-6xl items-center justify-center px-6 py-12">
+          <div className="w-full max-w-[720px] rounded-md bg-white px-8 py-10 shadow-md">
             <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-semibold text-gray-900">Sign up</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Complete the steps below to create your account.
+                <h1 className="text-[22px] font-semibold text-gray-900">Create your account</h1>
+                <p className="mt-2 text-sm text-gray-500">
+                  Complete the steps below to get started.
                 </p>
               </div>
 
@@ -399,7 +397,7 @@ export default function Signup() {
               </div>
             </div>
 
-            <div className="mb-10 flex items-center gap-3 sm:gap-4">
+            <div className="mb-8 flex items-center gap-3 sm:gap-4">
               <StepPill number={1} title="Your name" active={step === 1} completed={step > 1} />
               <div className="h-px flex-1 bg-gray-200" />
               <StepPill number={2} title="Account info" active={step === 2} completed={step > 2} />
@@ -408,7 +406,7 @@ export default function Signup() {
             </div>
 
             {isLoading && (
-              <div className="mb-8 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+              <div className="mb-8 rounded border border-blue-200 bg-blue-50 px-4 py-4">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
                     <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
@@ -419,7 +417,7 @@ export default function Signup() {
 
                 <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100">
                   <div
-                    className="h-full rounded-full bg-blue-600 transition-all duration-700 ease-in-out"
+                    className="h-full rounded-full bg-[#4a6cf7] transition-all duration-700 ease-in-out"
                     style={{ width: `${loadingProgress}%` }}
                   />
                 </div>
@@ -430,7 +428,7 @@ export default function Signup() {
               {step === 1 && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900">What’s your name?</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">What’s your name?</h3>
                     <p className="mt-1 text-sm text-gray-500">
                       Start with your personal details.
                     </p>
@@ -463,7 +461,7 @@ export default function Signup() {
                       type="button"
                       onClick={handleNextFromStep1}
                       disabled={isLoading}
-                      className="inline-flex min-w-[132px] items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
+                      className="inline-flex min-w-[132px] items-center justify-center gap-2 rounded bg-[#4a6cf7] px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#3f5ee0] disabled:cursor-not-allowed disabled:bg-blue-400"
                     >
                       Next
                       <FontAwesomeIcon icon={faArrowRight} />
@@ -475,7 +473,7 @@ export default function Signup() {
               {step === 2 && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900">Set up your account</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Set up your account</h3>
                     <p className="mt-1 text-sm text-gray-500">
                       These details must be unique before you continue.
                     </p>
@@ -531,7 +529,7 @@ export default function Signup() {
                       type="button"
                       onClick={handleBack}
                       disabled={checkingAvailability || isLoading}
-                      className="inline-flex min-w-[132px] items-center justify-center gap-2 rounded-2xl border border-gray-200 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex min-w-[132px] items-center justify-center gap-2 rounded border border-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <FontAwesomeIcon icon={faArrowLeft} />
                       Back
@@ -541,10 +539,10 @@ export default function Signup() {
                       type="button"
                       onClick={handleNextFromStep2}
                       disabled={checkingAvailability || isLoading}
-                      className={`inline-flex min-w-[160px] items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold text-white transition ${
+                      className={`inline-flex min-w-[160px] items-center justify-center gap-2 rounded px-6 py-2.5 text-sm font-semibold text-white transition ${
                         checkingAvailability || isLoading
                           ? "cursor-not-allowed bg-blue-400"
-                          : "bg-blue-600 hover:bg-blue-700"
+                          : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
                       }`}
                     >
                       {checkingAvailability ? (
@@ -566,7 +564,7 @@ export default function Signup() {
               {step === 3 && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900">Create a password</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Create a password</h3>
                     <p className="mt-1 text-sm text-gray-500">
                       Finish by securing your account.
                     </p>
@@ -586,9 +584,9 @@ export default function Signup() {
                         <button
                           type="button"
                           onClick={() => setShowPassword((s) => !s)}
-                          className="text-gray-500 transition hover:text-gray-700"
+                          className="text-gray-500 transition hover:text-gray-800"
                         >
-                          <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
+                          {showPassword ? "🙈" : "👁️"}
                         </button>
                       }
                     />
@@ -606,15 +604,15 @@ export default function Signup() {
                         <button
                           type="button"
                           onClick={() => setShowConfirm((s) => !s)}
-                          className="text-gray-500 transition hover:text-gray-700"
+                          className="text-gray-500 transition hover:text-gray-800"
                         >
-                          <FontAwesomeIcon icon={showConfirm ? faEyeSlash : faEye} />
+                          {showConfirm ? "🙈" : "👁️"}
                         </button>
                       }
                     />
                   </div>
 
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                  <div className="rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
                     Use at least 6 characters and include one special character.
                   </div>
 
@@ -623,7 +621,7 @@ export default function Signup() {
                       type="button"
                       onClick={handleBack}
                       disabled={isLoading}
-                      className="inline-flex min-w-[132px] items-center justify-center gap-2 rounded-2xl border border-gray-200 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex min-w-[132px] items-center justify-center gap-2 rounded border border-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <FontAwesomeIcon icon={faArrowLeft} />
                       Back
@@ -632,10 +630,10 @@ export default function Signup() {
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className={`inline-flex min-w-[185px] items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold text-white transition ${
+                      className={`inline-flex min-w-[185px] items-center justify-center gap-2 rounded px-6 py-2.5 text-sm font-semibold text-white transition ${
                         isLoading
                           ? "cursor-not-allowed bg-blue-400"
-                          : "bg-blue-600 hover:bg-blue-700"
+                          : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
                       }`}
                     >
                       {isLoading ? (
@@ -655,9 +653,9 @@ export default function Signup() {
               )}
             </form>
 
-            <p className="mt-8 text-center text-sm text-gray-600">
+            <p className="mt-6 text-center text-sm text-gray-600">
               Already have an account?{" "}
-              <Link to="/login" className="font-medium text-blue-600 hover:underline">
+              <Link to="/login" className="text-blue-600 hover:underline">
                 Sign in
               </Link>
             </p>
