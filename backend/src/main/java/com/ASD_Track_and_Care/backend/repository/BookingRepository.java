@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
@@ -12,11 +13,13 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     boolean existsByTherapistIdAndDateAndTime(Long therapistId, LocalDate date, String time);
 
-    // ✅ NEW: used to filter booked times from slots
     List<Booking> findAllByTherapistIdAndDate(Long therapistId, LocalDate date);
-    
+
     List<Booking> findAllByTherapistIdOrderByCreatedAtDesc(Long therapistId);
+
     List<Booking> findAllByTherapistIdAndDateAndTime(Long therapistId, LocalDate date, String time);
 
-    
+    Optional<Booking> findByKhaltiPidx(String khaltiPidx);
+
+    Optional<Booking> findByPurchaseOrderId(String purchaseOrderId);
 }

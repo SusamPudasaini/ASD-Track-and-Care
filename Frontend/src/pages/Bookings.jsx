@@ -19,13 +19,13 @@ import {
   FaEnvelope,
   FaXmark,
   FaUserGroup,
+  FaMoneyCheckDollar,
 } from "react-icons/fa6";
 
 const MY_BOOKINGS_ENDPOINT = "/api/bookings/me"; // GET
 const RESCHEDULE_ENDPOINT = (id) => `/api/bookings/${id}/reschedule`; // PUT { date, time }
 const CANCEL_ENDPOINT = (id) => `/api/bookings/${id}`; // DELETE
 
-// ✅ session duration (used for "COMPLETED" status)
 const SESSION_MINUTES = 30;
 
 function getErrorMessage(err) {
@@ -54,7 +54,6 @@ function todayISO() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// Parses "YYYY-MM-DD" + "HH:mm" into a Date in local time
 function parseLocalDateTime(dateStr, timeStr) {
   try {
     if (!dateStr || !timeStr) return null;
@@ -73,27 +72,117 @@ function addMinutes(dateObj, minutes) {
   return new Date(dateObj.getTime() + minutes * 60 * 1000);
 }
 
+function normalizeStatus(value, fallback = "") {
+  return String(value || fallback).trim().toUpperCase();
+}
+
+function getPaymentDisplay(paymentStatus) {
+  const p = normalizeStatus(paymentStatus, "UNKNOWN");
+
+  if (p === "COMPLETED") {
+    return {
+      label: "PAID",
+      className: "text-green-600",
+      icon: FaCircleCheck,
+    };
+  }
+
+  if (p === "FAILED" || p === "EXPIRED" || p === "USER CANCELED" || p === "USER CANCELLED") {
+    return {
+      label: p,
+      className: "text-red-600",
+      icon: FaCircleXmark,
+    };
+  }
+
+  return {
+    label: p,
+    className: "text-yellow-600",
+    icon: FaCircleInfo,
+  };
+}
+
+function getBookingDisplayStatus(bookingStatus, paymentStatus, date, time) {
+  const rawStatus = normalizeStatus(bookingStatus, "PENDING");
+  const rawPayment = normalizeStatus(paymentStatus, "UNKNOWN");
+
+  const isCancelled = rawStatus === "CANCELLED" || rawStatus === "CANCELED";
+
+  const start = parseLocalDateTime(date, time);
+  const end = start ? addMinutes(start, SESSION_MINUTES) : null;
+  const isCompletedByTime =
+    !isCancelled &&
+    rawStatus === "CONFIRMED" &&
+    end instanceof Date &&
+    !Number.isNaN(end) &&
+    end.getTime() < Date.now();
+
+  if (isCancelled) {
+    return {
+      label: "CANCELLED",
+      className: "text-red-600",
+      icon: FaCircleXmark,
+      disabled: true,
+      helperText: "This booking was cancelled.",
+    };
+  }
+
+  if (isCompletedByTime) {
+    return {
+      label: "COMPLETED",
+      className: "text-gray-600",
+      icon: FaCircleCheck,
+      disabled: true,
+      helperText: "This session is completed.",
+    };
+  }
+
+  if (rawPayment === "COMPLETED" && rawStatus === "PENDING") {
+    return {
+      label: "AWAITING THERAPIST APPROVAL",
+      className: "text-amber-600",
+      icon: FaCircleInfo,
+      disabled: false,
+      helperText: "Your payment was successful. The therapist still needs to approve this booking.",
+    };
+  }
+
+  if (rawStatus === "CONFIRMED") {
+    return {
+      label: "CONFIRMED",
+      className: "text-green-600",
+      icon: FaCircleCheck,
+      disabled: false,
+      helperText: "",
+    };
+  }
+
+  return {
+    label: rawStatus,
+    className: "text-blue-600",
+    icon: FaCircleInfo,
+    disabled: false,
+    helperText: "",
+  };
+}
+
 export default function Bookings() {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState([]);
 
-  // ✅ Search
   const [search, setSearch] = useState("");
 
-  // reschedule modal
   const [open, setOpen] = useState(false);
   const [activeBooking, setActiveBooking] = useState(null);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // available slots for reschedule
   const [slotsLoading, setSlotsLoading] = useState(false);
-  const [availableTimes, setAvailableTimes] = useState([]); // ["09:00","09:30"]
+  const [availableTimes, setAvailableTimes] = useState([]);
 
-  // cancel modal
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelBookingObj, setCancelBookingObj] = useState(null);
   const [canceling, setCanceling] = useState(false);
@@ -137,7 +226,6 @@ export default function Bookings() {
     return activeBooking?.therapistId || activeBooking?.therapist_id || activeBooking?.therapist?.id || null;
   }, [activeBooking]);
 
-  // ✅ Load available slots when reschedule modal is open AND date changes
   useEffect(() => {
     let mounted = true;
 
@@ -183,7 +271,7 @@ export default function Bookings() {
     return () => {
       mounted = false;
     };
-  }, [open, therapistId, date]); // intentionally NOT including time
+  }, [open, therapistId, date, time]);
 
   const reschedule = async () => {
     if (!activeBooking?.id) return;
@@ -254,7 +342,6 @@ export default function Bookings() {
     toast.error("Contact info not available.");
   };
 
-  // ✅ Search filter (therapist name/date/time/status)
   const filteredBookings = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return bookings;
@@ -264,8 +351,9 @@ export default function Bookings() {
       const d = String(b?.date || "").toLowerCase();
       const t = String(b?.time || "").toLowerCase();
       const s = String(b?.status || "").toLowerCase();
+      const p = String(b?.paymentStatus || "").toLowerCase();
 
-      return name.includes(q) || d.includes(q) || t.includes(q) || s.includes(q);
+      return name.includes(q) || d.includes(q) || t.includes(q) || s.includes(q) || p.includes(q);
     });
   }, [bookings, search]);
 
@@ -278,7 +366,7 @@ export default function Bookings() {
           <div>
             <h1 className="text-3xl font-semibold text-gray-900">Booking History</h1>
             <p className="mt-1 text-sm text-gray-600">
-              View your bookings, reschedule sessions, cancel, or contact your therapist.
+              View your bookings, payment progress, reschedule sessions, cancel, or contact your therapist.
             </p>
           </div>
 
@@ -291,7 +379,6 @@ export default function Bookings() {
           </button>
         </div>
 
-        {/* Search bar */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative w-full sm:max-w-md">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -300,7 +387,7 @@ export default function Bookings() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by therapist, date, time, or status..."
+              placeholder="Search by therapist, date, time, booking status, or payment..."
               className="w-full rounded-full border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
@@ -322,7 +409,6 @@ export default function Bookings() {
           </div>
         </div>
 
-        {/* Cards grid */}
         <div className="mt-6">
           {loading ? (
             <div className="text-sm text-gray-600">Loading bookings...</div>
@@ -377,36 +463,20 @@ export default function Bookings() {
 function BookingCard({ b, onReschedule, onCancel, onContact }) {
   const therapistName = b.therapistName || "Therapist";
 
-  const rawStatus = (b.status || "CONFIRMED").toString().trim().toUpperCase();
-  const isCancelled = rawStatus === "CANCELLED" || rawStatus === "CANCELED";
+  const bookingDisplay = getBookingDisplayStatus(b.status, b.paymentStatus, b.date, b.time);
+  const paymentDisplay = getPaymentDisplay(b.paymentStatus);
 
-  // ✅ Completed only after session duration has passed
-  const start = parseLocalDateTime(b.date, b.time);
-  const end = start ? addMinutes(start, SESSION_MINUTES) : null;
-  const isCompleted = !isCancelled && end instanceof Date && !Number.isNaN(end) && end.getTime() < Date.now();
+  const BookingStatusIcon = bookingDisplay.icon;
+  const PaymentStatusIcon = paymentDisplay.icon;
 
-  const displayStatus = isCancelled ? "CANCELLED" : isCompleted ? "COMPLETED" : rawStatus;
-
-  const statusClass =
-    displayStatus === "CANCELLED"
-      ? "text-red-600"
-      : displayStatus === "COMPLETED"
-      ? "text-gray-600"
-      : "text-green-600";
-
-  const StatusIcon =
-    displayStatus === "CANCELLED"
-      ? FaCircleXmark
-      : displayStatus === "COMPLETED"
-      ? FaCircleCheck
-      : FaCircleInfo;
-
-  const actionsDisabled = isCancelled || isCompleted;
+  const actionsDisabled =
+    normalizeStatus(b.status) === "CANCELLED" ||
+    bookingDisplay.label === "COMPLETED";
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 w-full">
           <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
             <FaUserDoctor className="text-[#4a6cf7]" />
             <span className="truncate">{therapistName}</span>
@@ -430,13 +500,36 @@ function BookingCard({ b, onReschedule, onCancel, onContact }) {
             </div>
 
             <div className="flex items-center justify-between gap-4">
-              <span>Status</span>
-              <span className={`inline-flex items-center gap-2 font-semibold ${statusClass}`}>
-                <StatusIcon />
-                {displayStatus}
+              <span>Booking</span>
+              <span className={`inline-flex items-center gap-2 text-right font-semibold ${bookingDisplay.className}`}>
+                <BookingStatusIcon />
+                {bookingDisplay.label}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <span className="inline-flex items-center gap-2">
+                <FaMoneyCheckDollar className="text-gray-400" />
+                Payment
+              </span>
+              <span className={`inline-flex items-center gap-2 text-right font-semibold ${paymentDisplay.className}`}>
+                <PaymentStatusIcon />
+                {paymentDisplay.label}
               </span>
             </div>
           </div>
+
+          {b?.therapistMessage ? (
+            <div className="mt-4 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+              <span className="font-semibold">Therapist note:</span> {b.therapistMessage}
+            </div>
+          ) : null}
+
+          {bookingDisplay.helperText ? (
+            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
+              {bookingDisplay.helperText}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -470,7 +563,9 @@ function BookingCard({ b, onReschedule, onCancel, onContact }) {
         </div>
       ) : (
         <div className="mt-6 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
-          {displayStatus === "COMPLETED" ? "This session is completed." : "This booking was cancelled."}
+          {bookingDisplay.label === "COMPLETED"
+            ? "This session is completed."
+            : "This booking was cancelled."}
         </div>
       )}
     </div>

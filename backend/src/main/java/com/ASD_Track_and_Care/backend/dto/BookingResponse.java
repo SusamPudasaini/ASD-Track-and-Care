@@ -6,6 +6,10 @@ public class BookingResponse {
     private String time;
     private String status;
 
+    private String paymentStatus;
+    private String khaltiPidx;
+    private String paymentUrl;
+
     // therapist details
     private Long therapistId;
     private String therapistName;
@@ -13,14 +17,13 @@ public class BookingResponse {
     private String therapistPhone;
     private String therapistProfilePictureUrl;
 
-    // user/patient details (booker)
+    // user/patient details
     private Long userId;
     private String userName;
     private String userEmail;
     private String userPhone;
     private String userProfilePictureUrl;
 
-    // ✅ NEW: therapist message (cancel reason / note)
     private String therapistMessage;
 
     public Long getId() { return id; }
@@ -34,6 +37,15 @@ public class BookingResponse {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public String getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+
+    public String getKhaltiPidx() { return khaltiPidx; }
+    public void setKhaltiPidx(String khaltiPidx) { this.khaltiPidx = khaltiPidx; }
+
+    public String getPaymentUrl() { return paymentUrl; }
+    public void setPaymentUrl(String paymentUrl) { this.paymentUrl = paymentUrl; }
 
     public Long getTherapistId() { return therapistId; }
     public void setTherapistId(Long therapistId) { this.therapistId = therapistId; }
@@ -65,7 +77,6 @@ public class BookingResponse {
     public String getUserProfilePictureUrl() { return userProfilePictureUrl; }
     public void setUserProfilePictureUrl(String userProfilePictureUrl) { this.userProfilePictureUrl = userProfilePictureUrl; }
 
-    // ✅ NEW getter/setter
     public String getTherapistMessage() { return therapistMessage; }
     public void setTherapistMessage(String therapistMessage) { this.therapistMessage = therapistMessage; }
 }

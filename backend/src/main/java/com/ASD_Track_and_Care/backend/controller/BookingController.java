@@ -30,6 +30,14 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.createBooking(authentication, req));
     }
 
+    @PostMapping("/confirm-khalti")
+    public ResponseEntity<BookingResponse> confirmKhalti(
+            Authentication authentication,
+            @RequestParam("pidx") String pidx
+    ) {
+        return ResponseEntity.ok(bookingService.confirmKhaltiPayment(pidx, authentication));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<List<BookingResponse>> myBookings(Authentication authentication) {
         return ResponseEntity.ok(bookingService.myBookings(authentication));
@@ -45,7 +53,6 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.approve(authentication, id));
     }
 
-    // ✅ UPDATED: accept optional cancel reason
     @PutMapping("/{id}/decline")
     public ResponseEntity<BookingResponse> decline(
             Authentication authentication,
@@ -56,7 +63,6 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.decline(authentication, id, message));
     }
 
-    // ✅ NEW: mark pending endpoint (fixes your 404)
     @PutMapping("/{id}/mark-pending")
     public ResponseEntity<BookingResponse> markPending(Authentication authentication, @PathVariable("id") Long id) {
         return ResponseEntity.ok(bookingService.markPending(authentication, id));

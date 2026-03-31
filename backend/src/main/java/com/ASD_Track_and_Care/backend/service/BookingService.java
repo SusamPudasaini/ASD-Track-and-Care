@@ -9,11 +9,13 @@ import com.ASD_Track_and_Care.backend.repository.TherapistTimeSlotRepository;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.List;
-import java.util.Set;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,19 +25,23 @@ public class BookingService {
     private final UserRepository userRepository;
     private final TherapistTimeSlotRepository timeSlotRepository;
     private final EmailService emailService;
+    private final KhaltiPaymentService khaltiPaymentService;
 
     public BookingService(
             BookingRepository bookingRepository,
             UserRepository userRepository,
             TherapistTimeSlotRepository timeSlotRepository,
-            EmailService emailService
+            EmailService emailService,
+            KhaltiPaymentService khaltiPaymentService
     ) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.timeSlotRepository = timeSlotRepository;
         this.emailService = emailService;
+        this.khaltiPaymentService = khaltiPaymentService;
     }
 
+    @Transactional
     public BookingResponse createBooking(Authentication auth, CreateBookingRequest req) {
         User me = getUserFromAuth(auth);
 
@@ -61,24 +67,88 @@ public class BookingService {
             throw new RuntimeException("This time slot is already booked. Please choose another time.");
         }
 
+        BigDecimal price = therapist.getPricePerSession();
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Therapist session price is not set.");
+        }
+
         Booking b = new Booking();
         b.setUserId(me.getId());
         b.setTherapistId(therapist.getId());
         b.setDate(date);
         b.setTime(time);
-
         b.setStatus(BookingStatus.PENDING);
-
-        if (req.getPidx() != null && !req.getPidx().isBlank()) {
-            b.setKhaltiPidx(req.getPidx().trim());
-        }
-
-        // new booking => clear any message
+        b.setPaymentStatus("INITIATED");
+        b.setAmount(price);
         b.setTherapistMessage(null);
+
+        String purchaseOrderId = "BOOK-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        b.setPurchaseOrderId(purchaseOrderId);
 
         bookingRepository.save(b);
 
-        return toResponseForUserView(b, therapist);
+        int amountInPaisa = price.multiply(BigDecimal.valueOf(100)).intValue();
+
+        Map<String, Object> khaltiResponse = khaltiPaymentService.initiatePayment(
+                amountInPaisa,
+                purchaseOrderId,
+                "Therapist Session Booking",
+                (me.getFirstName() + " " + me.getLastName()).trim(),
+                me.getUserEmail(),
+                me.getPhoneNumber()
+        );
+
+        String pidx = safeString(khaltiResponse.get("pidx"));
+        String paymentUrl = safeString(khaltiResponse.get("payment_url"));
+
+        if (pidx == null || paymentUrl == null) {
+            throw new RuntimeException("Failed to initiate Khalti payment.");
+        }
+
+        b.setKhaltiPidx(pidx);
+        bookingRepository.save(b);
+
+        BookingResponse response = toResponseForUserView(b, therapist);
+        response.setKhaltiPidx(pidx);
+        response.setPaymentUrl(paymentUrl);
+        response.setPaymentStatus(b.getPaymentStatus());
+
+        return response;
+    }
+
+    @Transactional
+    public BookingResponse confirmKhaltiPayment(String pidx, Authentication auth) {
+        User me = getUserFromAuth(auth);
+
+        Booking b = bookingRepository.findByKhaltiPidx(pidx)
+                .orElseThrow(() -> new RuntimeException("Booking not found for this payment."));
+
+        if (!b.getUserId().equals(me.getId())) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        Map<String, Object> lookup = khaltiPaymentService.lookupPayment(pidx);
+        String status = safeString(lookup.get("status"));
+        String transactionId = safeString(lookup.get("transaction_id"));
+
+        b.setPaymentStatus(status);
+        b.setTransactionId(transactionId);
+
+        if ("Completed".equalsIgnoreCase(status)) {
+            b.setPaidAt(LocalDateTime.now());
+        } else if ("User canceled".equalsIgnoreCase(status)
+                || "Expired".equalsIgnoreCase(status)
+                || "Failed".equalsIgnoreCase(status)) {
+            b.setStatus(BookingStatus.CANCELLED);
+        }
+
+        bookingRepository.save(b);
+
+        User therapist = userRepository.findById(b.getTherapistId()).orElse(null);
+        BookingResponse response = toResponseForUserView(b, therapist);
+        response.setKhaltiPidx(b.getKhaltiPidx());
+        response.setPaymentStatus(b.getPaymentStatus());
+        return response;
     }
 
     public List<BookingResponse> myBookings(Authentication auth) {
@@ -107,7 +177,6 @@ public class BookingService {
         }).collect(Collectors.toList());
     }
 
-    // ✅ Therapist approves PENDING -> CONFIRMED
     public BookingResponse approve(Authentication auth, Long bookingId) {
         User therapist = getUserFromAuth(auth);
 
@@ -126,11 +195,14 @@ public class BookingService {
             throw new RuntimeException("Booking already cancelled");
         }
 
+        if (!"Completed".equalsIgnoreCase(b.getPaymentStatus())) {
+            throw new RuntimeException("Payment is not completed for this booking.");
+        }
+
         if (b.getStatus() != BookingStatus.PENDING && b.getStatus() != BookingStatus.CONFIRMED) {
             throw new RuntimeException("Booking is not pending");
         }
 
-        // Idempotent
         if (b.getStatus() == BookingStatus.CONFIRMED) {
             User booker = userRepository.findById(b.getUserId()).orElse(null);
             return toResponseForTherapistView(b, therapist, booker);
@@ -141,8 +213,6 @@ public class BookingService {
         }
 
         b.setStatus(BookingStatus.CONFIRMED);
-
-        // ✅ optional: clear previous cancel reason when confirming again
         b.setTherapistMessage(null);
 
         bookingRepository.save(b);
@@ -151,10 +221,6 @@ public class BookingService {
         return toResponseForTherapistView(b, therapist, booker);
     }
 
-    /**
-     * ✅ Therapist declines/cancels -> CANCELLED (WITH MESSAGE)
-     * message is optional, but will be stored and emailed.
-     */
     public BookingResponse decline(Authentication auth, Long bookingId, String therapistMessage) {
         User therapist = getUserFromAuth(auth);
 
@@ -173,7 +239,6 @@ public class BookingService {
                 ? null
                 : therapistMessage.trim();
 
-        // store message (even if already cancelled, allow updating message)
         b.setTherapistMessage(msg);
 
         if (b.getStatus() != BookingStatus.CANCELLED) {
@@ -184,7 +249,6 @@ public class BookingService {
 
         User booker = userRepository.findById(b.getUserId()).orElse(null);
 
-        // ✅ email user if we can
         if (booker != null && booker.getUserEmail() != null && !booker.getUserEmail().isBlank()) {
             String therapistName = (therapist.getFirstName() + " " + therapist.getLastName()).trim();
             emailService.sendBookingCancelledEmail(
@@ -199,12 +263,10 @@ public class BookingService {
         return toResponseForTherapistView(b, therapist, booker);
     }
 
-    // ✅ keep your old signature too (optional safety if something still calls it)
     public BookingResponse decline(Authentication auth, Long bookingId) {
         return decline(auth, bookingId, null);
     }
 
-    // ✅ Therapist can revert CONFIRMED/CANCELLED -> PENDING
     public BookingResponse markPending(Authentication auth, Long bookingId) {
         User therapist = getUserFromAuth(auth);
 
@@ -219,6 +281,10 @@ public class BookingService {
             throw new RuntimeException("Not allowed");
         }
 
+        if (!"Completed".equalsIgnoreCase(b.getPaymentStatus())) {
+            throw new RuntimeException("Payment is not completed for this booking.");
+        }
+
         if (b.getStatus() == BookingStatus.PENDING) {
             User booker = userRepository.findById(b.getUserId()).orElse(null);
             return toResponseForTherapistView(b, therapist, booker);
@@ -229,8 +295,6 @@ public class BookingService {
         }
 
         b.setStatus(BookingStatus.PENDING);
-
-        // ✅ optional: keep message or clear it. I recommend clearing so old cancel reason doesn’t linger.
         b.setTherapistMessage(null);
 
         bookingRepository.save(b);
@@ -272,10 +336,8 @@ public class BookingService {
 
         b.setDate(newDate);
         b.setTime(newTime);
-
         b.setStatus(BookingStatus.PENDING);
-
-        // reschedule => clear old message
+        b.setPaymentStatus("RESCHEDULED_REQUIRES_MANUAL_REVIEW");
         b.setTherapistMessage(null);
 
         bookingRepository.save(b);
@@ -295,23 +357,30 @@ public class BookingService {
         }
 
         b.setStatus(BookingStatus.CANCELLED);
-
-        // user-cancel => clear therapist message
         b.setTherapistMessage(null);
 
         bookingRepository.save(b);
     }
 
-    // ---------------- helpers ----------------
-
     private boolean existsActiveBookingForTherapistSlot(Long therapistId, LocalDate date, String time) {
         List<Booking> list = bookingRepository.findAllByTherapistIdAndDateAndTime(therapistId, date, time);
-        return list.stream().anyMatch(b -> b.getStatus() != BookingStatus.CANCELLED);
+        return list.stream().anyMatch(b ->
+                b.getStatus() != BookingStatus.CANCELLED &&
+                !"User canceled".equalsIgnoreCase(b.getPaymentStatus()) &&
+                !"Expired".equalsIgnoreCase(b.getPaymentStatus()) &&
+                !"Failed".equalsIgnoreCase(b.getPaymentStatus())
+        );
     }
 
     private boolean existsOtherActiveBookingForTherapistSlot(Long bookingId, Long therapistId, LocalDate date, String time) {
         List<Booking> list = bookingRepository.findAllByTherapistIdAndDateAndTime(therapistId, date, time);
-        return list.stream().anyMatch(b -> !b.getId().equals(bookingId) && b.getStatus() != BookingStatus.CANCELLED);
+        return list.stream().anyMatch(b ->
+                !b.getId().equals(bookingId) &&
+                b.getStatus() != BookingStatus.CANCELLED &&
+                !"User canceled".equalsIgnoreCase(b.getPaymentStatus()) &&
+                !"Expired".equalsIgnoreCase(b.getPaymentStatus()) &&
+                !"Failed".equalsIgnoreCase(b.getPaymentStatus())
+        );
     }
 
     private void ensureTherapistHasSlot(Long therapistId, LocalDate date, String time) {
@@ -326,7 +395,7 @@ public class BookingService {
             throw new RuntimeException("Therapist is not available on " + day.name() + ".");
         }
 
-        Set<String> slotSet = slots.stream().collect(Collectors.toSet());
+        Set<String> slotSet = new HashSet<>(slots);
         if (!slotSet.contains(time)) {
             throw new RuntimeException("Therapist is not available at " + time + " on " + day.name() + ".");
         }
@@ -381,6 +450,8 @@ public class BookingService {
         r.setDate(b.getDate().toString());
         r.setTime(b.getTime());
         r.setStatus(b.getStatus().name());
+        r.setPaymentStatus(b.getPaymentStatus());
+        r.setKhaltiPidx(b.getKhaltiPidx());
 
         r.setTherapistId(b.getTherapistId());
         if (therapist != null) {
@@ -394,8 +465,6 @@ public class BookingService {
         }
 
         r.setUserId(b.getUserId());
-
-        // ✅ NEW: expose therapist cancel message to user
         r.setTherapistMessage(b.getTherapistMessage());
 
         return r;
@@ -407,6 +476,8 @@ public class BookingService {
         r.setDate(b.getDate().toString());
         r.setTime(b.getTime());
         r.setStatus(b.getStatus().name());
+        r.setPaymentStatus(b.getPaymentStatus());
+        r.setKhaltiPidx(b.getKhaltiPidx());
 
         r.setTherapistId(b.getTherapistId());
         if (therapist != null) {
@@ -428,7 +499,6 @@ public class BookingService {
             r.setUserName("User");
         }
 
-        // ✅ NEW: include message in therapist view too
         r.setTherapistMessage(b.getTherapistMessage());
 
         return r;
@@ -460,5 +530,9 @@ public class BookingService {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    private String safeString(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 }

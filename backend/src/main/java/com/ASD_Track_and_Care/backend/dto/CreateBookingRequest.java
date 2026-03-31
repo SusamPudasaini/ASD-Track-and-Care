@@ -14,9 +14,6 @@ public class CreateBookingRequest {
     @NotBlank(message = "time is required") // HH:mm
     private String time;
 
-    // for future Khalti integration
-    private String pidx; 
-
     public Long getTherapistId() { return therapistId; }
     public void setTherapistId(Long therapistId) { this.therapistId = therapistId; }
 
@@ -25,7 +22,4 @@ public class CreateBookingRequest {
 
     public String getTime() { return time; }
     public void setTime(String time) { this.time = time; }
-
-    public String getPidx() { return pidx; }
-    public void setPidx(String pidx) { this.pidx = pidx; }
 }

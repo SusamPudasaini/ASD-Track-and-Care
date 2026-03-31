@@ -336,11 +336,15 @@ export default function Therapists() {
     try {
       setBooking(true);
 
-      await api.post(CREATE_BOOKING_ENDPOINT, { therapistId, date, time });
+      const res = await api.post(CREATE_BOOKING_ENDPOINT, { therapistId, date, time });
 
-      toast.success("Booking placed!");
-      closeBook();
-      navigate("/bookings");
+      const paymentUrl = res?.data?.paymentUrl;
+      if (!paymentUrl) {
+        throw new Error("Payment URL not received.");
+      }
+
+      toast.success("Redirecting to Khalti...");
+      window.location.href = paymentUrl;
     } catch (err) {
       console.error("CREATE BOOKING ERROR:", err?.response?.status, err?.response?.data);
       toast.error(getErrorMessage(err) || "Booking failed.");
