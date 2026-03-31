@@ -49,6 +49,7 @@ public class AacService {
         card.setCategory(req.getCategory());
         card.setSortOrder(req.getSortOrder() == null ? 0 : req.getSortOrder());
         card.setActive(req.getActive() == null || req.getActive());
+        card.setSpokenTextNepali(blankToNull(req.getSpokenTextNepali())); // new optional field
 
         aacCardRepository.save(card);
         return toCardDto(card);
@@ -61,6 +62,7 @@ public class AacService {
         card.setCategory(req.getCategory());
         card.setSortOrder(req.getSortOrder() == null ? 0 : req.getSortOrder());
         card.setActive(req.getActive() == null || req.getActive());
+        card.setSpokenTextNepali(blankToNull(req.getSpokenTextNepali())); // new optional field
 
         aacCardRepository.save(card);
         return toCardDto(card);
@@ -119,6 +121,7 @@ public class AacService {
         dto.setCategory(card.getCategory());
         dto.setActive(card.isActive());
         dto.setSortOrder(card.getSortOrder());
+        dto.setSpokenTextNepali(card.getSpokenTextNepali()); // new optional field
         return dto;
     }
 

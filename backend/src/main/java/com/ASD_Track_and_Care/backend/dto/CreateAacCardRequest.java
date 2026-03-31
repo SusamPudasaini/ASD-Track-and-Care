@@ -14,21 +14,56 @@ public class CreateAacCardRequest {
     @NotNull(message = "category is required")
     private AacCardCategory category;
 
-    private Integer sortOrder = 0;
-    private Boolean active = true;
+    private Integer sortOrder;
+    private Boolean active;
 
-    public String getLabel() { return label; }
-    public void setLabel(String label) { this.label = label; }
+    private String spokenTextNepali; // optional
 
-    public String getImageUrl() { return imageUrl; }
-    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public String getLabel() {
+        return label;
+    }
 
-    public AacCardCategory getCategory() { return category; }
-    public void setCategory(AacCardCategory category) { this.category = category; }
+    public void setLabel(String label) {
+        this.label = label;
+    }
 
-    public Integer getSortOrder() { return sortOrder; }
-    public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public String getImageUrl() {
+        return imageUrl;
+    }
 
-    public Boolean getActive() { return active; }
-    public void setActive(Boolean active) { this.active = active; }
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
+    public AacCardCategory getCategory() {
+        return category;
+    }
+
+    public void setCategory(AacCardCategory category) {
+        this.category = category;
+    }
+
+    public Integer getSortOrder() {
+        return sortOrder;
+    }
+
+    public void setSortOrder(Integer sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
+    public Boolean getActive() {
+        return active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
+    }
+
+    public String getSpokenTextNepali() {
+        return spokenTextNepali;
+    }
+
+    public void setSpokenTextNepali(String spokenTextNepali) {
+        this.spokenTextNepali = spokenTextNepali;
+    }
 }

@@ -131,6 +131,9 @@ function AacCardItem({ item, onSelect }) {
         <div className="text-base font-semibold text-gray-900 group-hover:text-blue-600">
           {item.label}
         </div>
+        {item.spokenTextNepali ? (
+          <div className="mt-1 text-xs text-gray-500">{item.spokenTextNepali}</div>
+        ) : null}
       </div>
     </button>
   );
@@ -144,6 +147,7 @@ export default function AacBoard() {
   const [query, setQuery] = useState("");
   const [sentence, setSentence] = useState([]);
   const [savingFavorite, setSavingFavorite] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => {
     loadCards("ALL");
@@ -183,7 +187,13 @@ export default function AacBoard() {
   }
 
   function handleSelectCard(item) {
-    setSentence((prev) => [...prev, item.label]);
+    setSentence((prev) => [
+      ...prev,
+      {
+        label: item.label,
+        spoken: item.spokenTextNepali || item.label,
+      },
+    ]);
   }
 
   function handleRemoveWord(index) {
@@ -205,28 +215,48 @@ export default function AacBoard() {
     loadCards("ALL");
   }
 
-  function handleSpeak() {
-    const text = sentence.join(" ").trim();
+  async function handleSpeak() {
+    const text = sentence.map((w) => w.spoken).join(" ").trim();
 
     if (!text) {
       toast.error("Please build a sentence first.");
       return;
     }
 
-    if (!("speechSynthesis" in window)) {
-      toast.error("Text-to-speech is not supported in this browser.");
-      return;
-    }
+    try {
+      setSpeaking(true);
 
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-    window.speechSynthesis.speak(utterance);
+      const res = await api.post(
+        "/api/aac/speak",
+        { text },
+        { responseType: "blob" }
+      );
+
+      const audioBlob = new Blob([res.data], { type: "audio/mpeg" });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        setSpeaking(false);
+      };
+
+      audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
+        setSpeaking(false);
+        toast.error("Could not play Nepali audio.");
+      };
+
+      await audio.play();
+    } catch (err) {
+      console.error(err);
+      setSpeaking(false);
+      toast.error(getErrorMessage(err) || "Could not generate Nepali voice.");
+    }
   }
 
   async function handleSaveFavorite() {
-    const phraseText = sentence.join(" ").trim();
+    const phraseText = sentence.map((w) => w.label).join(" ").trim();
 
     if (!phraseText) {
       toast.error("Please build a sentence first.");
@@ -251,7 +281,7 @@ export default function AacBoard() {
       .split(/\s+/)
       .filter(Boolean);
 
-    setSentence(words);
+    setSentence(words.map((word) => ({ label: word, spoken: word })));
     toast.success("Favorite phrase loaded.");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -261,12 +291,16 @@ export default function AacBoard() {
     if (!q) return cards;
 
     return cards.filter((item) => {
-      const hay = [item.label, item.category].filter(Boolean).join(" ").toLowerCase();
+      const hay = [item.label, item.category, item.spokenTextNepali]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
       return hay.includes(q);
     });
   }, [cards, query]);
 
-  const sentenceText = sentence.join(" ").trim();
+  const sentenceText = sentence.map((w) => w.label).join(" ").trim();
+  const spokenPreview = sentence.map((w) => w.spoken).join(" ").trim();
 
   return (
     <div className="min-h-screen bg-white">
@@ -300,10 +334,15 @@ export default function AacBoard() {
                 <button
                   type="button"
                   onClick={handleSpeak}
-                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  disabled={speaking}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition ${
+                    speaking
+                      ? "cursor-not-allowed bg-blue-300"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
                 >
                   <FaVolumeHigh />
-                  Speak
+                  {speaking ? "Speaking..." : "Speak Nepali"}
                 </button>
 
                 <button
@@ -349,8 +388,8 @@ export default function AacBoard() {
                 <div className="flex flex-wrap gap-2">
                   {sentence.map((word, index) => (
                     <SentenceChip
-                      key={`${word}-${index}`}
-                      word={word}
+                      key={`${word.label}-${index}`}
+                      word={word.label}
                       onRemove={() => handleRemoveWord(index)}
                     />
                   ))}
@@ -361,6 +400,11 @@ export default function AacBoard() {
             <div className="mt-4 rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-700">
               <span className="font-semibold text-gray-900">Current phrase:</span>{" "}
               {sentenceText || "—"}
+            </div>
+
+            <div className="mt-3 rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              <span className="font-semibold">Nepali speech text:</span>{" "}
+              {spokenPreview || "—"}
             </div>
           </div>
 

@@ -1,7 +1,6 @@
 package com.ASD_Track_and_Care.backend.model;
 
 import jakarta.persistence.*;
-import java.time.Instant;
 
 @Entity
 @Table(name = "aac_cards")
@@ -11,53 +10,78 @@ public class AacCard {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 120)
+    @Column(nullable = false)
     private String label;
 
-    @Column(length = 1000)
+    @Column(name = "image_url")
     private String imageUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 40)
+    @Column(nullable = false, length = 30)
     private AacCardCategory category;
 
-    @Column(nullable = false)
+    @Column(name = "active", nullable = false)
     private boolean active = true;
 
-    @Column(nullable = false)
+    @Column(name = "sort_order", nullable = false)
     private Integer sortOrder = 0;
 
-    @Column(nullable = false)
-    private Instant createdAt = Instant.now();
+    @Column(name = "spoken_text_nepali", length = 500)
+    private String spokenTextNepali; // optional, safe for old cards
 
-    @Column(nullable = false)
-    private Instant updatedAt = Instant.now();
-
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = Instant.now();
+    public Long getId() {
+        return id;
     }
 
-    public Long getId() { return id; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getLabel() { return label; }
-    public void setLabel(String label) { this.label = label; }
+    public String getLabel() {
+        return label;
+    }
 
-    public String getImageUrl() { return imageUrl; }
-    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public void setLabel(String label) {
+        this.label = label;
+    }
 
-    public AacCardCategory getCategory() { return category; }
-    public void setCategory(AacCardCategory category) { this.category = category; }
+    public String getImageUrl() {
+        return imageUrl;
+    }
 
-    public boolean isActive() { return active; }
-    public void setActive(boolean active) { this.active = active; }
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
 
-    public Integer getSortOrder() { return sortOrder; }
-    public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public AacCardCategory getCategory() {
+        return category;
+    }
 
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public void setCategory(AacCardCategory category) {
+        this.category = category;
+    }
 
-    public Instant getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public Integer getSortOrder() {
+        return sortOrder;
+    }
+
+    public void setSortOrder(Integer sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
+    public String getSpokenTextNepali() {
+        return spokenTextNepali;
+    }
+
+    public void setSpokenTextNepali(String spokenTextNepali) {
+        this.spokenTextNepali = spokenTextNepali;
+    }
 }

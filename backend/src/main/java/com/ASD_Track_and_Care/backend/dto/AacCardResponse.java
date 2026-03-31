@@ -9,22 +9,61 @@ public class AacCardResponse {
     private AacCardCategory category;
     private boolean active;
     private Integer sortOrder;
+    private String spokenTextNepali;
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public String getLabel() { return label; }
-    public void setLabel(String label) { this.label = label; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getImageUrl() { return imageUrl; }
-    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public String getLabel() {
+        return label;
+    }
 
-    public AacCardCategory getCategory() { return category; }
-    public void setCategory(AacCardCategory category) { this.category = category; }
+    public void setLabel(String label) {
+        this.label = label;
+    }
 
-    public boolean isActive() { return active; }
-    public void setActive(boolean active) { this.active = active; }
+    public String getImageUrl() {
+        return imageUrl;
+    }
 
-    public Integer getSortOrder() { return sortOrder; }
-    public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
+    public AacCardCategory getCategory() {
+        return category;
+    }
+
+    public void setCategory(AacCardCategory category) {
+        this.category = category;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public Integer getSortOrder() {
+        return sortOrder;
+    }
+
+    public void setSortOrder(Integer sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
+    public String getSpokenTextNepali() {
+        return spokenTextNepali;
+    }
+
+    public void setSpokenTextNepali(String spokenTextNepali) {
+        this.spokenTextNepali = spokenTextNepali;
+    }
 }
