@@ -1,32 +1,104 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Baby,
+  Brain,
+  CheckCircle2,
+  ClipboardList,
+  HeartPulse,
+  History,
+  ShieldCheck,
+  Sparkles,
+  Stethoscope,
+  Users,
+} from "lucide-react";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 import toast from "react-hot-toast";
 
 // ---------------------------------------------------------------------------
-// FIX: Sub-components moved OUTSIDE the parent to prevent remounting on every
-// render, which caused state loss, focus jumps, and wasted re-renders.
-// They receive all needed data via props.
+// UI helpers
 // ---------------------------------------------------------------------------
+const sectionMeta = {
+  child: {
+    icon: Baby,
+    subtitle: "Basic child details used in the screening model.",
+  },
+  family: {
+    icon: Users,
+    subtitle: "Family background and caregiver-related information.",
+  },
+  birth: {
+    icon: HeartPulse,
+    subtitle: "Pregnancy and birth factors that may influence development.",
+  },
+  milestones: {
+    icon: Sparkles,
+    subtitle: "Early developmental milestone timing.",
+  },
+  conditions: {
+    icon: Stethoscope,
+    subtitle: "Associated developmental or medical conditions.",
+  },
+  screening: {
+    icon: ClipboardList,
+    subtitle: "Any earlier autism-related screening history.",
+  },
+  consent: {
+    icon: ShieldCheck,
+    subtitle: "Acknowledgement before generating a result.",
+  },
+};
 
-const Section = ({ title, children }) => (
-  <div className="rounded-md border border-gray-100 bg-white p-6 shadow-sm">
-    <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-    <div className="mt-4 space-y-5">{children}</div>
+const cardBase =
+  "rounded-2xl border border-white/60 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur";
+
+const Section = ({ title, children, sectionKey }) => {
+  const meta = sectionMeta[sectionKey] || {};
+  const Icon = meta.icon || ClipboardList;
+
+  return (
+    <section className={`${cardBase} p-6 md:p-7`}>
+      <div className="mb-6 flex items-start gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 shadow-sm">
+          <Icon size={22} strokeWidth={2.2} />
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">{title}</h2>
+          {meta.subtitle ? (
+            <p className="mt-1 text-sm text-slate-600">{meta.subtitle}</p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-2">{children}</div>
+    </section>
+  );
+};
+
+const FieldShell = ({ label, helper, children }) => (
+  <div className="space-y-2">
+    <label className="block text-sm font-semibold text-slate-800">{label}</label>
+    {helper ? <p className="text-xs leading-5 text-slate-500">{helper}</p> : null}
+    {children}
   </div>
 );
 
-const SelectField = ({ label, inputRef, options, placeholder, helper }) => (
-  <div>
-    <div className="flex items-start justify-between gap-3">
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
-    </div>
-    {helper ? <p className="mt-1 text-xs text-gray-500">{helper}</p> : null}
+const SelectField = ({
+  label,
+  inputRef,
+  options,
+  placeholder,
+  helper,
+  onValueChange,
+}) => (
+  <FieldShell label={label} helper={helper}>
     <select
       ref={inputRef}
       defaultValue=""
-      className="mt-2 w-full rounded border border-gray-200 px-4 py-2.5 text-sm outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500"
+      onChange={(e) => onValueChange?.(e.target.value)}
+      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
     >
       <option value="">{placeholder || "Select an option"}</option>
       {options.map((o) => (
@@ -35,13 +107,11 @@ const SelectField = ({ label, inputRef, options, placeholder, helper }) => (
         </option>
       ))}
     </select>
-  </div>
+  </FieldShell>
 );
 
 const NumberInputField = ({ label, inputRef, placeholder, helper, min, max }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-700">{label}</label>
-    {helper ? <p className="mt-1 text-xs text-gray-500">{helper}</p> : null}
+  <FieldShell label={label} helper={helper}>
     <input
       ref={inputRef}
       type="number"
@@ -49,13 +119,13 @@ const NumberInputField = ({ label, inputRef, placeholder, helper, min, max }) =>
       placeholder={placeholder || "Enter a number"}
       min={min}
       max={max}
-      className="mt-2 w-full rounded border border-gray-200 px-4 py-2.5 text-sm outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500"
+      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
     />
-  </div>
+  </FieldShell>
 );
 
 // ---------------------------------------------------------------------------
-// ResultModal — receives all state via props, no internal closures over parent
+// Result Modal
 // ---------------------------------------------------------------------------
 const ResultModal = ({
   open,
@@ -73,81 +143,109 @@ const ResultModal = ({
 
   const riskBadgeClass =
     riskLevel === "High"
-      ? "bg-red-100 text-red-800 border-red-200"
+      ? "bg-red-50 text-red-700 border-red-200"
       : riskLevel === "Moderate"
-        ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-        : "bg-green-100 text-green-800 border-green-200";
+        ? "bg-amber-50 text-amber-700 border-amber-200"
+        : "bg-emerald-50 text-emerald-700 border-emerald-200";
+
+  const ringClass =
+    riskLevel === "High"
+      ? "from-red-500 to-rose-500"
+      : riskLevel === "Moderate"
+        ? "from-amber-500 to-orange-500"
+        : "from-emerald-500 to-teal-500";
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Screening Result</h3>
-            <p className="mt-1 text-sm text-gray-600">
-              This is a screening estimate and not a medical diagnosis.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Close
-          </button>
-        </div>
-
-        <div className="mt-5 rounded-lg border border-gray-100 bg-gray-50 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/40 bg-white shadow-2xl">
+        <div className={`bg-gradient-to-r ${ringClass} px-6 py-6 text-white md:px-8`}>
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-gray-900">Predicted ASD Probability</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">{pct}%</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/80">
+                Screening completed
+              </p>
+              <h3 className="mt-2 flex items-center gap-2 text-2xl font-bold tracking-tight">
+                <CheckCircle2 size={26} />
+                Autism Screening Result
+              </h3>
+              <p className="mt-2 text-sm text-white/90">
+                This is a screening estimate and not a medical diagnosis.
+              </p>
             </div>
 
-            <div
-              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold ${riskBadgeClass}`}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-white/30 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
             >
-              <span className="h-2 w-2 rounded-full bg-current opacity-60" />
-              Risk: {riskLevel}
-            </div>
+              Close
+            </button>
           </div>
         </div>
 
-        <div className="mt-5 space-y-3">
-          <p className="text-sm font-medium text-gray-900">What would you like to do next?</p>
+        <div className="p-6 md:p-8">
+          <div className="grid gap-4 md:grid-cols-[1.2fr_.8fr]">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <p className="text-sm font-medium text-slate-600">Predicted ASD Probability</p>
+              <p className="mt-2 text-4xl font-bold tracking-tight text-slate-900">{pct}%</p>
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className={`h-full rounded-full bg-gradient-to-r ${ringClass}`}
+                  style={{ width: `${Math.min(Math.max(p * 100, 4), 100)}%` }}
+                />
+              </div>
+            </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <button
-              type="button"
-              onClick={() => onNavigate(`/therapists?${resultQuery}`)}
-              className="rounded-lg bg-[#4a6cf7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
-            >
-              Suggested Therapists
-            </button>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-sm font-medium text-slate-600">Risk Category</p>
+              <div
+                className={`mt-3 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${riskBadgeClass}`}
+              >
+                <Brain size={16} />
+                {riskLevel}
+              </div>
 
-            <button
-              type="button"
-              onClick={() => onNavigate(`/activities?${resultQuery}`)}
-              className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-            >
-              Suggested Activities
-            </button>
+              <p className="mt-4 text-sm leading-6 text-slate-600">
+                You can now explore suggested therapists or activities based on this result.
+              </p>
+            </div>
+          </div>
 
-            <button
-              type="button"
-              onClick={onRetake}
-              className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-            >
-              Retake Assessment
-            </button>
+          <div className="mt-6">
+            <p className="mb-3 text-sm font-semibold text-slate-900">What would you like to do next?</p>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => onNavigate(`/therapists?${resultQuery}`)}
+                className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
+              >
+                Suggested Therapists
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onNavigate(`/activities?${resultQuery}`)}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+              >
+                Suggested Activities
+              </button>
+
+              <button
+                type="button"
+                onClick={onRetake}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+              >
+                Retake Assessment
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -156,7 +254,7 @@ const ResultModal = ({
 };
 
 // ---------------------------------------------------------------------------
-// LastResultCard — receives all state via props
+// History / Last Result Card
 // ---------------------------------------------------------------------------
 const LastResultCard = ({
   historyLoading,
@@ -170,9 +268,11 @@ const LastResultCard = ({
 }) => {
   if (historyLoading) {
     return (
-      <div className="rounded-md bg-white p-6 shadow-md">
-        <h1 className="text-xl font-semibold text-gray-900">Autism Risk Screening Questionnaire</h1>
-        <p className="mt-2 text-sm text-gray-600">Loading your previous screening history...</p>
+      <div className={`${cardBase} p-8`}>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          Autism Risk Screening Questionnaire
+        </h1>
+        <p className="mt-3 text-sm text-slate-600">Loading your previous screening history...</p>
       </div>
     );
   }
@@ -182,95 +282,143 @@ const LastResultCard = ({
   const pct = (latest.probability * 100).toFixed(1);
   const lastRisk = latest.riskLevel || computeRiskLevel(latest.probability);
 
+  const riskStyles =
+    lastRisk === "High"
+      ? "bg-red-50 text-red-700 border-red-200"
+      : lastRisk === "Moderate"
+        ? "bg-amber-50 text-amber-700 border-amber-200"
+        : "bg-emerald-50 text-emerald-700 border-emerald-200";
+
   return (
-    <div className="rounded-md bg-white p-6 shadow-md">
-      <h1 className="text-xl font-semibold text-gray-900">Autism Risk Screening Questionnaire</h1>
-      <p className="mt-2 text-sm text-gray-600">
-        The last probability score was <span className="font-semibold">{pct}%</span> and the state
-        is <span className="font-semibold">{lastRisk}</span>.
-      </p>
-
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={() =>
-            onNavigate(
-              `/therapists?${new URLSearchParams({
-                p: String(latest.probability),
-                risk: String(lastRisk),
-              }).toString()}`
-            )
-          }
-          className="rounded-lg bg-[#4a6cf7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
-        >
-          View Suggested Therapists
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            onNavigate(
-              `/activities?${new URLSearchParams({
-                p: String(latest.probability),
-                risk: String(lastRisk),
-              }).toString()}`
-            )
-          }
-          className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-        >
-          View Suggested Activities
-        </button>
-
-        <button
-          type="button"
-          onClick={onRetake}
-          className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-        >
-          Retest →
-        </button>
+    <div className={`${cardBase} overflow-hidden`}>
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-8 text-white">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-100">
+          Previous result
+        </p>
+        <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold tracking-tight">
+          <History size={26} />
+          Autism Risk Screening Questionnaire
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-50">
+          Your latest recorded screening is shown below. You can review suggestions or retake the
+          questionnaire anytime.
+        </p>
       </div>
 
-      {!!historyError && (
-        <div className="mt-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-          {historyError}
-        </div>
-      )}
-
-      {history.length > 0 && (
-        <div className="mt-6">
-          <div className="text-sm font-semibold text-gray-900">Recent history</div>
-          <div className="mt-3 overflow-hidden rounded-lg border border-gray-100">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-700">
-                <tr>
-                  <th className="px-4 py-2 text-left">Date</th>
-                  <th className="px-4 py-2 text-left">Probability</th>
-                  <th className="px-4 py-2 text-left">Risk</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white">
-                {history.slice(0, 8).map((h) => {
-                  const r = h.riskLevel || computeRiskLevel(h.probability);
-                  return (
-                    // FIX: Use stable id instead of Math.random() to avoid key churn
-                    <tr key={h.id} className="border-t">
-                      <td className="px-4 py-2 text-gray-700">{fmtDate(h.createdAt) || "—"}</td>
-                      <td className="px-4 py-2 font-semibold text-gray-900">
-                        {(h.probability * 100).toFixed(1)}%
-                      </td>
-                      <td className="px-4 py-2 text-gray-700">{r}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <div className="p-8">
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div className="text-sm text-slate-500">Latest Probability</div>
+            <div className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{pct}%</div>
           </div>
 
-          <p className="mt-2 text-xs text-gray-500">
-            Tip: Click "Retest" to take the questionnaire again.
-          </p>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div className="text-sm text-slate-500">Risk Level</div>
+            <div className="mt-3">
+              <span
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold ${riskStyles}`}
+              >
+                <Brain size={15} />
+                {lastRisk}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div className="text-sm text-slate-500">Recorded</div>
+            <div className="mt-2 text-sm font-semibold text-slate-900">
+              {fmtDate(latest.createdAt) || "—"}
+            </div>
+          </div>
         </div>
-      )}
+
+        <div className="mt-6 flex flex-col gap-3 md:flex-row">
+          <button
+            type="button"
+            onClick={() =>
+              onNavigate(
+                `/therapists?${new URLSearchParams({
+                  p: String(latest.probability),
+                  risk: String(lastRisk),
+                }).toString()}`
+              )
+            }
+            className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
+          >
+            View Suggested Therapists
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              onNavigate(
+                `/activities?${new URLSearchParams({
+                  p: String(latest.probability),
+                  risk: String(lastRisk),
+                }).toString()}`
+              )
+            }
+            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+          >
+            View Suggested Activities
+          </button>
+
+          <button
+            type="button"
+            onClick={onRetake}
+            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+          >
+            Retake Assessment
+          </button>
+        </div>
+
+        {!!historyError && (
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            {historyError}
+          </div>
+        )}
+
+        {history.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Recent history</h3>
+                <p className="text-sm text-slate-500">Your most recent saved screening results.</p>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold">Date</th>
+                    <th className="px-4 py-3 text-left font-semibold">Probability</th>
+                    <th className="px-4 py-3 text-left font-semibold">Risk</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {history.slice(0, 8).map((h) => {
+                    const r = h.riskLevel || computeRiskLevel(h.probability);
+                    return (
+                      <tr key={h.id} className="border-t border-slate-100">
+                        <td className="px-4 py-3 text-slate-700">{fmtDate(h.createdAt) || "—"}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-900">
+                          {(h.probability * 100).toFixed(1)}%
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{r}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-500">
+              Tip: Use “Retake Assessment” whenever you want to generate a new screening record.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -281,7 +429,6 @@ const LastResultCard = ({
 export default function Questionnaire() {
   const navigate = useNavigate();
 
-  // refs (uncontrolled inputs)
   const age_months = useRef(null);
   const sex = useRef(null);
   const residence = useRef(null);
@@ -319,10 +466,10 @@ export default function Questionnaire() {
   const [history, setHistory] = useState([]);
   const [showForm, setShowForm] = useState(false);
 
+  const [screeningDoneValue, setScreeningDoneValue] = useState("");
+
   const yesNoTo01 = (v) => (v === "Yes" ? 1 : 0);
 
-  // FIX: Wrapped in useCallback so it is stable across renders and can be
-  // safely passed as a prop or used in dependency arrays.
   const computeRiskLevel = useCallback((p) => {
     if (p < 0.33) return "Low";
     if (p < 0.66) return "Moderate";
@@ -348,23 +495,18 @@ export default function Questionnaire() {
       sex: raw.sex === "Male" ? 1 : 0,
       residence: raw.residence === "Urban" ? 1 : 0,
       parental_education: eduMap[raw.parental_education],
-
       family_history_asd: yesNoTo01(raw.family_history_asd),
-
       preeclampsia: yesNoTo01(raw.preeclampsia),
       preterm_birth: yesNoTo01(raw.preterm_birth),
       birth_asphyxia: yesNoTo01(raw.birth_asphyxia),
       low_birth_weight: yesNoTo01(raw.low_birth_weight),
-
       eye_contact_age_months: Number(raw.eye_contact_age_months),
       social_smile_months: Number(raw.social_smile_months),
-
       intellectual_disability: yesNoTo01(raw.intellectual_disability),
       epilepsy: yesNoTo01(raw.epilepsy),
       adhd: yesNoTo01(raw.adhd),
       language_disorder: yesNoTo01(raw.language_disorder),
       motor_delay: yesNoTo01(raw.motor_delay),
-
       screening_done: yesNoTo01(raw.screening_done),
       screening_result:
         raw.screening_done === "Yes" ? screeningMap[raw.screening_result] : null,
@@ -379,8 +521,6 @@ export default function Questionnaire() {
     } catch {}
   };
 
-  // FIX: clearAllFields now also resets all related state so callers don't
-  // have to remember to do it separately.
   const clearAllFields = useCallback(() => {
     setRefValue(age_months, "");
     setRefValue(sex, "");
@@ -407,7 +547,7 @@ export default function Questionnaire() {
 
     if (consent.current) consent.current.checked = false;
 
-    // FIX: Reset derived state here so callers have a single place to clear everything
+    setScreeningDoneValue("");
     setServerError(null);
     setPrediction(null);
     setRiskLevel("");
@@ -437,6 +577,8 @@ export default function Questionnaire() {
 
     setRefValue(screening_done, "Yes");
     setRefValue(screening_result, "Unknown");
+
+    setScreeningDoneValue("Yes");
 
     if (consent.current) consent.current.checked = true;
 
@@ -480,8 +622,6 @@ export default function Questionnaire() {
 
     const normalized = list
       .map((x) => ({
-        // FIX: Use a stable fallback (index-based) rather than Math.random()
-        // to avoid key churn. Ideally all records have a real id from the backend.
         id: x.id ?? x._id ?? x.createdAt ?? `record-${x.probability}-${x.createdAt}`,
         probability: typeof x.probability === "number" ? x.probability : null,
         riskLevel: x.riskLevel || x.risk_level || "",
@@ -532,8 +672,6 @@ export default function Questionnaire() {
     return d.toLocaleString();
   }, []);
 
-  // FIX: handleRetake now delegates all state resets to clearAllFields to
-  // avoid duplicated reset logic spread across multiple functions.
   const handleRetake = useCallback(() => {
     clearAllFields();
     setShowForm(true);
@@ -541,7 +679,6 @@ export default function Questionnaire() {
   }, [clearAllFields]);
 
   const handlePredict = async () => {
-    // FIX: Use clearAllFields instead of individually resetting a subset of state
     setServerError(null);
     setPrediction(null);
     setRiskLevel("");
@@ -553,24 +690,19 @@ export default function Questionnaire() {
       residence: residence.current?.value ?? "",
       parental_education: parental_education.current?.value ?? "",
       family_history_asd: family_history_asd.current?.value ?? "",
-
       preeclampsia: preeclampsia.current?.value ?? "",
       preterm_birth: preterm_birth.current?.value ?? "",
       birth_asphyxia: birth_asphyxia.current?.value ?? "",
       low_birth_weight: low_birth_weight.current?.value ?? "",
-
       eye_contact_age_months: eye_contact_age_months.current?.value ?? "",
       social_smile_months: social_smile_months.current?.value ?? "",
-
       intellectual_disability: intellectual_disability.current?.value ?? "",
       epilepsy: epilepsy.current?.value ?? "",
       adhd: adhd.current?.value ?? "",
       language_disorder: language_disorder.current?.value ?? "",
       motor_delay: motor_delay.current?.value ?? "",
-
       screening_done: screening_done.current?.value ?? "",
       screening_result: screening_result.current?.value ?? "",
-
       consent: !!consent.current?.checked,
     };
 
@@ -613,7 +745,6 @@ export default function Questionnaire() {
       setIsSubmitting(true);
 
       const res = await api.post("/api/ml/predict", payload);
-
       const { p, rl } = normalizeServerData(res?.data);
 
       if (typeof p !== "number" || Number.isNaN(p)) {
@@ -631,7 +762,7 @@ export default function Questionnaire() {
         const normalized = await fetchHistory();
         setHistory(normalized);
       } catch {
-        // ignore history refresh failures silently
+        // ignore refresh errors
       }
     } catch (err) {
       const data = err?.response?.data;
@@ -643,7 +774,7 @@ export default function Questionnaire() {
 
   return (
     <div
-      className="min-h-screen bg-white"
+      className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.12),_transparent_35%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_35%,_#ffffff)]"
       onKeyDownCapture={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();
@@ -667,7 +798,7 @@ export default function Questionnaire() {
       />
 
       <main className="relative overflow-hidden">
-        <div className="relative z-10 mx-auto max-w-4xl px-6 py-10">
+        <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           {!showForm ? (
             <LastResultCard
               historyLoading={historyLoading}
@@ -681,64 +812,131 @@ export default function Questionnaire() {
             />
           ) : (
             <>
-              <div className="rounded-md bg-white p-6 shadow-md">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h1 className="text-xl font-semibold text-gray-900">
-                      Autism Risk Screening Questionnaire
-                    </h1>
-                    <p className="mt-2 text-sm text-gray-600">
-                      This tool provides a probabilistic screening result and does not replace a
-                      professional medical diagnosis.
-                    </p>
-                  </div>
+              <div className={`${cardBase} overflow-hidden`}>
+                <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-6 py-8 text-white md:px-8">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div className="max-w-3xl">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-100">
+                        ASD screening tool
+                      </p>
+                      <h1 className="mt-2 flex items-center gap-3 text-3xl font-bold tracking-tight">
+                        <Brain size={30} />
+                        Autism Risk Screening Questionnaire
+                      </h1>
+                      <p className="mt-3 text-sm leading-6 text-blue-50 md:text-base">
+                        Complete the questionnaire below to generate a probabilistic screening
+                        result. This tool supports early guidance and does not replace clinical
+                        diagnosis by a healthcare professional.
+                      </p>
+                    </div>
 
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleAutofill}
-                      className="rounded-md border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                      Autofill Test Values
-                    </button>
-
-                    {history.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setShowForm(false)}
-                        className="rounded-md border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                        onClick={handleAutofill}
+                        className="rounded-2xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
                       >
-                        View History
+                        Autofill Test Values
                       </button>
-                    )}
+
+                      {history.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowForm(false)}
+                          className="rounded-2xl border border-white/25 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-blue-50"
+                        >
+                          View History
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 border-t border-slate-100 bg-white px-6 py-5 md:grid-cols-3 md:px-8">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Sections
+                    </div>
+                    <div className="mt-2 text-lg font-bold text-slate-900">7</div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Questions
+                    </div>
+                    <div className="mt-2 text-lg font-bold text-slate-900">18</div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Outcome
+                    </div>
+                    <div className="mt-2 text-lg font-bold text-slate-900">Probability + Risk</div>
                   </div>
                 </div>
 
                 {!!serverError && (
-                  <div className="mt-5 rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                    {typeof serverError === "string" ? (
-                      serverError
-                    ) : (
-                      <>
-                        <div className="font-semibold">{serverError.message || "Error"}</div>
-                        {serverError.errors && (
-                          <ul className="mt-2 list-disc pl-5">
-                            {Object.entries(serverError.errors).map(([k, v]) => (
-                              <li key={k}>
-                                <span className="font-semibold">{k}:</span> {String(v)}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </>
-                    )}
+                  <div className="border-t border-slate-100 px-6 py-5 md:px-8">
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                      {typeof serverError === "string" ? (
+                        serverError
+                      ) : (
+                        <>
+                          <div className="font-semibold">{serverError.message || "Error"}</div>
+                          {serverError.errors && (
+                            <ul className="mt-2 list-disc pl-5">
+                              {Object.entries(serverError.errors).map(([k, v]) => (
+                                <li key={k}>
+                                  <span className="font-semibold">{k}:</span> {String(v)}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* FORM */}
-              <div className="mt-8 space-y-6">
-                <Section title="Section A: Child Information">
+              <div className="sticky top-3 z-20 mt-6">
+                <div className="mx-auto max-w-6xl rounded-2xl border border-blue-100 bg-white/85 px-4 py-3 shadow-lg backdrop-blur">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        Please answer all required fields before submitting.
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Pressing Enter is disabled to prevent accidental submission.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate(-1)}
+                        className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Back
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={handlePredict}
+                        className={`rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition ${
+                          isSubmitting
+                            ? "cursor-not-allowed bg-blue-300"
+                            : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:-translate-y-0.5 hover:shadow-lg"
+                        }`}
+                      >
+                        {isSubmitting ? "Submitting..." : "Submit & Predict"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-6">
+                <Section title="Section A: Child Information" sectionKey="child">
                   <NumberInputField
                     inputRef={age_months}
                     label="1) Child age (in months)"
@@ -758,7 +956,10 @@ export default function Questionnaire() {
                   />
                 </Section>
 
-                <Section title="Section B: Parental and Family Background">
+                <Section
+                  title="Section B: Parental and Family Background"
+                  sectionKey="family"
+                >
                   <SelectField
                     inputRef={parental_education}
                     label="4) Highest education level of primary caregiver"
@@ -772,7 +973,7 @@ export default function Questionnaire() {
                   />
                 </Section>
 
-                <Section title="Section C: Pregnancy and Birth History">
+                <Section title="Section C: Pregnancy and Birth History" sectionKey="birth">
                   <SelectField
                     inputRef={preeclampsia}
                     label="6) Pre-eclampsia during pregnancy"
@@ -795,7 +996,10 @@ export default function Questionnaire() {
                   />
                 </Section>
 
-                <Section title="Section D: Early Developmental Milestones">
+                <Section
+                  title="Section D: Early Developmental Milestones"
+                  sectionKey="milestones"
+                >
                   <NumberInputField
                     inputRef={eye_contact_age_months}
                     label="10) Eye contact age (months)"
@@ -812,7 +1016,10 @@ export default function Questionnaire() {
                   />
                 </Section>
 
-                <Section title="Section E: Developmental and Medical Conditions">
+                <Section
+                  title="Section E: Developmental and Medical Conditions"
+                  sectionKey="conditions"
+                >
                   <SelectField
                     inputRef={intellectual_disability}
                     label="12) Diagnosed intellectual disability"
@@ -840,55 +1047,84 @@ export default function Questionnaire() {
                   />
                 </Section>
 
-                <Section title="Section F: Previous Screening History">
+                <Section
+                  title="Section F: Previous Screening History"
+                  sectionKey="screening"
+                >
                   <SelectField
                     inputRef={screening_done}
                     label="17) Has the child undergone autism-related developmental screening before?"
                     options={["Yes", "No"]}
+                    onValueChange={(value) => {
+                      setScreeningDoneValue(value);
+                      if (value !== "Yes") {
+                        setRefValue(screening_result, "");
+                      }
+                    }}
                   />
 
-                  <SelectField
-                    inputRef={screening_result}
-                    label="18) If yes, what was the screening outcome?"
-                    options={["Positive", "Negative", "Unknown"]}
-                    placeholder="Select (only required if Q17 is Yes)"
-                    helper="Only required when Q17 is Yes."
-                  />
+                  {screeningDoneValue === "Yes" && (
+                    <SelectField
+                      inputRef={screening_result}
+                      label="18) If yes, what was the screening outcome?"
+                      options={["Positive", "Negative", "Unknown"]}
+                      placeholder="Select screening outcome"
+                      helper="This field appears only when Question 17 is Yes."
+                    />
+                  )}
                 </Section>
 
-                <Section title="Section G: Consent">
-                  <div className="rounded border border-gray-200 bg-gray-50 p-4">
-                    <p className="text-sm text-gray-700">
-                      <span className="font-medium">Consent:</span>{" "}
-                      I understand that this tool provides a probabilistic screening result and does
-                      not replace a professional medical diagnosis.
-                    </p>
+                <Section title="Section G: Consent" sectionKey="consent">
+                  <div className="md:col-span-2">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <p className="text-sm leading-6 text-slate-700">
+                        <span className="font-semibold">Consent:</span> I understand that this tool
+                        provides a probabilistic screening result and does not replace a
+                        professional medical diagnosis.
+                      </p>
 
-                    <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
-                      <input ref={consent} type="checkbox" />
-                      I agree
-                    </label>
+                      <label className="mt-4 inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm">
+                        <input ref={consent} type="checkbox" className="h-4 w-4 rounded" />
+                        I agree
+                      </label>
+                    </div>
                   </div>
                 </Section>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <button
-                    type="button"
-                    onClick={() => navigate(-1)}
-                    className="w-full sm:w-auto rounded border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                  >
-                    Back
-                  </button>
+                <div
+                  className={`${cardBase} flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between`}
+                >
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900">
+                      Ready to generate the result?
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Review your answers, then submit the questionnaire.
+                    </p>
+                  </div>
 
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={handlePredict}
-                    className={`w-full sm:w-auto rounded px-6 py-2.5 text-sm font-semibold text-white transition
-                      ${isSubmitting ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"}`}
-                  >
-                    {isSubmitting ? "Submitting..." : "Submit & Predict"}
-                  </button>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => navigate(-1)}
+                      className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Back
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={handlePredict}
+                      className={`rounded-2xl px-6 py-3 text-sm font-semibold text-white shadow-md transition ${
+                        isSubmitting
+                          ? "cursor-not-allowed bg-blue-300"
+                          : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:-translate-y-0.5 hover:shadow-lg"
+                      }`}
+                    >
+                      {isSubmitting ? "Submitting..." : "Submit & Predict"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </>
