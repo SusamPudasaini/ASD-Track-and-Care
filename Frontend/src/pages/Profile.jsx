@@ -1,12 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Camera,
+  Clock3,
+  KeyRound,
+  Mail,
+  Save,
+  Shield,
+  Stethoscope,
+  UserCircle2,
+  Wallet,
+  X,
+} from "lucide-react";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 
 // ✅ Backend endpoints
-const USER_AVATAR_ENDPOINT = "/api/users/me/avatar"; // POST multipart/form-data { file }
-const THERAPIST_UPDATE_ENDPOINT = "/api/users/me/therapist-settings"; // PUT { pricePerSession, availability: { Day: ["HH:mm"] } }
+const USER_AVATAR_ENDPOINT = "/api/users/me/avatar";
+const THERAPIST_UPDATE_ENDPOINT = "/api/users/me/therapist-settings";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -20,13 +34,8 @@ function resolveImageUrl(raw) {
   if (!raw) return "";
   const s = String(raw);
 
-  // blob preview
   if (s.startsWith("blob:")) return s;
-
-  // already absolute
   if (s.startsWith("http://") || s.startsWith("https://")) return s;
-
-  // relative path from backend
   if (s.startsWith("/")) return `${backendBase()}${s}`;
 
   return `${backendBase()}/${s}`;
@@ -80,13 +89,40 @@ function normalizeAvailability(inMap) {
   return out;
 }
 
+const cardBase =
+  "rounded-3xl border border-white/60 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur";
+
+function SectionCard({ icon, title, description, children, action }) {
+  const Icon = icon;
+  return (
+    <section className={`${cardBase} p-6 md:p-7`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 shadow-sm">
+            <Icon size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-slate-900">{title}</h2>
+            {description ? (
+              <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
+            ) : null}
+          </div>
+        </div>
+
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+
+      <div className="mt-6">{children}</div>
+    </section>
+  );
+}
+
 export default function Profile() {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Reset password modal
   const [resetOpen, setResetOpen] = useState(false);
   const [resetSending, setResetSending] = useState(false);
 
@@ -100,12 +136,10 @@ export default function Profile() {
     phoneNumber: "",
   });
 
-  // Avatar (everyone)
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState("");
 
-  // Therapist-only
   const [therapistSaving, setTherapistSaving] = useState(false);
 
   const [therapistForm, setTherapistForm] = useState({
@@ -113,7 +147,6 @@ export default function Profile() {
     availability: {},
   });
 
-  // UI state (dropdown + modal)
   const [selectedDay, setSelectedDay] = useState("Sunday");
   const [slotsModalOpen, setSlotsModalOpen] = useState(false);
 
@@ -124,15 +157,8 @@ export default function Profile() {
     return role.includes("THERAPIST");
   }, [me]);
 
-  // ✅ choose avatar shown (preview > saved url)
   const avatarToShow = useMemo(() => {
-    const raw =
-      avatarPreview ||
-      me?.profilePictureUrl ||
-      me?.avatarUrl ||
-      me?.profilePicture ||
-      "";
-
+    const raw = avatarPreview || me?.profilePictureUrl || me?.avatarUrl || me?.profilePicture || "";
     return resolveImageUrl(raw);
   }, [avatarPreview, me]);
 
@@ -160,7 +186,9 @@ export default function Profile() {
         const avail = normalizeAvailability(u.availability);
         setTherapistForm({
           pricePerSession:
-            u.pricePerSession === null || u.pricePerSession === undefined ? "" : String(u.pricePerSession),
+            u.pricePerSession === null || u.pricePerSession === undefined
+              ? ""
+              : String(u.pricePerSession),
           availability: avail,
         });
 
@@ -214,7 +242,6 @@ export default function Profile() {
     }
   };
 
-  // -------- Avatar (everyone) --------
   const onPickAvatar = (file) => {
     if (!file) return;
 
@@ -249,7 +276,6 @@ export default function Profile() {
 
       toast.success("Profile picture updated.");
 
-      // ✅ update cache so navbar + other pages refresh instantly
       localStorage.setItem("me", JSON.stringify(updated));
       if (updated?.profilePictureUrl) localStorage.setItem("profilePictureUrl", updated.profilePictureUrl);
 
@@ -266,7 +292,6 @@ export default function Profile() {
     }
   };
 
-  // -------- Therapist helpers --------
   const daySelectedCount = useMemo(() => {
     const a = therapistForm.availability || {};
     return Object.keys(a).filter((d) => (a[d] || []).length > 0).length;
@@ -330,12 +355,13 @@ export default function Profile() {
         availability,
       });
 
-      toast.success(totalSlots === 0 ? "Saved. You are marked as not available." : "Therapist settings updated.");
+      toast.success(
+        totalSlots === 0 ? "Saved. You are marked as not available." : "Therapist settings updated."
+      );
 
       const updated = res?.data || {};
       setMe(updated);
 
-      // ✅ cache
       localStorage.setItem("me", JSON.stringify(updated));
       if (updated?.role) localStorage.setItem("role", updated.role);
       if (updated?.profilePictureUrl) localStorage.setItem("profilePictureUrl", updated.profilePictureUrl);
@@ -343,7 +369,9 @@ export default function Profile() {
       const avail = normalizeAvailability(updated.availability);
       setTherapistForm({
         pricePerSession:
-          updated.pricePerSession === null || updated.pricePerSession === undefined ? "" : String(updated.pricePerSession),
+          updated.pricePerSession === null || updated.pricePerSession === undefined
+            ? ""
+            : String(updated.pricePerSession),
         availability: avail,
       });
 
@@ -357,7 +385,6 @@ export default function Profile() {
     }
   };
 
-  // Reset password
   const sendResetPasswordLink = async () => {
     if (!form.userEmail?.trim()) {
       toast.error("Email not found on your profile.");
@@ -382,230 +409,340 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.10),_transparent_35%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_35%,_#ffffff)]">
       <Navbar />
 
-      <main className="mx-auto max-w-3xl px-6 py-10">
-        <div className="rounded-md border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="text-xl font-semibold text-gray-900">My Profile</h1>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setResetOpen(true)}
-                className="rounded border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Reset Password
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate("/therapist/apply")}
-                className="rounded bg-[#4a6cf7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
-              >
-                Become a Therapist
-              </button>
-            </div>
-          </div>
-
-          <p className="mt-2 text-sm text-gray-600">View and edit your account details.</p>
-        </div>
-
-        {/* Avatar section */}
-        <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold text-gray-900">Profile Picture</h2>
-            <p className="text-sm text-gray-600">Upload a new profile photo (PNG/JPG up to 5MB).</p>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="h-16 w-16 overflow-hidden rounded-full border border-gray-200 bg-white">
-                {avatarToShow ? (
-                  <img src={avatarToShow} alt="Profile" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">No photo</div>
-                )}
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className={`${cardBase} overflow-hidden`}>
+          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-6 py-8 text-white md:px-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="max-w-3xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-100">
+                  Account settings
+                </p>
+                <h1 className="mt-2 flex items-center gap-3 text-3xl font-bold tracking-tight">
+                  <UserCircle2 size={30} />
+                  My Profile
+                </h1>
+                <p className="mt-3 text-sm leading-6 text-blue-50 md:text-base">
+                  View and manage your account details, profile picture, and therapist availability in one place.
+                </p>
               </div>
 
-              <div>
-                <div className="text-sm font-semibold text-gray-800">Change photo</div>
-                <div className="text-xs text-gray-500">This is visible on your account.</div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <label className="cursor-pointer rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-                Choose Image
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => onPickAvatar(e.target.files?.[0])}
-                />
-              </label>
-
-              <button
-                type="button"
-                onClick={uploadAvatar}
-                disabled={avatarUploading || !avatarFile}
-                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                  avatarUploading || !avatarFile ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
-                }`}
-              >
-                {avatarUploading ? "Uploading..." : "Upload"}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Basic profile */}
-        <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
-          {loading ? (
-            <div className="text-sm text-gray-600">Loading profile...</div>
-          ) : (
-            <form onSubmit={handleSave} className="space-y-5">
-              <Field label="Username" value={form.username} disabled hint="Username cannot be changed." />
-              <Field label="Email" value={form.userEmail} disabled hint="Email cannot be changed." />
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="First Name" value={form.firstName} onChange={(v) => onChange("firstName", v)} placeholder="e.g., John" />
-                <Field label="Last Name" value={form.lastName} onChange={(v) => onChange("lastName", v)} placeholder="e.g., Doe" />
-              </div>
-
-              <Field label="Phone Number" value={form.phoneNumber} onChange={(v) => onChange("phoneNumber", v)} placeholder="e.g., +97798XXXXXXXX" />
-
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => navigate(-1)}
-                  className="rounded border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  onClick={() => setResetOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
                 >
-                  Back
+                  <KeyRound size={16} />
+                  Reset Password
                 </button>
 
                 <button
-                  type="submit"
-                  disabled={saving}
-                  className={`rounded px-5 py-2 text-sm font-semibold text-white ${
-                    saving ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
-                  }`}
+                  type="button"
+                  onClick={() => navigate("/therapist/apply")}
+                  className="rounded-2xl border border-white/25 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-blue-50"
                 >
-                  {saving ? "Saving..." : "Save Changes"}
+                  Become a Therapist
                 </button>
               </div>
-            </form>
-          )}
+            </div>
+          </div>
+
+          <div className="grid gap-4 border-t border-slate-100 bg-white px-6 py-5 md:grid-cols-3 md:px-8">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Account</div>
+              <div className="mt-2 text-lg font-bold text-slate-900">
+                {form.firstName || form.username || "User"}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role</div>
+              <div className="mt-2 text-lg font-bold text-slate-900">{isTherapist ? "Therapist" : "User"}</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Email</div>
+              <div className="mt-2 truncate text-lg font-bold text-slate-900">{form.userEmail || "—"}</div>
+            </div>
+          </div>
         </div>
 
-        {/* Therapist-only settings */}
-        {!loading && isTherapist && (
-          <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-gray-900">Therapist Settings</h2>
-
-                {totalSlotsSelected === 0 && (
-                  <span className="rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700">
-                    Not available
-                  </span>
-                )}
-              </div>
-
-              <p className="text-sm text-gray-600">Pick a day → edit its slots. Saved slots stay green.</p>
-            </div>
-
-            <div className="mt-5 grid gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Price per session</label>
-                <div className="mt-2 flex items-center gap-2">
-                  <input
-                    value={therapistForm.pricePerSession}
-                    onChange={(e) => setTherapistForm((p) => ({ ...p, pricePerSession: e.target.value }))}
-                    placeholder="e.g., 20"
-                    inputMode="decimal"
-                    className="w-full rounded border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-semibold text-gray-500">/ session</span>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Availability</label>
-                    <div className="mt-1 text-xs text-gray-500">
-                      {daySelectedCount} day(s) · {totalSlotsSelected} total slot(s)
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <select
-                      value={selectedDay}
-                      onChange={(e) => setSelectedDay(e.target.value)}
-                      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    >
-                      {DAYS.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={() => setSlotsModalOpen(true)}
-                      className="rounded-lg bg-[#4a6cf7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#3f5ee0]"
-                    >
-                      Edit times
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-gray-900">{selectedDay}</div>
-                    <div className="text-xs text-gray-500">{selectedTimesForDay.length} selected</div>
-                  </div>
-
-                  {selectedTimesForDay.length === 0 ? (
-                    <div className="mt-2 text-sm text-gray-600">No times selected for this day.</div>
+        <div className="mt-6 grid gap-6">
+          <SectionCard
+            icon={Camera}
+            title="Profile Picture"
+            description="Upload a new profile photo. PNG and JPG are supported up to 5 MB."
+          >
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="relative h-20 w-20 overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
+                  {avatarToShow ? (
+                    <img src={avatarToShow} alt="Profile" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {selectedTimesForDay.map((t) => (
-                        <span
-                          key={t}
-                          className="rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700"
-                        >
-                          {t}
-                        </span>
-                      ))}
+                    <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
+                      No photo
                     </div>
                   )}
                 </div>
 
-                <p className="mt-2 text-xs text-gray-500">Slots are in 30-minute steps from 09:00 to 18:00.</p>
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Change profile photo</div>
+                  <div className="mt-1 text-sm text-slate-500">
+                    This image may be shown across your account and therapist profile.
+                  </div>
+                  {avatarFile && (
+                    <div className="mt-2 inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                      New image selected
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex flex-wrap gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                  <Camera size={16} />
+                  Choose Image
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => onPickAvatar(e.target.files?.[0])}
+                  />
+                </label>
+
                 <button
                   type="button"
-                  onClick={saveTherapistProfile}
-                  disabled={therapistSaving}
-                  className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
-                    therapistSaving ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+                  onClick={uploadAvatar}
+                  disabled={avatarUploading || !avatarFile}
+                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition ${
+                    avatarUploading || !avatarFile
+                      ? "cursor-not-allowed bg-blue-300"
+                      : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:-translate-y-0.5 hover:shadow-md"
                   }`}
                 >
-                  {therapistSaving ? "Saving..." : "Save Therapist Settings"}
+                  <Save size={16} />
+                  {avatarUploading ? "Uploading..." : "Upload"}
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          </SectionCard>
+
+          <SectionCard
+            icon={UserCircle2}
+            title="Basic Information"
+            description="Review your account details and update the editable fields below."
+          >
+            {loading ? (
+              <div className="text-sm text-slate-600">Loading profile...</div>
+            ) : (
+              <form onSubmit={handleSave} className="space-y-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field
+                    label="Username"
+                    value={form.username}
+                    disabled
+                    hint="Username cannot be changed."
+                  />
+                  <Field
+                    label="Email"
+                    value={form.userEmail}
+                    disabled
+                    hint="Email cannot be changed."
+                    icon={Mail}
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field
+                    label="First Name"
+                    value={form.firstName}
+                    onChange={(v) => onChange("firstName", v)}
+                    placeholder="e.g., John"
+                  />
+                  <Field
+                    label="Last Name"
+                    value={form.lastName}
+                    onChange={(v) => onChange("lastName", v)}
+                    placeholder="e.g., Doe"
+                  />
+                </div>
+
+                <Field
+                  label="Phone Number"
+                  value={form.phoneNumber}
+                  onChange={(v) => onChange("phoneNumber", v)}
+                  placeholder="e.g., +97798XXXXXXXX"
+                />
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+                  <button
+                    type="button"
+                    onClick={() => navigate(-1)}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <ArrowLeft size={16} />
+                    Back
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className={`inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition ${
+                      saving
+                        ? "cursor-not-allowed bg-blue-300"
+                        : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:-translate-y-0.5 hover:shadow-md"
+                    }`}
+                  >
+                    <Save size={16} />
+                    {saving ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </SectionCard>
+
+          {!loading && isTherapist && (
+            <SectionCard
+              icon={Stethoscope}
+              title="Therapist Settings"
+              description="Manage your pricing and weekly availability. Saved slots remain visible for each selected day."
+              action={
+                totalSlotsSelected === 0 ? (
+                  <span className="rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700">
+                    Not available
+                  </span>
+                ) : null
+              }
+            >
+              <div className="grid gap-6">
+                <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-800">
+                      Price per session
+                    </label>
+                    <div className="mt-2 flex items-center gap-3">
+                      <div className="relative w-full">
+                        <Wallet
+                          size={16}
+                          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <input
+                          value={therapistForm.pricePerSession}
+                          onChange={(e) =>
+                            setTherapistForm((p) => ({ ...p, pricePerSession: e.target.value }))
+                          }
+                          placeholder="e.g., 20"
+                          inputMode="decimal"
+                          className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                        />
+                      </div>
+                      <span className="text-sm font-semibold text-slate-500">/ session</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:w-[280px]">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Active days
+                      </div>
+                      <div className="mt-2 text-xl font-bold text-slate-900">{daySelectedCount}</div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Total slots
+                      </div>
+                      <div className="mt-2 text-xl font-bold text-slate-900">{totalSlotsSelected}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-800">Availability</label>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Choose a day, then edit the available 30-minute time slots.
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <select
+                        value={selectedDay}
+                        onChange={(e) => setSelectedDay(e.target.value)}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                      >
+                        {DAYS.map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => setSlotsModalOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                      >
+                        <CalendarDays size={16} />
+                        Edit times
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        <Clock3 size={16} className="text-blue-600" />
+                        {selectedDay}
+                      </div>
+                      <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                        {selectedTimesForDay.length} selected
+                      </div>
+                    </div>
+
+                    {selectedTimesForDay.length === 0 ? (
+                      <div className="mt-3 text-sm text-slate-600">No times selected for this day.</div>
+                    ) : (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {selectedTimesForDay.map((t) => (
+                          <span
+                            key={t}
+                            className="rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="mt-3 text-xs text-slate-500">
+                    Slots are available in 30-minute steps from 09:00 to 18:00.
+                  </p>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={saveTherapistProfile}
+                    disabled={therapistSaving}
+                    className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition ${
+                      therapistSaving
+                        ? "cursor-not-allowed bg-blue-300"
+                        : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:-translate-y-0.5 hover:shadow-md"
+                    }`}
+                  >
+                    <Save size={16} />
+                    {therapistSaving ? "Saving..." : "Save Therapist Settings"}
+                  </button>
+                </div>
+              </div>
+            </SectionCard>
+          )}
+        </div>
       </main>
 
-      {/* Slots Modal */}
       {slotsModalOpen && (
         <SlotsModal
           day={selectedDay}
@@ -617,54 +754,64 @@ export default function Profile() {
         />
       )}
 
-      {/* Reset Password Modal */}
       {resetOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">Reset Password</h2>
-                <p className="mt-1 text-sm text-gray-600">
-                  We will send a password reset link to:
-                  <span className="ml-1 font-semibold">{form.userEmail || "-"}</span>
-                </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/40 bg-white shadow-2xl">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="flex items-center gap-2 text-lg font-semibold">
+                    <KeyRound size={20} />
+                    Reset Password
+                  </h2>
+                  <p className="mt-2 text-sm text-blue-50">
+                    We will send a password reset link to:
+                    <span className="ml-1 font-semibold">{form.userEmail || "-"}</span>
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setResetOpen(false)}
+                  className="rounded-xl border border-white/20 bg-white/10 p-2 text-white hover:bg-white/20"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                Check your email for the <span className="font-semibold">reset link</span> and follow the instructions after pressing the button below.
               </div>
 
-              <button
-                type="button"
-                onClick={() => setResetOpen(false)}
-                className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-              >
-                ✕
-              </button>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setResetOpen(false)}
+                  className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={sendResetPasswordLink}
+                  disabled={resetSending}
+                  className={`rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition ${
+                    resetSending
+                      ? "cursor-not-allowed bg-blue-300"
+                      : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:-translate-y-0.5 hover:shadow-md"
+                  }`}
+                >
+                  {resetSending ? "Sending..." : "Send Reset Link"}
+                </button>
+              </div>
+
+              <div className="mt-3 text-xs text-slate-500">
+                If you do not see the email, check spam or junk folders.
+              </div>
             </div>
-
-            <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
-              Check your email for the <span className="font-semibold">reset link</span> and follow the instructions after pressing the button below.
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setResetOpen(false)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={sendResetPasswordLink}
-                disabled={resetSending}
-                className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
-                  resetSending ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
-                }`}
-              >
-                {resetSending ? "Sending..." : "Send Reset Link"}
-              </button>
-            </div>
-
-            <div className="mt-3 text-xs text-gray-500">If you don’t see the email, check spam/junk.</div>
           </div>
         </div>
       )}
@@ -674,92 +821,116 @@ export default function Profile() {
 
 function SlotsModal({ day, selectedTimes, onClose, onToggle, onSelectAll, onClear }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-lg">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Edit availability</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Day: <span className="font-semibold">{day}</span> ·{" "}
-              <span className="font-semibold">{selectedTimes.size}</span> selected
-            </p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-4xl overflow-hidden rounded-3xl border border-white/40 bg-white shadow-2xl">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-semibold">
+                <CalendarDays size={20} />
+                Edit Availability
+              </h2>
+              <p className="mt-2 text-sm text-blue-50">
+                Day: <span className="font-semibold">{day}</span> ·{" "}
+                <span className="font-semibold">{selectedTimes.size}</span> selected
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-white/20 bg-white/10 p-2 text-white hover:bg-white/20"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onSelectAll}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Select all
+            </button>
+            <button
+              type="button"
+              onClick={onClear}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Clear
+            </button>
+            <div className="ml-auto text-xs text-slate-500">
+              Click a time to toggle it. Green means selected.
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-          >
-            ✕
-          </button>
-        </div>
+          <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+            {TIME_SLOTS.map((t) => {
+              const active = selectedTimes.has(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => onToggle(t)}
+                  className={`rounded-2xl border px-3 py-2.5 text-center text-xs font-semibold transition ${
+                    active
+                      ? "border-green-200 bg-green-50 text-green-700 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {t}
+                </button>
+              );
+            })}
+          </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={onSelectAll}
-            className="rounded border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Select all
-          </button>
-          <button
-            type="button"
-            onClick={onClear}
-            className="rounded border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Clear
-          </button>
-          <div className="text-xs text-gray-500 self-center">Click a time to toggle. Green = saved in form.</div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-          {TIME_SLOTS.map((t) => {
-            const active = selectedTimes.has(t);
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => onToggle(t)}
-                className={`rounded-lg border px-3 py-2 text-center text-xs font-semibold ${
-                  active ? "border-green-200 bg-green-50 text-green-700" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                {t}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-6 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Done
-          </button>
+          <div className="mt-6 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Done
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function Field({ label, value, onChange, placeholder, disabled, hint }) {
+function Field({ label, value, onChange, placeholder, disabled, hint, icon: Icon }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
-      <input
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange?.(e.target.value)}
-        placeholder={placeholder}
-        className={`mt-2 w-full rounded border px-4 py-2.5 text-sm outline-none focus:ring-1 ${
-          disabled
-            ? "border-gray-200 bg-gray-50 text-gray-500"
-            : "border-gray-200 bg-white focus:border-blue-500 focus:ring-blue-500"
-        }`}
-      />
-      {!!hint && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
+      <label className="block text-sm font-semibold text-slate-800">{label}</label>
+
+      <div className="relative mt-2">
+        {Icon ? (
+          <Icon
+            size={16}
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+        ) : null}
+
+        <input
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange?.(e.target.value)}
+          placeholder={placeholder}
+          className={`w-full rounded-2xl px-4 py-3 text-sm outline-none transition ${
+            Icon ? "pl-11" : ""
+          } ${
+            disabled
+              ? "border border-slate-200 bg-slate-50 text-slate-500"
+              : "border border-slate-200 bg-white text-slate-800 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+          }`}
+        />
+      </div>
+
+      {!!hint && <p className="mt-2 text-xs text-slate-500">{hint}</p>}
     </div>
   );
 }

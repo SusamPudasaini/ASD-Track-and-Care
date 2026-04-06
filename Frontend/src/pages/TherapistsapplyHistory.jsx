@@ -1,10 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import {
+  ArrowLeft,
+  ClipboardList,
+  Eye,
+  FileText,
+  PlusCircle,
+  ShieldCheck,
+  UserCheck,
+  X,
+} from "lucide-react";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 
-// ✅ Always convert backend errors to a string (prevents React object render crash)
 function getErrorMessage(err) {
   const data = err?.response?.data;
 
@@ -16,7 +25,6 @@ function getErrorMessage(err) {
     if (data.error) return data.error;
     if (data.title) return data.title;
 
-    // Spring default error keys: timestamp/status/error/path
     if (data.status && data.path) return `${data.error || "Request failed"} (${data.status})`;
 
     try {
@@ -38,32 +46,47 @@ function fmtDate(value) {
   }
 }
 
+function getStatusStyle(status) {
+  const s = String(status || "").toUpperCase();
+
+  if (s === "APPROVED") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (s === "REJECTED") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  if (s === "PENDING") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+const cardBase =
+  "rounded-3xl border border-white/60 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur";
+
 export default function TherapistApply() {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [apps, setApps] = useState([]);
 
-  // Details modal
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [details, setDetails] = useState(null); // { application, documents } OR application object
+  const [details, setDetails] = useState(null);
   const [detailsRow, setDetailsRow] = useState(null);
 
-  // ✅ Latest application logic (assumes apps are sorted newest first from backend)
   const latestApp = apps?.length ? apps[0] : null;
   const latestStatus = (latestApp?.status || "").toUpperCase();
 
-  // ✅ only enable submit if no apps OR latest is REJECTED
   const canSubmitNew = !latestApp || latestStatus === "REJECTED";
 
   const submitDisabledReason = !latestApp
     ? ""
     : latestStatus === "REJECTED"
-    ? ""
-    : `Submit disabled because your latest application is ${latestStatus}.`;
+      ? ""
+      : `Submit disabled because your latest application is ${latestStatus}.`;
 
-  // ✅ Load user's application history
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -116,7 +139,6 @@ export default function TherapistApply() {
     return () => controller.abort();
   }, [navigate]);
 
-  // ✅ View application details (expects: { application, documents } or application)
   const openDetails = async (row) => {
     setDetailsRow(row);
     setDetails(null);
@@ -151,199 +173,346 @@ export default function TherapistApply() {
   const detailsDocs = Array.isArray(details?.documents) ? details.documents : [];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.10),_transparent_35%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_35%,_#ffffff)]">
       <Navbar />
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        {/* Header */}
-        <div className="rounded-md border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Become a Therapist</h1>
-              <p className="mt-2 text-sm text-gray-600">
-                Track your previous applications and submit a new one when you’re ready.
-              </p>
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className={`${cardBase} overflow-hidden`}>
+          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-6 py-8 text-white md:px-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="max-w-3xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-100">
+                  Therapist application
+                </p>
+                <h1 className="mt-2 flex items-center gap-3 text-3xl font-bold tracking-tight">
+                  <UserCheck size={30} />
+                  Become a Therapist
+                </h1>
+                <p className="mt-3 text-sm leading-6 text-blue-50 md:text-base">
+                  Track your previous applications and submit a new one when you are eligible.
+                </p>
 
-              {!canSubmitNew && (
-                <p className="mt-2 text-sm text-gray-500">{submitDisabledReason}</p>
-              )}
+                {!canSubmitNew && (
+                  <div className="mt-4 inline-flex rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/95 backdrop-blur">
+                    {submitDisabledReason}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/therapist/apply/new")}
+                  disabled={!canSubmitNew}
+                  title={!canSubmitNew ? submitDisabledReason : ""}
+                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold shadow-sm transition ${
+                    canSubmitNew
+                      ? "bg-white text-slate-900 hover:bg-blue-50"
+                      : "cursor-not-allowed bg-white/30 text-white/70"
+                  }`}
+                >
+                  <PlusCircle size={16} />
+                  Submit New Application
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
+                >
+                  <ArrowLeft size={16} />
+                  Back
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 border-t border-slate-100 bg-white px-6 py-5 md:grid-cols-3 md:px-8">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Total applications
+              </div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{apps.length}</div>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => navigate("/therapist/apply/new")}
-                disabled={!canSubmitNew}
-                title={!canSubmitNew ? submitDisabledReason : ""}
-                className={`rounded px-4 py-2 text-sm font-semibold text-white ${
-                  canSubmitNew ? "bg-[#4a6cf7] hover:bg-[#3f5ee0]" : "bg-gray-300 cursor-not-allowed"
-                }`}
-              >
-                Submit New Application
-              </button>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Latest status
+              </div>
+              <div className="mt-2">
+                {latestApp ? (
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1.5 text-sm font-semibold ${getStatusStyle(
+                      latestApp.status
+                    )}`}
+                  >
+                    {latestApp.status}
+                  </span>
+                ) : (
+                  <span className="text-lg font-bold text-slate-900">No applications</span>
+                )}
+              </div>
+            </div>
 
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="rounded border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Back
-              </button>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Submit eligibility
+              </div>
+              <div className="mt-2 text-lg font-bold text-slate-900">
+                {canSubmitNew ? "Eligible" : "Not eligible"}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* My old applications table */}
-        <div className="mt-6 rounded-md border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900">My old applications</h2>
-            <span className="text-xs text-gray-500">{apps.length} total</span>
+        <div className={`${cardBase} mt-6 p-6 md:p-7`}>
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                <ClipboardList size={20} className="text-blue-600" />
+                My old applications
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Review your previous therapist applications and open details for each submission.
+              </p>
+            </div>
+
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
+              {apps.length} total
+            </span>
           </div>
 
           {loading ? (
-            <div className="text-sm text-gray-600">Loading your applications...</div>
-          ) : apps.length === 0 ? (
-            <div className="text-sm text-gray-600">You haven’t submitted any therapist applications yet.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] border-collapse">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">ID</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Status</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Submitted Time</th>
-                    <th className="py-3 text-left text-xs font-semibold text-gray-500">Reviewed Time</th>
-                    <th className="py-3 text-right text-xs font-semibold text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {apps.map((a) => (
-                    <tr key={a.id} className="border-b last:border-b-0">
-                      <td className="py-3 text-sm text-gray-900">{a.id ?? "-"}</td>
-                      <td className="py-3 text-sm text-gray-900">{a.status ?? "-"}</td>
-                      <td className="py-3 text-sm text-gray-700">{fmtDate(a.createdAt)}</td>
-                      <td className="py-3 text-sm text-gray-700">{fmtDate(a.reviewedAt)}</td>
-
-                      <td className="py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => openDetails(a)}
-                          className="rounded border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                        >
-                          View Application Detail
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <p className="mt-4 text-xs text-gray-500">
-                Note: You can only submit a new application if your latest application is{" "}
-                <span className="font-semibold">REJECTED</span> (or you have no applications yet).
-              </p>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
+              Loading your applications...
             </div>
+          ) : apps.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                <FileText size={24} />
+              </div>
+              <h3 className="mt-4 text-base font-semibold text-slate-900">
+                No applications yet
+              </h3>
+              <p className="mt-2 text-sm text-slate-600">
+                You have not submitted any therapist applications yet.
+              </p>
+              <div className="mt-5">
+                <button
+                  type="button"
+                  onClick={() => navigate("/therapist/apply/new")}
+                  disabled={!canSubmitNew}
+                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition ${
+                    canSubmitNew
+                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:-translate-y-0.5 hover:shadow-md"
+                      : "cursor-not-allowed bg-blue-300"
+                  }`}
+                >
+                  <PlusCircle size={16} />
+                  Submit New Application
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full min-w-[900px] border-collapse bg-white">
+                  <thead className="bg-slate-50">
+                    <tr className="border-b border-slate-200">
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        ID
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Submitted Time
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Reviewed Time
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {apps.map((a) => (
+                      <tr
+                        key={a.id}
+                        onClick={() => openDetails(a)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openDetails(a);
+                          }
+                        }}
+                        tabIndex={0}
+                        role="button"
+                        className="cursor-pointer border-b border-slate-100 last:border-b-0 transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
+                      >
+                        <td className="px-4 py-4 text-sm font-semibold text-slate-900">
+                          {a.id ?? "-"}
+                        </td>
+
+                        <td className="px-4 py-4 text-sm">
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold ${getStatusStyle(
+                              a.status
+                            )}`}
+                          >
+                            {a.status ?? "-"}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-700">
+                          {fmtDate(a.createdAt)}
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-700">
+                          {fmtDate(a.reviewedAt)}
+                        </td>
+
+                        <td className="px-4 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDetails(a);
+                            }}
+                            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                          >
+                            <Eye size={14} />
+                            View Details
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                <span className="font-semibold">Note:</span> You can only submit a new application if your latest application is{" "}
+                <span className="font-semibold">REJECTED</span>, or if you have not submitted one yet.
+              </div>
+            </>
           )}
         </div>
       </main>
 
-      {/* ✅ DETAILS MODAL (THIS WAS MISSING) */}
       {detailsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-lg">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">Application Details</h2>
-                <p className="mt-1 text-sm text-gray-600">
-                  ID: <span className="font-semibold">{detailsApp?.id ?? "-"}</span>{" "}
-                  <span className="text-gray-400">•</span>{" "}
-                  Status: <span className="font-semibold">{detailsApp?.status ?? "-"}</span>
-                </p>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-4xl overflow-hidden rounded-3xl border border-white/40 bg-white shadow-2xl">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="flex items-center gap-2 text-lg font-semibold">
+                    <ShieldCheck size={20} />
+                    Application Details
+                  </h2>
+                  <p className="mt-2 text-sm text-blue-50">
+                    ID: <span className="font-semibold">{detailsApp?.id ?? "-"}</span>{" "}
+                    <span className="mx-2 text-white/60">•</span>
+                    Status:{" "}
+                    <span className="font-semibold">{detailsApp?.status ?? "-"}</span>
+                  </p>
+                </div>
 
-              <button
-                type="button"
-                onClick={closeDetails}
-                className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-              >
-                ✕
-              </button>
+                <button
+                  type="button"
+                  onClick={closeDetails}
+                  className="rounded-xl border border-white/20 bg-white/10 p-2 text-white hover:bg-white/20"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
-            {detailsLoading ? (
-              <div className="mt-5 text-sm text-gray-600">Loading details...</div>
-            ) : (
-              <div className="mt-5 grid gap-5 md:grid-cols-2">
-                <Info label="Full Name" value={detailsApp?.fullName} />
-                <Info label="Qualification" value={detailsApp?.qualification} />
-                <Info label="Specialization" value={detailsApp?.specialization} />
-                <Info label="Years Experience" value={detailsApp?.yearsExperience} />
-                <Info label="License Number" value={detailsApp?.licenseNumber} />
-                <Info label="City" value={detailsApp?.city} />
-                <Info label="Workplace" value={detailsApp?.workplace} />
-                <Info label="Submitted" value={fmtDate(detailsApp?.createdAt)} />
-                <Info label="Reviewed At" value={fmtDate(detailsApp?.reviewedAt)} />
-                <Info label="Reviewed By" value={detailsApp?.reviewedBy} />
-
-                <div className="md:col-span-2">
-                  <div className="text-sm font-semibold text-gray-900">Your Message</div>
-                  <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm text-gray-700">
-                    {detailsApp?.message ? detailsApp.message : <span className="text-gray-400">—</span>}
-                  </div>
+            <div className="p-6">
+              {detailsLoading ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
+                  Loading details...
                 </div>
-
-                <div className="md:col-span-2">
-                  <div className="text-sm font-semibold text-gray-900">Admin Message</div>
-                  <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm text-gray-700">
-                    {detailsApp?.adminMessage ? detailsApp.adminMessage : <span className="text-gray-400">—</span>}
+              ) : (
+                <div className="grid gap-6">
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <Info label="Full Name" value={detailsApp?.fullName} />
+                    <Info label="Qualification" value={detailsApp?.qualification} />
+                    <Info label="Specialization" value={detailsApp?.specialization} />
+                    <Info label="Years Experience" value={detailsApp?.yearsExperience} />
+                    <Info label="License Number" value={detailsApp?.licenseNumber} />
+                    <Info label="City" value={detailsApp?.city} />
+                    <Info label="Workplace" value={detailsApp?.workplace} />
+                    <Info label="Submitted" value={fmtDate(detailsApp?.createdAt)} />
+                    <Info label="Reviewed At" value={fmtDate(detailsApp?.reviewedAt)} />
+                    <Info label="Reviewed By" value={detailsApp?.reviewedBy} />
                   </div>
-                </div>
 
-                <div className="md:col-span-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-gray-900">Uploaded Documents</div>
-                    <div className="text-xs text-gray-500">{detailsDocs.length} file(s)</div>
-                  </div>
-
-                  {detailsDocs.length === 0 ? (
-                    <div className="mt-2 rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-600">
-                      No documents uploaded.
+                  <div className="grid gap-5">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-sm font-semibold text-slate-900">Your Message</div>
+                      <div className="mt-2 text-sm leading-6 text-slate-700">
+                        {detailsApp?.message ? detailsApp.message : <span className="text-slate-400">—</span>}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="mt-3 space-y-2">
-                      {detailsDocs.map((d) => (
-                        <div
-                          key={d.id || d.title}
-                          className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3"
-                        >
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold text-gray-900">
-                              {d.title || d.fileName || `Document ${d.id}`}
-                            </div>
-                            <div className="truncate text-xs text-gray-500">
-                              {d.fileType || d.contentType || "file"}
-                              {d.uploadedAt ? ` • ${fmtDate(d.uploadedAt)}` : ""}
-                            </div>
-                          </div>
 
-                          <span className="shrink-0 text-xs text-gray-400"></span>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-sm font-semibold text-slate-900">Admin Message</div>
+                      <div className="mt-2 text-sm leading-6 text-slate-700">
+                        {detailsApp?.adminMessage ? detailsApp.adminMessage : <span className="text-slate-400">—</span>}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-slate-900">Uploaded Documents</div>
+                        <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                          {detailsDocs.length} file(s)
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+                      </div>
 
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                onClick={closeDetails}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Close
-              </button>
+                      {detailsDocs.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                          No documents uploaded.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {detailsDocs.map((d) => (
+                            <div
+                              key={d.id || d.title}
+                              className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4"
+                            >
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-semibold text-slate-900">
+                                  {d.title || d.fileName || `Document ${d.id}`}
+                                </div>
+                                <div className="truncate text-xs text-slate-500">
+                                  {d.fileType || d.contentType || "file"}
+                                  {d.uploadedAt ? ` • ${fmtDate(d.uploadedAt)}` : ""}
+                                </div>
+                              </div>
+
+                              <FileText size={16} className="shrink-0 text-slate-400" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={closeDetails}
+                  className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -354,10 +523,11 @@ export default function TherapistApply() {
 
 function Info({ label, value }) {
   const show = value === 0 ? "0" : value ? String(value) : "—";
+
   return (
-    <div>
-      <div className="text-xs font-semibold text-gray-500">{label}</div>
-      <div className="mt-1 text-sm text-gray-900">{show}</div>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-2 text-sm font-medium text-slate-900">{show}</div>
     </div>
   );
 }
