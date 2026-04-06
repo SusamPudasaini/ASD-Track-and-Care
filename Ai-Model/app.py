@@ -50,7 +50,7 @@ class PredictResponse(BaseModel):
     asd_probability_score: float
     prediction: int
     risk_level: str
-    model_version: str = "questionnaire_rules_v1"
+    model_version: str = "questionnaire_rules_v2"
 
 
 def questionnaire_risk_score(row: dict) -> float:
@@ -107,11 +107,17 @@ def questionnaire_risk_score(row: dict) -> float:
 
 
 def get_risk_level(probability: float) -> str:
-    if probability < 0.20:
+    percent = probability * 100.0
+
+    if percent <= 10.0:
+        return "Very Low"
+    elif percent <= 25.0:
         return "Low"
-    elif probability < 0.50:
+    elif percent <= 50.0:
         return "Moderate"
-    return "High"
+    elif percent <= 75.0:
+        return "High"
+    return "Very High"
 
 
 @app.get("/health")

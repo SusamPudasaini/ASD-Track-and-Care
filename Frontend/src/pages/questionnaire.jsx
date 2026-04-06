@@ -142,18 +142,26 @@ const ResultModal = ({
   const pct = (p * 100).toFixed(1);
 
   const riskBadgeClass =
-    riskLevel === "High"
-      ? "bg-red-50 text-red-700 border-red-200"
-      : riskLevel === "Moderate"
-        ? "bg-amber-50 text-amber-700 border-amber-200"
-        : "bg-emerald-50 text-emerald-700 border-emerald-200";
+    riskLevel === "Very High"
+      ? "bg-red-100 text-red-800 border-red-200"
+      : riskLevel === "High"
+        ? "bg-orange-100 text-orange-800 border-orange-200"
+        : riskLevel === "Moderate"
+          ? "bg-amber-100 text-amber-800 border-amber-200"
+          : riskLevel === "Low"
+            ? "bg-lime-100 text-lime-800 border-lime-200"
+            : "bg-emerald-100 text-emerald-800 border-emerald-200";
 
   const ringClass =
-    riskLevel === "High"
-      ? "from-red-500 to-rose-500"
-      : riskLevel === "Moderate"
-        ? "from-amber-500 to-orange-500"
-        : "from-emerald-500 to-teal-500";
+    riskLevel === "Very High"
+      ? "from-red-600 to-rose-600"
+      : riskLevel === "High"
+        ? "from-orange-500 to-red-500"
+        : riskLevel === "Moderate"
+          ? "from-amber-500 to-orange-500"
+          : riskLevel === "Low"
+            ? "from-lime-500 to-green-500"
+            : "from-emerald-500 to-teal-500";
 
   return (
     <div
@@ -219,7 +227,9 @@ const ResultModal = ({
           </div>
 
           <div className="mt-6">
-            <p className="mb-3 text-sm font-semibold text-slate-900">What would you like to do next?</p>
+            <p className="mb-3 text-sm font-semibold text-slate-900">
+              What would you like to do next?
+            </p>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <button
@@ -283,11 +293,15 @@ const LastResultCard = ({
   const lastRisk = latest.riskLevel || computeRiskLevel(latest.probability);
 
   const riskStyles =
-    lastRisk === "High"
-      ? "bg-red-50 text-red-700 border-red-200"
-      : lastRisk === "Moderate"
-        ? "bg-amber-50 text-amber-700 border-amber-200"
-        : "bg-emerald-50 text-emerald-700 border-emerald-200";
+    lastRisk === "Very High"
+      ? "bg-red-100 text-red-800 border-red-200"
+      : lastRisk === "High"
+        ? "bg-orange-100 text-orange-800 border-orange-200"
+        : lastRisk === "Moderate"
+          ? "bg-amber-100 text-amber-800 border-amber-200"
+          : lastRisk === "Low"
+            ? "bg-lime-100 text-lime-800 border-lime-200"
+            : "bg-emerald-100 text-emerald-800 border-emerald-200";
 
   return (
     <div className={`${cardBase} overflow-hidden`}>
@@ -471,9 +485,13 @@ export default function Questionnaire() {
   const yesNoTo01 = (v) => (v === "Yes" ? 1 : 0);
 
   const computeRiskLevel = useCallback((p) => {
-    if (p < 0.33) return "Low";
-    if (p < 0.66) return "Moderate";
-    return "High";
+    const percent = p * 100;
+
+    if (percent <= 10) return "Very Low";
+    if (percent <= 25) return "Low";
+    if (percent <= 50) return "Moderate";
+    if (percent <= 75) return "High";
+    return "Very High";
   }, []);
 
   const encodePayload = (raw) => {
@@ -830,11 +848,11 @@ export default function Questionnaire() {
                       </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={handleAutofill}
-                        className="rounded-2xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
+                        className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur transition hover:bg-white/20"
                       >
                         Autofill Test Values
                       </button>
@@ -843,33 +861,12 @@ export default function Questionnaire() {
                         <button
                           type="button"
                           onClick={() => setShowForm(false)}
-                          className="rounded-2xl border border-white/25 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-blue-50"
+                          className="rounded-xl border border-white/20 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-blue-50"
                         >
                           View History
                         </button>
                       )}
                     </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 border-t border-slate-100 bg-white px-6 py-5 md:grid-cols-3 md:px-8">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Sections
-                    </div>
-                    <div className="mt-2 text-lg font-bold text-slate-900">7</div>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Questions
-                    </div>
-                    <div className="mt-2 text-lg font-bold text-slate-900">18</div>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Outcome
-                    </div>
-                    <div className="mt-2 text-lg font-bold text-slate-900">Probability + Risk</div>
                   </div>
                 </div>
 

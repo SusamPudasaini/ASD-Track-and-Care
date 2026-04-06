@@ -34,9 +34,6 @@ public class MlController {
     private final QuestionnaireRecordRepository repo;
     private final UserRepository userRepo;
 
-    // FIX: Secrets and URLs must never be hardcoded in source. Inject from
-    // application.properties / environment variables so they are not
-    // accidentally committed to version control.
     @Value("${fastapi.url:http://localhost:8000/predict}")
     private String fastapiUrl;
 
@@ -51,7 +48,6 @@ public class MlController {
         this.userRepo = userRepo;
     }
 
-    // -------------------- shared: resolve logged-in user --------------------
     private User requireLoggedInUser(String authorizationHeader) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
@@ -75,7 +71,6 @@ public class MlController {
                 .orElseThrow(() -> new RuntimeException("User not found by username/email: " + name));
     }
 
-    // -------------------- GET /last --------------------
     @GetMapping("/last")
     public ResponseEntity<?> last(
             @RequestHeader(value = "Authorization", required = false) String authorization
@@ -89,12 +84,16 @@ public class MlController {
             }
 
             QuestionnaireRecord r = recOpt.get();
-            return ResponseEntity.ok(Map.of(
-                    "hasHistory", true,
-                    "id", r.getId(),
-                    "probability", r.getProbability(),
-                    "riskLevel", r.getRiskLevel()
-            ));
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("hasHistory", true);
+            response.put("id", r.getId());
+            response.put("probability", r.getProbability());
+            response.put("riskLevel", r.getRiskLevel());
+            response.put("createdAt", r.getCreatedAt());
+
+            return ResponseEntity.ok(response);
+
         } catch (RuntimeException ex) {
             if ("UNAUTHORIZED".equals(ex.getMessage())) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -112,7 +111,6 @@ public class MlController {
         }
     }
 
-    // -------------------- GET /history --------------------
     @GetMapping("/history")
     public ResponseEntity<?> history(
             @RequestHeader(value = "Authorization", required = false) String authorization,
@@ -131,6 +129,7 @@ public class MlController {
                 m.put("id", r.getId());
                 m.put("probability", r.getProbability());
                 m.put("riskLevel", r.getRiskLevel());
+                m.put("createdAt", r.getCreatedAt());
                 return m;
             }).collect(Collectors.toList());
 
@@ -153,14 +152,12 @@ public class MlController {
         }
     }
 
-    // -------------------- POST /predict --------------------
     @PostMapping("/predict")
     public ResponseEntity<?> predict(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @Valid @RequestBody PredictPayload payload
     ) {
 
-        // 0) Resolve logged-in user
         User user;
         try {
             user = requireLoggedInUser(authorization);
@@ -182,9 +179,6 @@ public class MlController {
             ));
         }
 
-        // 1) Persist inputs before calling FastAPI
-        // FIX: Declare savedRecord in its own variable so it is unambiguously set
-        // after a successful save. If save throws, we return early and never use it.
         QuestionnaireRecord savedRecord;
         try {
             QuestionnaireRecord record = new QuestionnaireRecord();
@@ -219,7 +213,6 @@ public class MlController {
             ));
         }
 
-        // 2) Call FastAPI
         ResponseEntity<String> resp;
         try {
             Map<String, Object> features = mapper.convertValue(payload, Map.class);
@@ -251,9 +244,7 @@ public class MlController {
             ));
         }
 
-        // 3) Handle FastAPI non-2xx
         if (!resp.getStatusCode().is2xxSuccessful()) {
-            // FIX: Null-check the body before using it in the error response
             String rawBody = resp.getBody() != null ? resp.getBody() : "(empty body)";
             log.warn("FastAPI returned non-2xx. recordId={}, status={}, body={}",
                     savedRecord.getId(), resp.getStatusCode(), rawBody);
@@ -266,7 +257,6 @@ public class MlController {
             ));
         }
 
-        // 4) Parse FastAPI response and save prediction result
         try {
             String body = resp.getBody();
 
@@ -280,8 +270,6 @@ public class MlController {
 
             JsonNode node = mapper.readTree(body);
 
-            // FIX: Removed the duplicate asd_probability_score check that appeared twice.
-            // All distinct field names the FastAPI response may use are checked once each.
             Double probability = null;
             if (node.hasNonNull("asd_probability_score")) {
                 probability = node.get("asd_probability_score").asDouble();
@@ -301,28 +289,33 @@ public class MlController {
                 ));
             }
 
-            // NOTE: These thresholds are dataset-calibrated. The model outputs very
-            // low raw probabilities (< 0.10 is typical), hence the non-standard cutoffs.
-            // Revisit if you retrain on a differently balanced dataset.
             String riskLevel;
-            if (probability < 0.012) {
+            double percent = probability * 100.0;
+
+            if (percent <= 10.0) {
+                riskLevel = "Very Low";
+            } else if (percent <= 25.0) {
                 riskLevel = "Low";
-            } else if (probability < 0.060) {
+            } else if (percent <= 50.0) {
                 riskLevel = "Moderate";
-            } else {
+            } else if (percent <= 75.0) {
                 riskLevel = "High";
+            } else {
+                riskLevel = "Very High";
             }
 
             savedRecord.setProbability(probability);
             savedRecord.setRiskLevel(riskLevel);
             repo.save(savedRecord);
 
-            return ResponseEntity.ok(Map.of(
-                    "recordId", savedRecord.getId(),
-                    "userId", user.getId(),
-                    "probability", probability,
-                    "riskLevel", riskLevel
-            ));
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("recordId", savedRecord.getId());
+            response.put("userId", user.getId());
+            response.put("probability", probability);
+            response.put("riskLevel", riskLevel);
+            response.put("createdAt", savedRecord.getCreatedAt());
+
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             log.error("Failed to parse FastAPI response. recordId={}, body={}",
