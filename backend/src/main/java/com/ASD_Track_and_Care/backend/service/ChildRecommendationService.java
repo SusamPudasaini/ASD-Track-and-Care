@@ -251,31 +251,54 @@ public class ChildRecommendationService {
 
         for (MChatQuestionCategory c : weakCategories) {
             switch (c) {
-                case SENSORY -> preferredCategories.add(ResourceCategory.SENSORY_SUPPORT);
+                case SENSORY -> {
+                    preferredCategories.add(ResourceCategory.SENSORY);
+                    preferredCategories.add(ResourceCategory.SENSORY_SUPPORT);
+                }
                 case COMMUNICATION -> preferredCategories.add(ResourceCategory.COMMUNICATION);
-                case SOCIAL_INTERACTION -> preferredCategories.add(ResourceCategory.SOCIAL_SKILLS);
-                case BEHAVIOR -> preferredCategories.add(ResourceCategory.BEHAVIOR_SUPPORT);
-                case ATTENTION, PLAY -> preferredCategories.add(ResourceCategory.HOME_ACTIVITIES);
+                case SOCIAL_INTERACTION -> {
+                    preferredCategories.add(ResourceCategory.SOCIAL_INTERACTION);
+                    preferredCategories.add(ResourceCategory.SOCIAL_SKILLS);
+                }
+                case BEHAVIOR -> {
+                    preferredCategories.add(ResourceCategory.BEHAVIOR);
+                    preferredCategories.add(ResourceCategory.BEHAVIOR_SUPPORT);
+                }
+                case ATTENTION -> {
+                    preferredCategories.add(ResourceCategory.ATTENTION);
+                    preferredCategories.add(ResourceCategory.HOME_ACTIVITIES);
+                }
+                case PLAY -> {
+                    preferredCategories.add(ResourceCategory.PLAY);
+                    preferredCategories.add(ResourceCategory.HOME_ACTIVITIES);
+                }
             }
         }
 
         preferredCategories.addAll(switch (risk) {
             case "HIGH" -> List.of(
+                    ResourceCategory.BEHAVIOR,
                     ResourceCategory.BEHAVIOR_SUPPORT,
-                    ResourceCategory.PARENT_GUIDANCE,
-                    ResourceCategory.DAILY_ROUTINE,
-                    ResourceCategory.SENSORY_SUPPORT
+                    ResourceCategory.SENSORY,
+                    ResourceCategory.SENSORY_SUPPORT,
+                    ResourceCategory.SOCIAL_INTERACTION,
+                    ResourceCategory.SOCIAL_SKILLS
             );
             case "MODERATE" -> List.of(
+                    ResourceCategory.PLAY,
+                    ResourceCategory.ATTENTION,
                     ResourceCategory.HOME_ACTIVITIES,
                     ResourceCategory.COMMUNICATION,
+                    ResourceCategory.SOCIAL_INTERACTION,
                     ResourceCategory.SOCIAL_SKILLS,
                     ResourceCategory.PARENT_GUIDANCE
             );
             default -> List.of(
+                    ResourceCategory.PLAY,
+                    ResourceCategory.ATTENTION,
                     ResourceCategory.HOME_ACTIVITIES,
                     ResourceCategory.COMMUNICATION,
-                    ResourceCategory.DAILY_ROUTINE,
+                    ResourceCategory.SOCIAL_INTERACTION,
                     ResourceCategory.SOCIAL_SKILLS
             );
                 });

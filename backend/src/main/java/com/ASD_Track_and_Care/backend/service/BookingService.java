@@ -9,6 +9,9 @@ import com.ASD_Track_and_Care.backend.dto.SubmitTherapistReviewRequest;
 import com.ASD_Track_and_Care.backend.model.*;
 import com.ASD_Track_and_Care.backend.repository.BookingChatMessageRepository;
 import com.ASD_Track_and_Care.backend.repository.BookingRepository;
+import com.ASD_Track_and_Care.backend.repository.MChatQuestionnaireAnswerRepository;
+import com.ASD_Track_and_Care.backend.repository.MChatQuestionnaireSubmissionRepository;
+import com.ASD_Track_and_Care.backend.repository.QuestionnaireRecordRepository;
 import com.ASD_Track_and_Care.backend.repository.TherapistReviewRepository;
 import com.ASD_Track_and_Care.backend.repository.TherapistTimeSlotRepository;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
@@ -31,6 +34,9 @@ public class BookingService {
     private final BookingChatMessageRepository bookingChatMessageRepository;
     private final UserRepository userRepository;
     private final TherapistTimeSlotRepository timeSlotRepository;
+    private final QuestionnaireRecordRepository questionnaireRecordRepository;
+    private final MChatQuestionnaireSubmissionRepository mchatSubmissionRepository;
+    private final MChatQuestionnaireAnswerRepository mchatAnswerRepository;
     private final TherapistReviewRepository therapistReviewRepository;
     private final EmailService emailService;
     private final KhaltiPaymentService khaltiPaymentService;
@@ -40,6 +46,9 @@ public class BookingService {
             BookingChatMessageRepository bookingChatMessageRepository,
             UserRepository userRepository,
             TherapistTimeSlotRepository timeSlotRepository,
+            QuestionnaireRecordRepository questionnaireRecordRepository,
+            MChatQuestionnaireSubmissionRepository mchatSubmissionRepository,
+            MChatQuestionnaireAnswerRepository mchatAnswerRepository,
             TherapistReviewRepository therapistReviewRepository,
             EmailService emailService,
             KhaltiPaymentService khaltiPaymentService
@@ -48,6 +57,9 @@ public class BookingService {
         this.bookingChatMessageRepository = bookingChatMessageRepository;
         this.userRepository = userRepository;
         this.timeSlotRepository = timeSlotRepository;
+        this.questionnaireRecordRepository = questionnaireRecordRepository;
+        this.mchatSubmissionRepository = mchatSubmissionRepository;
+        this.mchatAnswerRepository = mchatAnswerRepository;
         this.therapistReviewRepository = therapistReviewRepository;
         this.emailService = emailService;
         this.khaltiPaymentService = khaltiPaymentService;
@@ -659,6 +671,7 @@ public class BookingService {
 
         r.setTherapistMessage(b.getTherapistMessage());
         fillReviewMeta(r, b);
+        fillAssessmentMeta(r, booker);
 
         return r;
     }
@@ -693,6 +706,117 @@ public class BookingService {
             therapistReviewRepository.findByBookingId(booking.getId())
                     .ifPresent(x -> r.setReviewRating(x.getRating()));
         }
+    }
+
+    private void fillAssessmentMeta(BookingResponse r, User booker) {
+        if (booker == null || booker.getId() == null) {
+            r.setWeaknessCategories(List.of());
+            return;
+        }
+
+        Optional<QuestionnaireRecord> aiLast = questionnaireRecordRepository.findTopByUser_IdOrderByIdDesc(booker.getId());
+        Optional<MChatQuestionnaireSubmission> mchatLast = mchatSubmissionRepository.findTopByUserOrderBySubmittedAtDesc(booker);
+
+        Double aiProbabilityPercent = aiLast
+                .map(QuestionnaireRecord::getProbability)
+                .map(x -> round2(x * 100.0))
+                .orElse(null);
+
+        Double mchatConcernPercent = mchatLast
+                .map(MChatQuestionnaireSubmission::getNormalizedConcernScore)
+                .map(this::round2)
+                .orElse(null);
+
+        r.setAiProbabilityScore(aiProbabilityPercent);
+        r.setMchatScore(mchatConcernPercent);
+        r.setAiRiskLevel(aiLast.map(QuestionnaireRecord::getRiskLevel).orElse(null));
+        r.setMchatRiskLevel(mchatLast
+                .map(MChatQuestionnaireSubmission::getRiskLevel)
+                .map(Enum::name)
+                .orElse(null));
+        r.setRiskLevel(resolveCombinedRiskLevel(aiProbabilityPercent, mchatConcernPercent));
+
+        List<String> weakAreas = mchatLast
+                .map(this::resolveWeakCategories)
+                .orElse(List.of())
+                .stream()
+                .map(this::humanizeCategory)
+                .toList();
+        r.setWeaknessCategories(weakAreas);
+    }
+
+    private String resolveCombinedRiskLevel(Double aiProbabilityPercent, Double mchatConcernPercent) {
+        Double combined = null;
+
+        if (aiProbabilityPercent != null && mchatConcernPercent != null) {
+            combined = (aiProbabilityPercent * 0.6) + (mchatConcernPercent * 0.4);
+        } else if (aiProbabilityPercent != null) {
+            combined = aiProbabilityPercent;
+        } else if (mchatConcernPercent != null) {
+            combined = mchatConcernPercent;
+        }
+
+        if (combined == null) {
+            return null;
+        }
+
+        if (combined >= 66.0) return "HIGH";
+        if (combined >= 33.0) return "MODERATE";
+        return "LOW";
+    }
+
+    private List<MChatQuestionCategory> resolveWeakCategories(MChatQuestionnaireSubmission submission) {
+        List<MChatQuestionnaireAnswer> answers = mchatAnswerRepository.findAllBySubmission(submission);
+        if (answers.isEmpty()) {
+            return List.of();
+        }
+
+        Map<MChatQuestionCategory, double[]> aggregate = new LinkedHashMap<>();
+        for (MChatQuestionnaireAnswer answer : answers) {
+            if (answer.getQuestion() == null) continue;
+
+            MChatQuestionCategory category = answer.getQuestion().getCategory();
+            if (category == null) continue;
+
+            double[] bucket = aggregate.computeIfAbsent(category, k -> new double[]{0.0, 0.0});
+            bucket[0] += answer.getWeightedConcernScore() == null ? 0.0 : answer.getWeightedConcernScore();
+
+            int maxPerQuestion =
+                    answer.getQuestion().getAnswerType() == null ||
+                    answer.getQuestion().getAnswerType().name().equals("YES_NO") ? 1 : 4;
+            int weight = answer.getQuestion().getWeight() == null ? 1 : answer.getQuestion().getWeight();
+            bucket[1] += maxPerQuestion * weight;
+        }
+
+        List<Map.Entry<MChatQuestionCategory, Double>> scored = new ArrayList<>();
+        for (Map.Entry<MChatQuestionCategory, double[]> entry : aggregate.entrySet()) {
+            double max = entry.getValue()[1];
+            double concernPercent = max == 0.0 ? 0.0 : (entry.getValue()[0] * 100.0 / max);
+            scored.add(Map.entry(entry.getKey(), concernPercent));
+        }
+
+        scored.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
+
+        List<MChatQuestionCategory> output = new ArrayList<>();
+        for (Map.Entry<MChatQuestionCategory, Double> row : scored) {
+            if (row.getValue() >= 35.0 || output.size() < 2) {
+                output.add(row.getKey());
+            }
+            if (output.size() >= 3) break;
+        }
+
+        return output;
+    }
+
+    private String humanizeCategory(MChatQuestionCategory category) {
+        if (category == null) return "";
+        String value = category.name().toLowerCase(Locale.ROOT).replace('_', ' ');
+        return Character.toUpperCase(value.charAt(0)) + value.substring(1);
+    }
+
+    private Double round2(Double value) {
+        if (value == null) return null;
+        return Math.round(value * 100.0) / 100.0;
     }
 
     private User getUserFromAuth(Authentication authentication) {

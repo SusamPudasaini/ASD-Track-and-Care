@@ -1,6 +1,8 @@
 from typing import Optional
+import os
 
 from fastapi import FastAPI, HTTPException, Security, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field
 
@@ -8,6 +10,26 @@ API_KEY = "SusamSecretAndhoMancheleMovieHeryo"
 API_KEY_NAME = "X-API-KEY"
 
 app = FastAPI(title="ASD Risk Screening API")
+
+raw_origins = os.getenv(
+    "AI_ALLOWED_ORIGINS",
+    "http://localhost:5173,"
+    "http://127.0.0.1:5173,"
+    "http://localhost:8081,"
+    "http://127.0.0.1:8081,"
+    "http://213.145.86.157:5173,"
+    "http://213.145.86.157:8081",
+)
+
+allowed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
