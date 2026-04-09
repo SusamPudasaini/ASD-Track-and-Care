@@ -12,7 +12,7 @@ The system contains three connected applications:
 - Frontend/ -> React + Vite client
 - backend/ -> Spring Boot API and core business services
 - Ai-Model/ -> FastAPI model service
-- uploads/ -> stored files (profile pictures, therapist application docs)
+- uploads/ -> stored files (profile pictures, therapist application docs) 
 
 ## Core Features
 
