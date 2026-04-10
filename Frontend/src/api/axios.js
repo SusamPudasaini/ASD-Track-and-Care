@@ -1,8 +1,11 @@
 import axios from "axios";
 
-const resolvedBaseUrl =
+const rawBaseUrl =
   import.meta.env.VITE_API_BASE_URL ||
   (typeof window !== "undefined" ? window.location.origin : "http://localhost:8081");
+
+// Keep one consistent convention: endpoints include /api, so base URL should not end with /api.
+const resolvedBaseUrl = String(rawBaseUrl).replace(/\/api\/?$/, "");
 
 const api = axios.create({
   baseURL: resolvedBaseUrl,

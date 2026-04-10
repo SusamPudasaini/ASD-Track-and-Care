@@ -58,6 +58,9 @@ import FirstThenBoard from "./pages/FirstThenBoard";
 
 import AdminMatchingSorting from "./pages/AdminMatchingSorting";
 import MatchingSortingActivity from "./pages/MatchingSortingActivity";
+import AdminUserManagement from "./pages/AdminUserManagement";
+import AdminBookingManagement from "./pages/AdminBookingManagement";
+import AdminTherapistReviewsManagement from "./pages/AdminTherapistReviewsManagement";
 
 import { Toaster } from "react-hot-toast";
 import TherapistDashboardBookings from "./pages/TherapistsBookingApplcations";
@@ -226,6 +229,51 @@ export default function App() {
               element={
                 <RoleRoute allow={["ADMIN"]}>
                   <AdminResources />
+                </RoleRoute>
+              }
+            />
+
+            <Route
+              path="/admin/user-management"
+              element={
+                <RoleRoute allow={["ADMIN"]}>
+                  <AdminUserManagement />
+                </RoleRoute>
+              }
+            />
+
+            <Route
+              path="/admin/booking-management"
+              element={
+                <RoleRoute allow={["ADMIN"]}>
+                  <AdminBookingManagement />
+                </RoleRoute>
+              }
+            />
+
+            <Route
+              path="/admin/therapist-reviews"
+              element={
+                <RoleRoute allow={["ADMIN"]}>
+                  <AdminTherapistReviewsManagement />
+                </RoleRoute>
+              }
+            />
+
+            <Route
+              path="/admin/database"
+              element={
+                <RoleRoute allow={["ADMIN"]}>
+                  <Navigate to="/admin/user-management" replace />
+                </RoleRoute>
+              }
+            />
+
+            <Route
+              path="/admin/database/:section"
+              element={
+                <RoleRoute allow={["ADMIN"]}>
+                  <Navigate to="/admin/user-management" replace />
                 </RoleRoute>
               }
             />
