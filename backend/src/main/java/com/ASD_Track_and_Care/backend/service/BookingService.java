@@ -359,7 +359,19 @@ public class BookingService {
                 ? null
                 : therapistMessage.trim();
 
-        b.setTherapistMessage(msg);
+        boolean wasPaid = "Completed".equalsIgnoreCase(b.getPaymentStatus());
+        String refundNotice = wasPaid ? "Your payment will be refunded." : null;
+        String combinedMessage;
+
+        if (msg == null || msg.isBlank()) {
+            combinedMessage = refundNotice;
+        } else if (refundNotice == null) {
+            combinedMessage = msg;
+        } else {
+            combinedMessage = msg + "\n\n" + refundNotice;
+        }
+
+        b.setTherapistMessage(combinedMessage);
 
         if (b.getStatus() != BookingStatus.CANCELLED) {
             b.setStatus(BookingStatus.CANCELLED);
@@ -376,7 +388,8 @@ public class BookingService {
                     therapistName,
                     b.getDate() == null ? null : b.getDate().toString(),
                     b.getTime(),
-                    msg
+                    combinedMessage,
+                    wasPaid
             );
         }
 
@@ -437,6 +450,10 @@ public class BookingService {
             throw new RuntimeException("Booking already cancelled");
         }
 
+        if (b.getStatus() == BookingStatus.CONFIRMED) {
+            throw new RuntimeException("Booking is already approved by therapist and cannot be rescheduled.");
+        }
+
         LocalDate newDate = parseDate(req.getDate());
         String newTime = normalizeTime(req.getTime());
 
@@ -457,7 +474,6 @@ public class BookingService {
         b.setDate(newDate);
         b.setTime(newTime);
         b.setStatus(BookingStatus.PENDING);
-        b.setPaymentStatus("RESCHEDULED_REQUIRES_MANUAL_REVIEW");
         b.setTherapistMessage(null);
 
         bookingRepository.save(b);
@@ -474,6 +490,10 @@ public class BookingService {
 
         if (!b.getUserId().equals(me.getId())) {
             throw new RuntimeException("Not allowed");
+        }
+
+        if (b.getStatus() == BookingStatus.CONFIRMED) {
+            throw new RuntimeException("Approved bookings cannot be cancelled by the user.");
         }
 
         b.setStatus(BookingStatus.CANCELLED);

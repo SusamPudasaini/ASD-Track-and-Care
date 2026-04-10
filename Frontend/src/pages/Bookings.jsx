@@ -228,6 +228,11 @@ export default function Bookings() {
   }, []);
 
   const openReschedule = (b) => {
+    if (normalizeStatus(b?.status) === "CONFIRMED") {
+      toast.error("Booking already approved. Date/time cannot be changed.");
+      return;
+    }
+
     setActiveBooking(b);
     setDate(b.date || "");
     setTime(b.time || "");
@@ -553,8 +558,14 @@ function BookingCard({ b, onReschedule, onCancel, onContact, onChat, onReview })
   const actionsDisabled =
     normalizeStatus(b.status) === "CANCELLED" ||
     bookingDisplay.label === "COMPLETED";
+  const isConfirmed = normalizeStatus(b.status) === "CONFIRMED";
+  const canReschedule = !actionsDisabled && !isConfirmed;
+  const canCancel = !actionsDisabled && !isConfirmed;
   const canChat = normalizeStatus(b.status) === "CONFIRMED";
   const canReview = bookingDisplay.label === "COMPLETED" && !b?.reviewSubmitted;
+  const showRefundNotice =
+    normalizeStatus(b.status) === "CANCELLED" &&
+    normalizeStatus(b.paymentStatus) === "COMPLETED";
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -663,7 +674,12 @@ function BookingCard({ b, onReschedule, onCancel, onContact, onChat, onReview })
             <div className="flex gap-2">
               <button
                 onClick={onReschedule}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                disabled={!canReschedule}
+                className={`inline-flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold ${
+                  canReschedule
+                    ? "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    : "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
+                }`}
               >
                 <FaPenToSquare />
                 Change Date/Time
@@ -671,7 +687,12 @@ function BookingCard({ b, onReschedule, onCancel, onContact, onChat, onReview })
 
               <button
                 onClick={onCancel}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+                disabled={!canCancel}
+                className={`inline-flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold ${
+                  canCancel
+                    ? "border-red-200 bg-white text-red-600 hover:bg-red-50"
+                    : "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
+                }`}
               >
                 <FaCircleXmark />
                 Cancel
@@ -699,6 +720,12 @@ function BookingCard({ b, onReschedule, onCancel, onContact, onChat, onReview })
             {bookingDisplay.label === "COMPLETED" && b?.reviewSubmitted && (
               <div className="rounded-md border border-emerald-100 bg-emerald-50 p-2.5 text-xs text-emerald-800">
                 Review submitted {b?.reviewRating ? `(${b.reviewRating}/5)` : ""}.
+              </div>
+            )}
+
+            {showRefundNotice && (
+              <div className="rounded-md border border-blue-100 bg-blue-50 p-2.5 text-xs text-blue-800">
+                Your payment will be refunded.
               </div>
             )}
           </>

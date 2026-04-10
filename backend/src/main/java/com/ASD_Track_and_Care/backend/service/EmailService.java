@@ -62,7 +62,8 @@ public class EmailService {
             String therapistName,
             String date,
             String time,
-            String reason
+            String reason,
+            boolean wasPaid
     ) {
         SimpleMailMessage msg = new SimpleMailMessage();
         msg.setTo(toEmail);
@@ -79,6 +80,10 @@ public class EmailService {
             body.append(reason.trim()).append("\n\n");
         } else {
             body.append("Reason: (not provided)\n\n");
+        }
+
+        if (wasPaid) {
+            body.append("Your payment will be refunded.\n\n");
         }
 
         body.append("You can book another session anytime from your account.\n");
