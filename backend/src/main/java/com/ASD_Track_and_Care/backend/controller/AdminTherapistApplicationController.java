@@ -3,6 +3,8 @@ package com.ASD_Track_and_Care.backend.controller;
 import com.ASD_Track_and_Care.backend.dto.TherapistDecisionRequest;
 import com.ASD_Track_and_Care.backend.model.TherapistApplication;
 import com.ASD_Track_and_Care.backend.service.TherapistApplicationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +15,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/therapist-applications")
 public class AdminTherapistApplicationController {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminTherapistApplicationController.class);
 
     private final TherapistApplicationService service;
 
@@ -79,7 +83,16 @@ public class AdminTherapistApplicationController {
         String adminUsername = auth.getName();
         String msg = body == null ? null : body.getAdminMessage();
 
+        log.info("[AUDIT] mark-pending endpoint hit: appId={}, admin={}, hasMessage={}",
+            id,
+            adminUsername,
+            msg != null && !msg.isBlank());
+
         TherapistApplication updated = service.markPending(id, adminUsername, msg);
+
+        log.info("[AUDIT] mark-pending completed: appId={}, status={}",
+            updated.getId(),
+            updated.getStatus().name());
 
         return ResponseEntity.ok(Map.of(
                 "message", "Application marked as pending",
