@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
+import AppModal from "../components/ui/AppModal";
 import {
   FaArrowTrendUp,
   FaArrowsRotate,
@@ -121,6 +122,21 @@ function statusPill(status) {
   if (s === "CONFIRMED") return "bg-green-50 text-green-700 border-green-200";
   if (s === "CANCELLED") return "bg-red-50 text-red-700 border-red-200";
   return "bg-gray-50 text-gray-700 border-gray-200";
+}
+
+function riskPill(level) {
+  const s = String(level || "").toUpperCase();
+  if (s === "HIGH") return "bg-red-50 text-red-700 border-red-200";
+  if (s === "MODERATE") return "bg-amber-50 text-amber-700 border-amber-200";
+  if (s === "LOW") return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  return "bg-gray-50 text-gray-700 border-gray-200";
+}
+
+function pct(value) {
+  if (value === null || value === undefined || value === "") return "-";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "-";
+  return `${n.toFixed(1)}%`;
 }
 
 export default function TherapistDashboardBookings() {
@@ -523,6 +539,10 @@ export default function TherapistDashboardBookings() {
 
   // current modal data
   const d = detailsRow;
+  const weaknessAreas = Array.isArray(d?.weaknessCategories)
+    ? d.weaknessCategories.filter((x) => typeof x === "string" && x.trim())
+    : [];
+  const riskLevel = String(d?.riskLevel || "").toUpperCase();
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_30%,_#ffffff)]">
@@ -1038,148 +1058,216 @@ export default function TherapistDashboardBookings() {
       </main>
 
       {/* DETAILS MODAL */}
-      {detailsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-lg">
-            <div className="flex items-start justify-between gap-4">
+      <AppModal
+        open={detailsOpen}
+        onClose={closeDetails}
+        title="Booking Details"
+        subtitle={`Client: ${d?.userName || `User #${d?.userId ?? "-"}`} • Status: ${toTitle(d?.status || "")}`}
+        icon={<FaListCheck />}
+        size="xl"
+        footer={
+          <div className="flex justify-end gap-2">
+            {String(d?.status || "").toUpperCase() === "PENDING" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => approveBooking(d)}
+                  disabled={actionId === d?.id}
+                  className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                    actionId === d?.id ? "bg-green-300 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+                  }`}
+                >
+                  {actionId === d?.id ? "Working..." : "Approve"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openCancel(d)}
+                  disabled={actionId === d?.id}
+                  className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                    actionId === d?.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+                  }`}
+                >
+                  {actionId === d?.id ? "Working..." : "Cancel"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => markPending(d)}
+                  disabled={actionId === d?.id}
+                  className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                    actionId === d?.id ? "bg-gray-300 cursor-not-allowed" : "bg-gray-700 hover:bg-gray-800"
+                  }`}
+                >
+                  {actionId === d?.id ? "Working..." : "Mark Pending"}
+                </button>
+
+                {String(d?.status || "").toUpperCase() === "CONFIRMED" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/bookings/${d?.id}/chat`)}
+                      className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                    >
+                      Open Chat
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openCancel(d)}
+                      disabled={actionId === d?.id}
+                      className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                        actionId === d?.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+                      }`}
+                    >
+                      {actionId === d?.id ? "Working..." : "Cancel"}
+                    </button>
+                  </>
+                ) : null}
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={closeDetails}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+            >
+              Close
+            </button>
+          </div>
+        }
+      >
+        <div className="mt-1 space-y-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${statusPill(
+                d?.status
+              )}`}
+            >
+              {toTitle(d?.status)}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              Payment: {toTitle(d?.paymentStatus || "Unknown")}
+            </span>
+            {riskLevel ? (
+              <span
+                className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${riskPill(
+                  riskLevel
+                )}`}
+              >
+                Combined Risk: {toTitle(riskLevel)}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Session</div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <Info label="Booking ID" value={d?.id} />
+                <Info label="Status" value={toTitle(d?.status)} />
+                <Info label="Date" value={fmtDateOnly(d?.date)} />
+                <Info label="Time" value={fmtTime(d?.time)} />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Client</div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <Info label="Name" value={d?.userName} />
+                <Info label="User ID" value={d?.userId} />
+                <Info label="Email" value={d?.userEmail} />
+                <Info label="Phone" value={d?.userPhone} />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 via-indigo-50 to-sky-50 p-4">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold text-gray-900">Booking Details</h2>
-                <p className="mt-1 text-sm text-gray-600">
-                  Client: <span className="font-semibold">{d?.userName || `User #${d?.userId ?? "-"}`}</span>{" "}
-                  <span className="text-gray-400">•</span> Status:{" "}
-                  <span className="font-semibold">{toTitle(d?.status || "")}</span>
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeDetails}
-                className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-5 grid gap-5 md:grid-cols-2">
-              <Info label="Booking ID" value={d?.id} />
-              <Info label="Status" value={toTitle(d?.status)} />
-              <Info label="Date" value={fmtDateOnly(d?.date)} />
-              <Info label="Time" value={fmtTime(d?.time)} />
-
-              <div className="md:col-span-2">
-                <div className="text-sm font-semibold text-gray-900">Client Info</div>
-                <div className="mt-2 grid gap-3 rounded-lg border border-gray-100 bg-gray-50 p-4 md:grid-cols-2">
-                  <Info label="Name" value={d?.userName} />
-                  <Info label="User ID" value={d?.userId} />
-                  <Info label="Email" value={d?.userEmail} />
-                  <Info label="Phone" value={d?.userPhone} />
+                <div className="text-sm font-semibold text-gray-900">Child Assessment Snapshot</div>
+                <div className="text-xs text-gray-600">
+                  Shared automatically from the latest parent AI and M-CHAT assessments.
                 </div>
               </div>
-
-              <div className="md:col-span-2">
-                <div className="text-sm font-semibold text-gray-900">Therapist Info</div>
-                <div className="mt-2 grid gap-3 rounded-lg border border-gray-100 bg-gray-50 p-4 md:grid-cols-2">
-                  <Info label="Name" value={d?.therapistName} />
-                  <Info label="Therapist ID" value={d?.therapistId} />
-                  <Info label="Email" value={d?.therapistEmail} />
-                  <Info label="Phone" value={d?.therapistPhone} />
-                </div>
-              </div>
+              {riskLevel ? (
+                <span
+                  className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${riskPill(
+                    riskLevel
+                  )}`}
+                >
+                  {toTitle(riskLevel)} Risk
+                </span>
+              ) : null}
             </div>
 
-            <div className="mt-6 flex justify-end gap-2">
-              {String(d?.status || "").toUpperCase() === "PENDING" ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => approveBooking(d)}
-                    disabled={actionId === d?.id}
-                    className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                      actionId === d?.id ? "bg-green-300 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
-                    }`}
-                  >
-                    {actionId === d?.id ? "Working..." : "Approve"}
-                  </button>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-white/80 bg-white/80 p-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">AI Probability</div>
+                <div className="mt-1 text-lg font-bold text-gray-900">{pct(d?.aiProbabilityScore)}</div>
+                <div className="mt-1 text-xs text-gray-500">AI Risk: {toTitle(d?.aiRiskLevel || "-")}</div>
+              </div>
 
-                  <button
-                    type="button"
-                    onClick={() => openCancel(d)}
-                    disabled={actionId === d?.id}
-                    className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                      actionId === d?.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
-                    }`}
-                  >
-                    {actionId === d?.id ? "Working..." : "Cancel"}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => markPending(d)}
-                    disabled={actionId === d?.id}
-                    className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                      actionId === d?.id ? "bg-gray-300 cursor-not-allowed" : "bg-gray-700 hover:bg-gray-800"
-                    }`}
-                  >
-                    {actionId === d?.id ? "Working..." : "Mark Pending"}
-                  </button>
+              <div className="rounded-lg border border-white/80 bg-white/80 p-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">M-CHAT Score</div>
+                <div className="mt-1 text-lg font-bold text-gray-900">{pct(d?.mchatScore)}</div>
+                <div className="mt-1 text-xs text-gray-500">M-CHAT Risk: {toTitle(d?.mchatRiskLevel || "-")}</div>
+              </div>
 
-                  {String(d?.status || "").toUpperCase() === "CONFIRMED" ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/bookings/${d?.id}/chat`)}
-                        className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+              <div className="rounded-lg border border-white/80 bg-white/80 p-3 sm:col-span-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Weakness Categories</div>
+                {weaknessAreas.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {weaknessAreas.map((area) => (
+                      <span
+                        key={area}
+                        className="rounded-full border border-blue-200 bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800"
                       >
-                        Open Chat
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openCancel(d)}
-                        disabled={actionId === d?.id}
-                        className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                          actionId === d?.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
-                        }`}
-                      >
-                        {actionId === d?.id ? "Working..." : "Cancel"}
-                      </button>
-                    </>
-                  ) : null}
-                </>
-              )}
-
-              <button
-                type="button"
-                onClick={closeDetails}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Close
-              </button>
+                        {area}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-2 text-sm text-gray-600">No weakness categories available yet.</div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      )}
+      </AppModal>
 
       {/* ✅ CANCEL MODAL */}
-      {cancelOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">Cancel Booking</h2>
-                <p className="mt-1 text-sm text-gray-600">This will cancel the booking and email the user your reason.</p>
-              </div>
+      <AppModal
+        open={cancelOpen}
+        onClose={closeCancel}
+        title="Cancel Booking"
+        subtitle="This will cancel the booking and email the user your reason."
+        icon={<FaCircleInfo />}
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={closeCancel}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+            >
+              Back
+            </button>
 
-              <button
-                type="button"
-                onClick={closeCancel}
-                className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-              >
-                ✕
-              </button>
-            </div>
-
+            <button
+              type="button"
+              onClick={confirmCancel}
+              disabled={actionId === cancelBooking?.id}
+              className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
+                actionId === cancelBooking?.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+              }`}
+            >
+              {actionId === cancelBooking?.id ? "Working..." : "Confirm Cancel"}
+            </button>
+          </div>
+        }
+      >
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700">Reason (optional but recommended)</label>
               <textarea
@@ -1191,30 +1279,7 @@ export default function TherapistDashboardBookings() {
               />
               <p className="mt-2 text-xs text-gray-500">Keep it short and clear.</p>
             </div>
-
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeCancel}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Back
-              </button>
-
-              <button
-                type="button"
-                onClick={confirmCancel}
-                disabled={actionId === cancelBooking?.id}
-                className={`rounded-lg px-5 py-2 text-sm font-semibold text-white ${
-                  actionId === cancelBooking?.id ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
-                }`}
-              >
-                {actionId === cancelBooking?.id ? "Working..." : "Confirm Cancel"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </AppModal>
 
       {slotsModalOpen && (
         <SlotsModal
@@ -1283,24 +1348,25 @@ function MetricCard({ label, value, subtitle, tone = "slate", tag = "ST", compac
 
 function SlotsModal({ day, selectedTimes, onClose, onToggle, onSelectAll, onClear }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-4xl rounded-xl bg-white p-6 shadow-lg">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Edit Availability</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Day: <span className="font-semibold">{day}</span> • {selectedTimes.size} selected
-            </p>
-          </div>
-
+    <AppModal
+      open
+      onClose={onClose}
+      title="Edit Availability"
+      subtitle={`Day: ${day} • ${selectedTimes.size} selected`}
+      icon={<FaSliders />}
+      size="2xl"
+      footer={
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
           >
-            ✕
+            Done
           </button>
         </div>
+      }
+    >
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button
@@ -1339,18 +1405,7 @@ function SlotsModal({ day, selectedTimes, onClose, onToggle, onSelectAll, onClea
             );
           })}
         </div>
-
-        <div className="mt-5 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Done
-          </button>
-        </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }
 

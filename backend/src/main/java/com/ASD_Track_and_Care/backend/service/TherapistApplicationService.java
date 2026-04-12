@@ -8,8 +8,13 @@ import com.ASD_Track_and_Care.backend.model.User;
 import com.ASD_Track_and_Care.backend.repository.TherapistApplicationDocumentRepository;
 import com.ASD_Track_and_Care.backend.repository.TherapistApplicationRepository;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Files;
@@ -20,9 +25,12 @@ import java.util.*;
 @Service
 public class TherapistApplicationService {
 
+    private static final Logger log = LoggerFactory.getLogger(TherapistApplicationService.class);
+
     private final TherapistApplicationRepository repo;
     private final TherapistApplicationDocumentRepository docRepo;
     private final UserRepository userRepository;
+    private final JdbcTemplate jdbcTemplate;
     private final EmailService emailService;
     private final AddressGeocodingService addressGeocodingService;
 
@@ -32,12 +40,14 @@ public class TherapistApplicationService {
             TherapistApplicationRepository repo,
             TherapistApplicationDocumentRepository docRepo,
             UserRepository userRepository,
+            JdbcTemplate jdbcTemplate,
             EmailService emailService,
             AddressGeocodingService addressGeocodingService
     ) {
         this.repo = repo;
         this.docRepo = docRepo;
         this.userRepository = userRepository;
+        this.jdbcTemplate = jdbcTemplate;
         this.emailService = emailService;
         this.addressGeocodingService = addressGeocodingService;
     }
@@ -138,6 +148,7 @@ public class TherapistApplicationService {
     public Map<String, Object> getAdminDetails(Long applicationId) {
         TherapistApplication app = repo.findById(applicationId)
                 .orElseThrow(() -> new RuntimeException("Application not found"));
+        Optional<User> applicantUser = findApplicantUser(app.getApplicantUsername(), app.getEmail());
 
         List<TherapistApplicationDocument> docs =
                 docRepo.findByApplicationIdOrderByUploadedAtAsc(app.getId());
@@ -162,6 +173,7 @@ public class TherapistApplicationService {
         appMap.put("reviewedBy", app.getReviewedBy());
         appMap.put("reviewedAt", app.getReviewedAt() == null ? null : app.getReviewedAt().toString());
         appMap.put("createdAt", app.getCreatedAt() == null ? null : app.getCreatedAt().toString());
+        appMap.put("applicantProfilePictureUrl", applicantUser.map(User::getProfilePictureUrl).orElse(null));
 
         List<Map<String, Object>> docList = new ArrayList<>();
         for (TherapistApplicationDocument d : docs) {
@@ -189,8 +201,7 @@ public class TherapistApplicationService {
             throw new IllegalStateException("Only PENDING applications can be approved.");
         }
 
-        User user = userRepository.findByUsername(app.getApplicantUsername())
-                .orElseThrow(() -> new RuntimeException("User not found for applicant: " + app.getApplicantUsername()));
+        User user = resolveApplicantUser(app.getApplicantUsername(), app.getEmail());
 
         String workplaceAddress = buildWorkplaceAddress(app.getWorkplace(), app.getCity());
         if (!workplaceAddress.isBlank()) {
@@ -251,7 +262,49 @@ public class TherapistApplicationService {
         TherapistApplication app = repo.findById(applicationId)
                 .orElseThrow(() -> new RuntimeException("Application not found"));
 
+        log.info("[AUDIT] markPending start: appId={}, admin={}, appStatus={}, applicantUsername={}, applicantEmail={}",
+            applicationId,
+            adminUsername,
+            app.getStatus().name(),
+            app.getApplicantUsername(),
+            app.getEmail());
+
+        User user = resolveApplicantUser(app.getApplicantUsername(), app.getEmail());
+        log.info("[AUDIT] markPending resolved user: appId={}, userId={}, username={}, email={}, currentRole={}",
+            applicationId,
+            user.getId(),
+            user.getUsername(),
+            user.getUserEmail(),
+            user.getRole().name());
+
+        Long auditedUserId = user.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                logRoleFromDb(auditedUserId, applicationId, "after-commit");
+            }
+        });
+
+        if (user.getRole() != Role.USER) {
+            Role before = user.getRole();
+            user.setRole(Role.USER);
+            userRepository.saveAndFlush(user);
+            log.info("[AUDIT] markPending role updated: appId={}, userId={}, fromRole={}, toRole={}",
+                applicationId,
+                user.getId(),
+                before.name(),
+                user.getRole().name());
+                logRoleFromDb(user.getId(), applicationId, "after-user-save-flush");
+        } else {
+            log.info("[AUDIT] markPending role unchanged: appId={}, userId={}, role={}",
+                applicationId,
+                user.getId(),
+                user.getRole().name());
+                logRoleFromDb(user.getId(), applicationId, "role-already-user");
+        }
+
         if (app.getStatus() == TherapistApplication.Status.PENDING) {
+            log.info("[AUDIT] markPending exit early: appId={}, reason=already_pending", applicationId);
             return app;
         }
 
@@ -260,7 +313,37 @@ public class TherapistApplicationService {
         app.setReviewedBy(adminUsername);
         app.setReviewedAt(LocalDateTime.now());
 
-        return repo.save(app);
+        TherapistApplication saved = repo.saveAndFlush(app);
+        log.info("[AUDIT] markPending app status updated: appId={}, newStatus={}",
+            saved.getId(),
+            saved.getStatus().name());
+        logRoleFromDb(user.getId(), applicationId, "after-app-save-flush");
+        return saved;
+    }
+
+        private void logRoleFromDb(Long userId, Long applicationId, String stage) {
+        String roleFromDb = jdbcTemplate.queryForObject(
+            "select role from users where user_id = ?",
+            String.class,
+            userId
+        );
+        log.info("[AUDIT] markPending db role check: appId={}, userId={}, stage={}, dbRole={}",
+            applicationId,
+            userId,
+            stage,
+            roleFromDb);
+        }
+
+    private User resolveApplicantUser(String applicantIdentifier, String applicantEmail) {
+        String key = applicantIdentifier == null ? "" : applicantIdentifier.trim();
+        String email = applicantEmail == null ? "" : applicantEmail.trim();
+
+        return userRepository.findByUsername(key)
+                .or(() -> userRepository.findByUserEmail(key))
+                .or(() -> userRepository.findByUserEmailIgnoreCase(key))
+                .or(() -> userRepository.findByUserEmail(email))
+                .or(() -> userRepository.findByUserEmailIgnoreCase(email))
+                .orElseThrow(() -> new RuntimeException("User not found for applicant: " + applicantIdentifier));
     }
 
     // ✅ User: get latest application + docs (your existing method)
@@ -276,6 +359,7 @@ public class TherapistApplicationService {
 
         List<TherapistApplicationDocument> docs =
                 docRepo.findByApplicationIdOrderByUploadedAtAsc(app.getId());
+        Optional<User> applicantUser = findApplicantUser(app.getApplicantUsername(), app.getEmail());
 
         Map<String, Object> appMap = new LinkedHashMap<>();
         appMap.put("id", app.getId());
@@ -297,6 +381,7 @@ public class TherapistApplicationService {
         appMap.put("reviewedBy", app.getReviewedBy());
         appMap.put("reviewedAt", app.getReviewedAt() == null ? null : app.getReviewedAt().toString());
         appMap.put("createdAt", app.getCreatedAt() == null ? null : app.getCreatedAt().toString());
+        appMap.put("applicantProfilePictureUrl", applicantUser.map(User::getProfilePictureUrl).orElse(null));
 
         List<Map<String, Object>> docList = new ArrayList<>();
         for (TherapistApplicationDocument d : docs) {
@@ -336,6 +421,7 @@ public class TherapistApplicationService {
 
         List<TherapistApplicationDocument> docs =
                 docRepo.findByApplicationIdOrderByUploadedAtAsc(app.getId());
+        Optional<User> applicantUser = findApplicantUser(app.getApplicantUsername(), app.getEmail());
 
         Map<String, Object> appMap = new LinkedHashMap<>();
         appMap.put("id", app.getId());
@@ -357,6 +443,7 @@ public class TherapistApplicationService {
         appMap.put("reviewedBy", app.getReviewedBy());
         appMap.put("reviewedAt", app.getReviewedAt() == null ? null : app.getReviewedAt().toString());
         appMap.put("createdAt", app.getCreatedAt() == null ? null : app.getCreatedAt().toString());
+        appMap.put("applicantProfilePictureUrl", applicantUser.map(User::getProfilePictureUrl).orElse(null));
 
         List<Map<String, Object>> docList = new ArrayList<>();
         for (TherapistApplicationDocument d : docs) {
@@ -388,5 +475,16 @@ public class TherapistApplicationService {
         if (w.isBlank()) return c;
         if (c.isBlank()) return w;
         return w + ", " + c;
+    }
+
+    private Optional<User> findApplicantUser(String applicantIdentifier, String applicantEmail) {
+        String key = applicantIdentifier == null ? "" : applicantIdentifier.trim();
+        String email = applicantEmail == null ? "" : applicantEmail.trim();
+
+        return userRepository.findByUsername(key)
+                .or(() -> userRepository.findByUserEmail(key))
+                .or(() -> userRepository.findByUserEmailIgnoreCase(key))
+                .or(() -> userRepository.findByUserEmail(email))
+                .or(() -> userRepository.findByUserEmailIgnoreCase(email));
     }
 }

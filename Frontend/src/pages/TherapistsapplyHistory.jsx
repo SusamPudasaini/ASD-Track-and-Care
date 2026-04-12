@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
+import AppModal from "../components/ui/AppModal";
 
 function getErrorMessage(err) {
   const data = err?.response?.data;
@@ -402,121 +403,99 @@ export default function TherapistApply() {
         </div>
       </main>
 
-      {detailsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-4xl overflow-hidden rounded-3xl border border-white/40 bg-white shadow-2xl">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="flex items-center gap-2 text-lg font-semibold">
-                    <ShieldCheck size={20} />
-                    Application Details
-                  </h2>
-                  <p className="mt-2 text-sm text-blue-50">
-                    ID: <span className="font-semibold">{detailsApp?.id ?? "-"}</span>{" "}
-                    <span className="mx-2 text-white/60">•</span>
-                    Status:{" "}
-                    <span className="font-semibold">{detailsApp?.status ?? "-"}</span>
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={closeDetails}
-                  className="rounded-xl border border-white/20 bg-white/10 p-2 text-white hover:bg-white/20"
-                >
-                  <X size={16} />
-                </button>
-              </div>
+      <AppModal
+        open={detailsOpen}
+        onClose={closeDetails}
+        title="Application Details"
+        subtitle={`ID: ${detailsApp?.id ?? "-"} • Status: ${detailsApp?.status ?? "-"}`}
+        badge="Therapist Application"
+        icon={<ShieldCheck size={18} />}
+        size="2xl"
+        footer={
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={closeDetails}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
+            >
+              Close
+            </button>
+          </div>
+        }
+      >
+        {detailsLoading ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
+            Loading details...
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            <div className="grid gap-5 md:grid-cols-2">
+              <Info label="Full Name" value={detailsApp?.fullName} />
+              <Info label="Qualification" value={detailsApp?.qualification} />
+              <Info label="Specialization" value={detailsApp?.specialization} />
+              <Info label="Years Experience" value={detailsApp?.yearsExperience} />
+              <Info label="License Number" value={detailsApp?.licenseNumber} />
+              <Info label="City" value={detailsApp?.city} />
+              <Info label="Workplace" value={detailsApp?.workplace} />
+              <Info label="Submitted" value={fmtDate(detailsApp?.createdAt)} />
+              <Info label="Reviewed At" value={fmtDate(detailsApp?.reviewedAt)} />
+              <Info label="Reviewed By" value={detailsApp?.reviewedBy} />
             </div>
 
-            <div className="p-6">
-              {detailsLoading ? (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
-                  Loading details...
+            <div className="grid gap-5">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-semibold text-slate-900">Your Message</div>
+                <div className="mt-2 text-sm leading-6 text-slate-700">
+                  {detailsApp?.message ? detailsApp.message : <span className="text-slate-400">—</span>}
                 </div>
-              ) : (
-                <div className="grid gap-6">
-                  <div className="grid gap-5 md:grid-cols-2">
-                    <Info label="Full Name" value={detailsApp?.fullName} />
-                    <Info label="Qualification" value={detailsApp?.qualification} />
-                    <Info label="Specialization" value={detailsApp?.specialization} />
-                    <Info label="Years Experience" value={detailsApp?.yearsExperience} />
-                    <Info label="License Number" value={detailsApp?.licenseNumber} />
-                    <Info label="City" value={detailsApp?.city} />
-                    <Info label="Workplace" value={detailsApp?.workplace} />
-                    <Info label="Submitted" value={fmtDate(detailsApp?.createdAt)} />
-                    <Info label="Reviewed At" value={fmtDate(detailsApp?.reviewedAt)} />
-                    <Info label="Reviewed By" value={detailsApp?.reviewedBy} />
-                  </div>
+              </div>
 
-                  <div className="grid gap-5">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-sm font-semibold text-slate-900">Your Message</div>
-                      <div className="mt-2 text-sm leading-6 text-slate-700">
-                        {detailsApp?.message ? detailsApp.message : <span className="text-slate-400">—</span>}
-                      </div>
-                    </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-semibold text-slate-900">Admin Message</div>
+                <div className="mt-2 text-sm leading-6 text-slate-700">
+                  {detailsApp?.adminMessage ? detailsApp.adminMessage : <span className="text-slate-400">—</span>}
+                </div>
+              </div>
 
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-sm font-semibold text-slate-900">Admin Message</div>
-                      <div className="mt-2 text-sm leading-6 text-slate-700">
-                        {detailsApp?.adminMessage ? detailsApp.adminMessage : <span className="text-slate-400">—</span>}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold text-slate-900">Uploaded Documents</div>
-                        <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                          {detailsDocs.length} file(s)
-                        </div>
-                      </div>
-
-                      {detailsDocs.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                          No documents uploaded.
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {detailsDocs.map((d) => (
-                            <div
-                              key={d.id || d.title}
-                              className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4"
-                            >
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-slate-900">
-                                  {d.title || d.fileName || `Document ${d.id}`}
-                                </div>
-                                <div className="truncate text-xs text-slate-500">
-                                  {d.fileType || d.contentType || "file"}
-                                  {d.uploadedAt ? ` • ${fmtDate(d.uploadedAt)}` : ""}
-                                </div>
-                              </div>
-
-                              <FileText size={16} className="shrink-0 text-slate-400" />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-slate-900">Uploaded Documents</div>
+                  <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                    {detailsDocs.length} file(s)
                   </div>
                 </div>
-              )}
 
-              <div className="mt-6 flex justify-end">
-                <button
-                  type="button"
-                  onClick={closeDetails}
-                  className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Close
-                </button>
+                {detailsDocs.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    No documents uploaded.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {detailsDocs.map((d) => (
+                      <div
+                        key={d.id || d.title}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-slate-900">
+                            {d.title || d.fileName || `Document ${d.id}`}
+                          </div>
+                          <div className="truncate text-xs text-slate-500">
+                            {d.fileType || d.contentType || "file"}
+                            {d.uploadedAt ? ` • ${fmtDate(d.uploadedAt)}` : ""}
+                          </div>
+                        </div>
+
+                        <FileText size={16} className="shrink-0 text-slate-400" />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </AppModal>
     </div>
   );
 }

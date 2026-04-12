@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
+import AppModal from "../components/ui/AppModal";
 
 // ✅ FontAwesome (react-icons / FA6)
 import {
@@ -739,25 +740,35 @@ function ReviewModal({ booking, rating, setRating, comment, setComment, onClose,
   const therapistName = booking?.therapistName || "Therapist";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Rate your therapist</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Session with <span className="font-semibold">{therapistName}</span>
-            </p>
-          </div>
-
+    <AppModal
+      open
+      onClose={onClose}
+      title="Rate Your Therapist"
+      subtitle={`Session with ${therapistName}`}
+      icon={<FaStar />}
+      size="md"
+      footer={
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center justify-center rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+            className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
           >
-            <FaXmark />
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={submitting}
+            className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
+              submitting ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+            }`}
+          >
+            {submitting ? "Submitting..." : "Submit Review"}
           </button>
         </div>
-
+      }
+    >
         <div className="mt-4">
           <div className="text-sm font-medium text-gray-700">Your rating</div>
           <div className="mt-2 flex gap-2">
@@ -786,28 +797,7 @@ function ReviewModal({ booking, rating, setRating, comment, setComment, onClose,
             placeholder="Share your experience"
           />
         </div>
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={submitting}
-            className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
-              submitting ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
-            }`}
-          >
-            {submitting ? "Submitting..." : "Submit Review"}
-          </button>
-        </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }
 
@@ -828,26 +818,36 @@ function RescheduleModal({
   const noSlots = !!date && !slotsLoading && availableTimes.length === 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Reschedule booking</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Therapist: <span className="font-semibold">{name}</span>
-            </p>
-          </div>
-
+    <AppModal
+      open
+      onClose={onClose}
+      title="Reschedule Booking"
+      subtitle={`Therapist: ${name}`}
+      icon={<FaCalendarDays />}
+      size="lg"
+      footer={
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center justify-center rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-            aria-label="Close"
+            className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
           >
-            <FaXmark />
+            Close
+          </button>
+
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving || !date || !time}
+            className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
+              saving || !date || !time ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+            }`}
+          >
+            {saving ? "Saving..." : "Save"}
           </button>
         </div>
-
+      }
+    >
         <div className="mt-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Select date</label>
@@ -909,29 +909,7 @@ function RescheduleModal({
             )}
           </div>
         </div>
-
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Close
-          </button>
-
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving || !date || !time}
-            className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
-              saving || !date || !time ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
-            }`}
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
-        </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }
 
@@ -941,26 +919,37 @@ function CancelModal({ booking, onClose, onConfirm, canceling }) {
   const time = booking?.time || "-";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Cancel booking?</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              You’re about to cancel your session with <span className="font-semibold">{therapistName}</span>.
-            </p>
-          </div>
-
+    <AppModal
+      open
+      onClose={onClose}
+      title="Cancel Booking?"
+      subtitle={`You are about to cancel your session with ${therapistName}.`}
+      icon={<FaCircleXmark />}
+      size="md"
+      footer={
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center justify-center rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-            aria-label="Close"
+            disabled={canceling}
+            className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
           >
-            <FaXmark />
+            Keep
+          </button>
+
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={canceling}
+            className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
+              canceling ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+            }`}
+          >
+            {canceling ? "Canceling..." : "Yes, Cancel"}
           </button>
         </div>
-
+      }
+    >
         <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-2 text-gray-600">
@@ -977,29 +966,6 @@ function CancelModal({ booking, onClose, onConfirm, canceling }) {
             <span className="font-semibold">{time}</span>
           </div>
         </div>
-
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={canceling}
-            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Keep
-          </button>
-
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={canceling}
-            className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
-              canceling ? "bg-red-300 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
-            }`}
-          >
-            {canceling ? "Canceling..." : "Yes, Cancel"}
-          </button>
-        </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }

@@ -12,11 +12,11 @@ import {
   FaArrowsRotate,
   FaStar,
   FaUser,
-  FaXmark,
   FaCalendarDays,
   FaClock,
   FaCircleInfo,
 } from "react-icons/fa6";
+import AppModal from "../components/ui/AppModal";
 
 const THERAPISTS_ENDPOINT = "/api/therapists"; // GET
 const CREATE_BOOKING_ENDPOINT = "/api/bookings"; // POST { therapistId, date, time }
@@ -695,117 +695,104 @@ function BookModal({
   const noSlots = !!date && !slotsLoading && availableTimes.length === 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Book a session</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Therapist: <span className="font-semibold">{therapistName}</span>
-            </p>
-          </div>
-
+    <AppModal
+      open
+      onClose={onClose}
+      title="Book a session"
+      subtitle={`Therapist: ${therapistName}`}
+      size="md"
+      bodyClassName="space-y-4"
+      footer={
+        <>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center justify-center rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-            aria-label="Close"
+            className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
           >
-            <FaXmark />
+            Cancel
           </button>
+          <button
+            type="button"
+            onClick={onBook}
+            disabled={unavailable || booking || !date || !time}
+            className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
+              unavailable || booking || !date || !time
+                ? "bg-blue-300 cursor-not-allowed"
+                : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+            }`}
+          >
+            {booking ? "Booking..." : "Confirm Booking"}
+          </button>
+        </>
+      }
+    >
+      {unavailable ? (
+        <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
+          This therapist is currently <span className="font-semibold">unavailable</span>. Please choose another therapist.
         </div>
-
-        {unavailable ? (
-          <div className="mt-5 rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
-            This therapist is currently <span className="font-semibold">unavailable</span>. Please choose another therapist.
+      ) : (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Select date</label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <FaCalendarDays />
+              </span>
+              <input
+                type="date"
+                value={date}
+                min={todayISO()}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 pl-11 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
           </div>
-        ) : (
-          <>
-            <div className="mt-5 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Select date</label>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                    <FaCalendarDays />
-                  </span>
-                  <input
-                    type="date"
-                    value={date}
-                    min={todayISO()}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 pl-11 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
 
-              <div>
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-gray-700">Select time</label>
-                  <span className="text-xs text-gray-500">Only available slots are shown</span>
-                </div>
-
-                {!date ? (
-                  <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
-                    Pick a date to see available time slots.
-                  </div>
-                ) : slotsLoading ? (
-                  <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
-                    Loading availability...
-                  </div>
-                ) : noSlots ? (
-                  <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
-                    No available time slots for this date.
-                  </div>
-                ) : (
-                  <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
-                    {availableTimes.map((t) => {
-                      const active = t === time;
-                      return (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => setTime(t)}
-                          className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
-                            active
-                              ? "border-blue-200 bg-blue-50 text-blue-700"
-                              : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                          }`}
-                        >
-                          <span className="inline-flex items-center gap-2">
-                            <FaClock className={`${active ? "text-blue-700" : "text-gray-400"}`} />
-                            {t}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">Select time</label>
+              <span className="text-xs text-gray-500">Only available slots are shown</span>
             </div>
 
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={onBook}
-                disabled={booking || !date || !time}
-                className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
-                  booking || !date || !time ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
-                }`}
-              >
-                {booking ? "Booking..." : "Confirm Booking"}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+            {!date ? (
+              <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+                Pick a date to see available time slots.
+              </div>
+            ) : slotsLoading ? (
+              <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+                Loading availability...
+              </div>
+            ) : noSlots ? (
+              <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+                No available time slots for this date.
+              </div>
+            ) : (
+              <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {availableTimes.map((t) => {
+                  const active = t === time;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTime(t)}
+                      className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                        active
+                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <FaClock className={`${active ? "text-blue-700" : "text-gray-400"}`} />
+                        {t}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </AppModal>
   );
 }
