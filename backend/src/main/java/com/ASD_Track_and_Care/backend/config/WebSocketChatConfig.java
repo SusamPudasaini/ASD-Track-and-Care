@@ -31,6 +31,10 @@ public class WebSocketChatConfig implements WebSocketMessageBrokerConfigurer {
             .setAllowedOriginPatterns(
                 "http://localhost:*",
                 "http://127.0.0.1:*",
+                "http://213.145.86.157:5173",
+                "http://213.145.86.157:5173/",
+                "http://213.145.86.157:8081",
+                "http://213.145.86.157:8081/",
                 "https://kaley-vellicative-lucca.ngrok-free.dev:*"
             );
 
@@ -38,6 +42,10 @@ public class WebSocketChatConfig implements WebSocketMessageBrokerConfigurer {
                 .setAllowedOriginPatterns(
                         "http://localhost:*",
                         "http://127.0.0.1:*",
+                    "http://213.145.86.157:5173",
+                    "http://213.145.86.157:5173/",
+                    "http://213.145.86.157:8081",
+                    "http://213.145.86.157:8081/",
                         "https://kaley-vellicative-lucca.ngrok-free.dev:*"
                 )
                 .withSockJS();

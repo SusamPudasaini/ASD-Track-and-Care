@@ -1,5 +1,7 @@
 package com.ASD_Track_and_Care.backend.dto;
 
+import java.util.List;
+
 public class BookingResponse {
     private Long id;
     private String date;
@@ -27,6 +29,14 @@ public class BookingResponse {
     private String therapistMessage;
     private boolean reviewSubmitted;
     private Integer reviewRating;
+
+    // child assessment snapshot for therapist decision-making
+    private Double aiProbabilityScore;
+    private Double mchatScore;
+    private String riskLevel;
+    private String aiRiskLevel;
+    private String mchatRiskLevel;
+    private List<String> weaknessCategories;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -87,4 +97,22 @@ public class BookingResponse {
 
     public Integer getReviewRating() { return reviewRating; }
     public void setReviewRating(Integer reviewRating) { this.reviewRating = reviewRating; }
+
+    public Double getAiProbabilityScore() { return aiProbabilityScore; }
+    public void setAiProbabilityScore(Double aiProbabilityScore) { this.aiProbabilityScore = aiProbabilityScore; }
+
+    public Double getMchatScore() { return mchatScore; }
+    public void setMchatScore(Double mchatScore) { this.mchatScore = mchatScore; }
+
+    public String getRiskLevel() { return riskLevel; }
+    public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
+
+    public String getAiRiskLevel() { return aiRiskLevel; }
+    public void setAiRiskLevel(String aiRiskLevel) { this.aiRiskLevel = aiRiskLevel; }
+
+    public String getMchatRiskLevel() { return mchatRiskLevel; }
+    public void setMchatRiskLevel(String mchatRiskLevel) { this.mchatRiskLevel = mchatRiskLevel; }
+
+    public List<String> getWeaknessCategories() { return weaknessCategories; }
+    public void setWeaknessCategories(List<String> weaknessCategories) { this.weaknessCategories = weaknessCategories; }
 }

@@ -10,11 +10,11 @@ import {
   Save,
   Shield,
   UserCircle2,
-  X,
 } from "lucide-react";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 import MapLocationPicker from "../components/map/MapLocationPicker";
+import AppModal from "../components/ui/AppModal";
 
 // ✅ Backend endpoints
 const USER_AVATAR_ENDPOINT = "/api/users/me/avatar";
@@ -523,67 +523,46 @@ export default function Profile() {
         </div>
       </main>
 
-      {resetOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/40 bg-white shadow-2xl">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="flex items-center gap-2 text-lg font-semibold">
-                    <KeyRound size={20} />
-                    Reset Password
-                  </h2>
-                  <p className="mt-2 text-sm text-blue-50">
-                    We will send a password reset link to:
-                    <span className="ml-1 font-semibold">{form.userEmail || "-"}</span>
-                  </p>
-                </div>
+      <AppModal
+        open={resetOpen}
+        onClose={() => setResetOpen(false)}
+        title="Reset Password"
+        subtitle={`We will send a password reset link to: ${form.userEmail || "-"}`}
+        icon={<KeyRound size={18} />}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setResetOpen(false)}
+              className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
+            >
+              Cancel
+            </button>
 
-                <button
-                  type="button"
-                  onClick={() => setResetOpen(false)}
-                  className="rounded-xl border border-white/20 bg-white/10 p-2 text-white hover:bg-white/20"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                Check your email for the <span className="font-semibold">reset link</span> and follow the instructions after pressing the button below.
-              </div>
-
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setResetOpen(false)}
-                  className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={sendResetPasswordLink}
-                  disabled={resetSending}
-                  className={`rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition ${
-                    resetSending
-                      ? "cursor-not-allowed bg-blue-300"
-                      : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:-translate-y-0.5 hover:shadow-md"
-                  }`}
-                >
-                  {resetSending ? "Sending..." : "Send Reset Link"}
-                </button>
-              </div>
-
-              <div className="mt-3 text-xs text-slate-500">
-                If you do not see the email, check spam or junk folders.
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={sendResetPasswordLink}
+              disabled={resetSending}
+              className={`rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition ${
+                resetSending
+                  ? "cursor-not-allowed bg-blue-300"
+                  : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+              }`}
+            >
+              {resetSending ? "Sending..." : "Send Reset Link"}
+            </button>
           </div>
+        }
+      >
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+          Check your email for the <span className="font-semibold">reset link</span> and follow the instructions after pressing the button below.
         </div>
-      )}
+
+        <div className="mt-3 text-xs text-slate-500">
+          If you do not see the email, check spam or junk folders.
+        </div>
+      </AppModal>
     </div>
   );
 }

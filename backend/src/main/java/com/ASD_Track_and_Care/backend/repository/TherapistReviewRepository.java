@@ -22,4 +22,6 @@ public interface TherapistReviewRepository extends JpaRepository<TherapistReview
     Double averageRatingByTherapistId(@Param("therapistId") Long therapistId);
 
     long countByTherapistId(Long therapistId);
+
+    long countByUserId(Long userId);
 }

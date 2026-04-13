@@ -34,12 +34,11 @@ function getErrorMessage(err) {
 const CATEGORY_OPTIONS = [
   "ALL",
   "COMMUNICATION",
-  "BEHAVIOR_SUPPORT",
-  "DAILY_ROUTINE",
-  "SENSORY_SUPPORT",
-  "SOCIAL_SKILLS",
-  "HOME_ACTIVITIES",
-  "PARENT_GUIDANCE",
+  "SOCIAL_INTERACTION",
+  "ATTENTION",
+  "PLAY",
+  "SENSORY",
+  "BEHAVIOR",
 ];
 
 function prettyLabel(v) {

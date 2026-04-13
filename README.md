@@ -50,6 +50,19 @@ The system contains three connected applications:
 
 Run services in this order: FastAPI -> Spring Boot -> React.
 
+### Windows One-Click Launcher
+
+From the project root, run:
+
+start-all.bat
+
+This launches all three services in separate terminal windows:
+- FastAPI AI model on port 8000
+- Spring Boot backend on port 8081
+- React frontend on port 5173
+
+Close the opened terminals to stop the services.
+
 ### 1) Database Setup
 
 Create a MySQL database named ASD.

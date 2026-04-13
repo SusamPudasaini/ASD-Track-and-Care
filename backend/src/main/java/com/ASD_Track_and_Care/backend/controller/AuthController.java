@@ -26,7 +26,6 @@ import com.ASD_Track_and_Care.backend.service.EmailService;
 
 @RestController
 @RequestMapping("/auth")
-@CrossOrigin(origins = "http://localhost:5173")
 public class AuthController {
 
     @Autowired

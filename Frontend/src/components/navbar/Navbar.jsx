@@ -20,6 +20,7 @@ import {
   FaUserDoctor,
   FaPuzzlePiece,
   FaToolbox,
+  FaDatabase,
 } from "react-icons/fa6";
 import api from "../../api/axios";
 
@@ -59,6 +60,10 @@ export default function Navbar() {
 
   const [me, setMe] = useState(getStoredMe);
   const [adminCollapsed, setAdminCollapsed] = useState(false);
+  const [openAdminGroups, setOpenAdminGroups] = useState({
+    content: true,
+    database: false,
+  });
 
   const role = useMemo(() => getRoleFromMe(me), [me]);
 
@@ -131,6 +136,28 @@ export default function Navbar() {
     setMobileNavOpen(false);
     setOpenMobileGroup(null);
     setOpenDesktopDropdown(null);
+
+    if (role === "ADMIN") {
+      if (
+        location.pathname.startsWith("/admin/user-management") ||
+        location.pathname.startsWith("/admin/booking-management") ||
+        location.pathname.startsWith("/admin/therapist-reviews") ||
+        location.pathname.startsWith("/admin/database")
+      ) {
+        setOpenAdminGroups((prev) => ({ ...prev, database: true }));
+      }
+
+      if (
+        location.pathname.startsWith("/admin/request") ||
+        location.pathname.startsWith("/admin/resources") ||
+        location.pathname.startsWith("/admin/mchat-questions") ||
+        location.pathname.startsWith("/admin/daycares") ||
+        location.pathname.startsWith("/admin/aac-cards") ||
+        location.pathname.startsWith("/admin/matching-sorting")
+      ) {
+        setOpenAdminGroups((prev) => ({ ...prev, content: true }));
+      }
+    }
   }, [location.pathname]);
 
   const go = (path) => {
@@ -202,13 +229,19 @@ export default function Navbar() {
     { label: "Day Care Finder", path: "/daycares" },
   ];
 
-  const adminLinks = [
+  const adminContentLinks = [
     { label: "Therapist Requests", path: "/admin/request", icon: FaFileCircleCheck },
     { label: "Manage Resources", path: "/admin/resources", icon: FaBookOpen },
     { label: "Manage M-CHAT Questions", path: "/admin/mchat-questions", icon: FaCircleQuestion },
     { label: "Manage Day Cares", path: "/admin/daycares", icon: FaSchool },
     { label: "Manage AAC Cards", path: "/admin/aac-cards", icon: FaComments },
     { label: "Manage Matching & Sorting", path: "/admin/matching-sorting", icon: FaGamepad },
+  ];
+
+  const adminDatabaseLinks = [
+    { label: "User Management", path: "/admin/user-management", icon: FaUserGear },
+    { label: "Booking Management", path: "/admin/booking-management", icon: FaBookOpen },
+    { label: "Therapist Reviews", path: "/admin/therapist-reviews", icon: FaComments },
   ];
 
   const desktopLinks =
@@ -226,6 +259,10 @@ export default function Navbar() {
       : "sticky top-0 z-[9999] w-full border-b border-slate-100 bg-white/95 backdrop-blur";
 
   const isGroupActive = (items = []) => items.some((item) => isActive(item.path));
+
+  const toggleAdminGroup = (key) => {
+    setOpenAdminGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   return (
     <>
@@ -316,24 +353,109 @@ export default function Navbar() {
           </div>
 
           <div className={`flex-1 overflow-y-auto py-5 ${adminCollapsed ? "px-2" : "px-4"}`}>
-            {!adminCollapsed && (
-              <div className="mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
-                Admin Panel
-              </div>
-            )}
+            <div className="space-y-6">
+              <div>
+                {!adminCollapsed ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => toggleAdminGroup("content")}
+                      className="mb-3 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left"
+                    >
+                      <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                        Section 1: Manage Content
+                      </span>
+                      <FaChevronDown
+                        className={`text-xs text-slate-500 transition-transform ${
+                          openAdminGroups.content ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
 
-            <div className="space-y-1.5">
-              {adminLinks.map((item) => (
-                <SidebarItem
-                  key={item.path}
-                  active={isActive(item.path)}
-                  onClick={() => go(item.path)}
-                  icon={item.icon}
-                  collapsed={adminCollapsed}
-                >
-                  {item.label}
-                </SidebarItem>
-              ))}
+                    {openAdminGroups.content && (
+                      <div className="space-y-1.5">
+                        {adminContentLinks.map((item) => (
+                          <SidebarItem
+                            key={item.path}
+                            active={isActive(item.path)}
+                            onClick={() => go(item.path)}
+                            icon={item.icon}
+                            collapsed={adminCollapsed}
+                          >
+                            {item.label}
+                          </SidebarItem>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-1.5">
+                    {adminContentLinks.map((item) => (
+                      <SidebarItem
+                        key={item.path}
+                        active={isActive(item.path)}
+                        onClick={() => go(item.path)}
+                        icon={item.icon}
+                        collapsed={adminCollapsed}
+                      >
+                        {item.label}
+                      </SidebarItem>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                {!adminCollapsed ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => toggleAdminGroup("database")}
+                      className="mb-3 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left"
+                    >
+                      <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                        <FaDatabase className="text-[11px]" />
+                        Section 2: Manage Database
+                      </span>
+                      <FaChevronDown
+                        className={`text-xs text-slate-500 transition-transform ${
+                          openAdminGroups.database ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {openAdminGroups.database && (
+                      <div className="space-y-1.5">
+                        {adminDatabaseLinks.map((item) => (
+                          <SidebarItem
+                            key={item.path}
+                            active={isActive(item.path)}
+                            onClick={() => go(item.path)}
+                            icon={item.icon}
+                            collapsed={adminCollapsed}
+                          >
+                            {item.label}
+                          </SidebarItem>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-1.5">
+                    {adminDatabaseLinks.map((item) => (
+                      <SidebarItem
+                        key={item.path}
+                        active={isActive(item.path)}
+                        onClick={() => go(item.path)}
+                        icon={item.icon}
+                        collapsed={adminCollapsed}
+                      >
+                        {item.label}
+                      </SidebarItem>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
