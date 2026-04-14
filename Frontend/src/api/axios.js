@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearAllOnboardingStatusCache } from "../utils/onboardingStatusCache";
 
 const rawBaseUrl =
   import.meta.env.VITE_API_BASE_URL ||
@@ -38,6 +39,9 @@ api.interceptors.response.use(
       console.log("AUTH FAILURE:", status, "clearing token and role");
       localStorage.removeItem("token");
       localStorage.removeItem("role");
+      localStorage.removeItem("me");
+      localStorage.removeItem("profilePictureUrl");
+      clearAllOnboardingStatusCache();
     }
 
     return Promise.reject(err);

@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import api from "../api/axios";
+import {
+  readOnboardingStatusCache,
+  writeOnboardingStatusCache,
+} from "../utils/onboardingStatusCache";
 
 const ALLOWED_WHEN_PENDING = [
   "/questionnaire",
   "/mchat-questionnaire",
-  "/profile",
   "/logout",
 ];
 
@@ -20,10 +23,11 @@ function getStoredRole() {
 
 export default function OnboardingGuard() {
   const location = useLocation();
+  const cached = useMemo(() => readOnboardingStatusCache(), []);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({
-    aiCompleted: false,
-    mchatCompleted: false,
+    aiCompleted: cached.aiCompleted,
+    mchatCompleted: cached.mchatCompleted,
   });
 
   const role = useMemo(() => getStoredRole(), []);
@@ -42,18 +46,29 @@ export default function OnboardingGuard() {
       try {
         const [aiRes, mchatRes] = await Promise.all([
           api.get("/api/ml/last"),
-          api.get("/api/mchat-questionnaire/history", { params: { limit: 1 } }),
+          api.get("/api/mchat-questionnaire/last"),
         ]);
 
         if (!mounted) return;
 
-        const aiCompleted = Boolean(aiRes?.data?.hasHistory);
-        const mchatCompleted = Array.isArray(mchatRes?.data) && mchatRes.data.length > 0;
+        const next = {
+          aiCompleted: Boolean(aiRes?.data?.hasHistory),
+          mchatCompleted: Boolean(mchatRes?.data?.hasHistory),
+        };
 
-        setStatus({ aiCompleted, mchatCompleted });
+        setStatus(next);
+        writeOnboardingStatusCache(next);
       } catch {
         if (!mounted) return;
-        setStatus({ aiCompleted: false, mchatCompleted: false });
+        // Keep last known state when status checks fail to avoid false redirects.
+        setStatus((prev) => {
+          const safe = {
+            aiCompleted: !!prev?.aiCompleted,
+            mchatCompleted: !!prev?.mchatCompleted,
+          };
+          writeOnboardingStatusCache(safe);
+          return safe;
+        });
       } finally {
         if (mounted) setLoading(false);
       }

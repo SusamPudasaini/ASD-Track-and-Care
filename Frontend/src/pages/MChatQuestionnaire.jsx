@@ -5,12 +5,28 @@ import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  readOnboardingStatusCache,
+  writeOnboardingStatusCache,
+} from "../utils/onboardingStatusCache";
+import {
   FaArrowLeft,
   FaArrowRight,
   FaCircleCheck,
   FaClipboardQuestion,
   FaRegNoteSticky,
 } from "react-icons/fa6";
+
+function markMchatCompletedInCache() {
+  try {
+    const current = readOnboardingStatusCache();
+    writeOnboardingStatusCache({
+      aiCompleted: !!current.aiCompleted,
+      mchatCompleted: true,
+    });
+  } catch {
+    // ignore cache write errors
+  }
+}
 
 function getErrorMessage(err) {
   const data = err?.response?.data;
@@ -162,6 +178,8 @@ export default function MChatQuestionnaire() {
         answers: payloadAnswers,
         notes: notes.trim() || null,
       });
+
+      markMchatCompletedInCache();
 
       toast.success("M-CHAT questionnaire submitted successfully.");
       navigate("/analytics");

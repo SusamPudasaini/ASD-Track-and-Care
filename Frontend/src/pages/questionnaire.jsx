@@ -15,6 +15,22 @@ import {
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 import toast from "react-hot-toast";
+import {
+  readOnboardingStatusCache,
+  writeOnboardingStatusCache,
+} from "../utils/onboardingStatusCache";
+
+function markAiCompletedInCache() {
+  try {
+    const current = readOnboardingStatusCache();
+    writeOnboardingStatusCache({
+      aiCompleted: true,
+      mchatCompleted: !!current.mchatCompleted,
+    });
+  } catch {
+    // ignore cache write errors
+  }
+}
 
 // ---------------------------------------------------------------------------
 // UI helpers
@@ -266,7 +282,10 @@ const ResultModal = ({
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <button
                   type="button"
-                  onClick={() => onNavigate("/mchat-questionnaire")}
+                  onClick={() => {
+                    onClose();
+                    onNavigate("/mchat-questionnaire");
+                  }}
                   className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
                 >
                   Fill M-CHAT Now
@@ -738,16 +757,16 @@ export default function Questionnaire() {
 
         const [normalized, mchatRes] = await Promise.all([
           fetchHistory(),
-          api.get("/api/mchat-questionnaire/history", { params: { limit: 1 } }),
+          api.get("/api/mchat-questionnaire/last"),
         ]);
         if (!mounted) return;
 
         setHistory(normalized);
-        setMchatCompleted(Array.isArray(mchatRes?.data) && mchatRes.data.length > 0);
+        setMchatCompleted(Boolean(mchatRes?.data?.hasHistory));
       } catch {
         if (!mounted) return;
         setHistoryError("Could not load previous results.");
-        setMchatCompleted(false);
+        setMchatCompleted(!!readOnboardingStatusCache().mchatCompleted);
       } finally {
         if (mounted) setHistoryLoading(false);
       }
@@ -852,6 +871,8 @@ export default function Questionnaire() {
       }
 
       const finalRisk = rl || computeRiskLevel(p);
+
+      markAiCompletedInCache();
 
       setPrediction(p);
       setRiskLevel(finalRisk);
