@@ -83,8 +83,9 @@ export default function OnboardingGuard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center text-sm text-gray-600">
-        Checking onboarding progress...
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" aria-label="Loading onboarding status" role="status" />
+        <span className="sr-only">Checking onboarding progress...</span>
       </div>
     );
   }

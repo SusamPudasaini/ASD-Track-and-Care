@@ -8,24 +8,49 @@ backend/src/main/resources/application-*.properties
 backend/src/main/resources/*.yml
 backend/src/main/resources/*.yaml
 
-# Maven
+# Maven build output
 backend/target/
-backend/.mvn/
-backend/mvnw
-backend/mvnw.cmd
-
-# Logs
-*.log
 
 # =====================
 # Frontend (React / Vite)
 # =====================
 
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-frontend/.env
-frontend/.env.*
+Frontend/node_modules/
+Frontend/dist/
+Frontend/dist-ssr/
+Frontend/.vite/
+Frontend/.env
+Frontend/.env.*
+Frontend/coverage/
+
+# =====================
+# Chat Server (Node)
+# =====================
+
+chat-server/node_modules/
+chat-server/.env
+chat-server/.env.*
+
+# =====================
+# AI Model (Python)
+# =====================
+
+Ai-Model/.venv/
+Ai-Model/venv/
+Ai-Model/__pycache__/
+Ai-Model/.pytest_cache/
+Ai-Model/.mypy_cache/
+Ai-Model/.ipynb_checkpoints/
+*.py[cod]
+
+# =====================
+# Runtime Uploads
+# =====================
+
+uploads/profile-pics/*
+uploads/therapist-applications/*
+!uploads/profile-pics/.gitkeep
+!uploads/therapist-applications/.gitkeep
 
 # =====================
 # OS / IDE
@@ -33,15 +58,18 @@ frontend/.env.*
 
 .DS_Store
 Thumbs.db
-
-# IntelliJ / VS Code
 .idea/
 .vscode/
 *.iml
 
 # =====================
-# General
+# Logs / Environment
 # =====================
+
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
 
 .env
 .env.*
