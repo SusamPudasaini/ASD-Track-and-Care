@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import ActivityShell from "./ActivityShell";
 import { getMyActivityResults, saveActivityResult } from "../../api/activityApi";
+import { FaBolt, FaRegClock } from "react-icons/fa6";
 
 const TRIALS = 5;
 
@@ -235,13 +236,14 @@ export default function ReactionTime() {
     <ActivityShell
       title="Reaction Time"
       subtitle="A calm, predictable reaction-time exercise (5 trials)."
+      headerIcon={FaBolt}
       footer={
         <div>
           <strong>Therapy note:</strong> This supports attention + response timing. Low Sensory mode keeps transitions calmer.
         </div>
       }
     >
-      <div className="p-4 border-b border-gray-100">
+      <div className="border-b border-blue-100 bg-blue-50/60 p-4">
         <label className="flex items-center gap-3 text-sm text-gray-700">
           <input
             type="checkbox"
@@ -287,7 +289,10 @@ export default function ReactionTime() {
       </button>
 
       <div className="p-4">
-        <h3 className="text-base font-semibold text-gray-900 mb-3">Recent results</h3>
+        <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900">
+          <FaRegClock className="text-[#4a6cf7]" />
+          Recent results
+        </h3>
 
         {historyLoading ? (
           <div className="text-sm text-gray-600">Loading...</div>

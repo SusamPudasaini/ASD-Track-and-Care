@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import ActivityShell from "./ActivityShell";
 import { getMyActivityResults, saveActivityResult } from "../../api/activityApi";
+import { FaEye, FaRegClock } from "react-icons/fa6";
 
 // HumanBenchmark-ish defaults (but calmer)
 const DEFAULT_GRID = 3; // starts 3x3
@@ -80,6 +81,14 @@ export default function VisualMemory() {
   const flashMs = useMemo(() => FLASH_MS[speed] || FLASH_MS.NORMAL, [speed]);
 
   const totalTiles = useMemo(() => gridSize * gridSize, [gridSize]);
+
+  const tileHeight = useMemo(() => {
+    if (gridSize <= 3) return 116;
+    if (gridSize <= 4) return 102;
+    if (gridSize <= 5) return 90;
+    if (gridSize <= 6) return 80;
+    return 72;
+  }, [gridSize]);
 
   function clearTimer() {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -252,6 +261,7 @@ export default function VisualMemory() {
     <ActivityShell
       title="Visual Memory"
       subtitle="Remember the highlighted tiles, then tap them back. Each level adds one tile."
+      headerIcon={FaEye}
       footer={
         <div>
           <strong>Therapy note:</strong> Supports visual attention and short-term memory. Low Sensory mode reduces surprise.
@@ -259,7 +269,7 @@ export default function VisualMemory() {
       }
     >
       {/* Controls */}
-      <div className="p-4 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-b border-blue-100 bg-blue-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
         <label className="flex items-center gap-3 text-sm text-gray-700">
           <input
             type="checkbox"
@@ -332,7 +342,8 @@ export default function VisualMemory() {
               className="mx-auto mt-4 grid gap-3"
               style={{
                 gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
-                maxWidth: Math.min(560, gridSize * 92),
+                maxWidth: Math.min(660, gridSize * 102),
+                width: "100%",
               }}
             >
               {Array.from({ length: totalTiles }).map((_, idx) => {
@@ -354,7 +365,7 @@ export default function VisualMemory() {
                     onClick={() => onTileClick(idx)}
                     disabled={phase !== "input"}
                     style={{
-                      height: 72,
+                      height: tileHeight,
                       borderRadius: 16,
                       border: `1px solid ${COLORS.border}`,
                       background: bg,
@@ -370,8 +381,11 @@ export default function VisualMemory() {
       </div>
 
       {/* History */}
-      <div className="p-4 border-t border-gray-100">
-        <h3 className="text-base font-semibold text-gray-900 mb-3">Recent results</h3>
+      <div className="border-t border-blue-100 p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900">
+          <FaRegClock className="text-[#4a6cf7]" />
+          Recent results
+        </h3>
 
         {historyLoading ? (
           <div className="text-sm text-gray-600">Loading...</div>

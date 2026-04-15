@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import ActivityShell from "./ActivityShell";
 import { getMyActivityResults, saveActivityResult } from "../../api/activityApi";
+import { FaHashtag, FaRegClock } from "react-icons/fa6";
 
 const DEFAULT_SPEED = "NORMAL"; // SLOW | NORMAL | FAST
 
@@ -197,6 +198,7 @@ export default function NumberMemory() {
     <ActivityShell
       title="Number Memory"
       subtitle="Memorize the number, then type it back. Each level adds one digit."
+      headerIcon={FaHashtag}
       footer={
         <div>
           <strong>Therapy note:</strong> Supports working memory and sustained attention. Speed control helps match the child’s comfort.
@@ -204,7 +206,7 @@ export default function NumberMemory() {
       }
     >
       {/* Controls */}
-      <div className="p-4 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-b border-blue-100 bg-blue-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
         <label className="flex items-center gap-3 text-sm text-gray-700">
           <input
             type="checkbox"
@@ -298,8 +300,11 @@ export default function NumberMemory() {
       </div>
 
       {/* History */}
-      <div className="p-4 border-t border-gray-100">
-        <h3 className="text-base font-semibold text-gray-900 mb-3">Recent results</h3>
+      <div className="border-t border-blue-100 p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900">
+          <FaRegClock className="text-[#4a6cf7]" />
+          Recent results
+        </h3>
 
         {historyLoading ? (
           <div className="text-sm text-gray-600">Loading...</div>

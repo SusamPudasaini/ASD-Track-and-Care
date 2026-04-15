@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import Navbar from "../../components/navbar/Navbar";
 import api from "../../api/axios";
 
@@ -12,6 +13,7 @@ import {
   FaStar,
   FaRotateLeft,
   FaArrowRight,
+  FaArrowTrendUp,
 } from "react-icons/fa6";
 
 export default function ActivitiesHub() {
@@ -156,16 +158,40 @@ export default function ActivitiesHub() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_30%,_#ffffff)]">
       <Navbar />
 
       <main className="mx-auto max-w-6xl px-6 py-10">
-        <h1 className="text-3xl font-semibold text-gray-900">
-          Therapy & Activity Modules
-        </h1>
+        <motion.section
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur md:p-8"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-blue-700">
+                Activity Center
+              </div>
+              <h1 className="mt-3 text-3xl font-semibold text-gray-900">
+                Therapy & Activity Modules
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Choose modules by child needs, follow recommendations, and keep progress consistent.
+              </p>
+            </div>
+
+            <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 text-[#4a6cf7] shadow-sm">
+              <FaArrowTrendUp />
+            </div>
+          </div>
+        </motion.section>
 
         {!reminder.loading && (
-          <div
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.08, ease: "easeOut" }}
             className={`mt-6 rounded-xl border p-4 text-sm ${
               reminder.inactiveDays >= 3
                 ? "border-orange-200 bg-orange-50 text-orange-900"
@@ -179,12 +205,17 @@ export default function ActivitiesHub() {
                 ? `No activity logged for ${reminder.inactiveDays} days. Restart with a short 10-minute session today.`
                 : "Great consistency. Keep a daily routine to strengthen progress."}
             </p>
-          </div>
+          </motion.div>
         )}
 
         {/* Recommended Mode Banner */}
         {isRecommendedMode && (
-          <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.12, ease: "easeOut" }}
+            className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"
+          >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2 font-semibold">
                 <FaStar className="text-yellow-500" />
@@ -200,45 +231,59 @@ export default function ActivitiesHub() {
                 Reset
               </button>
             </div>
-          </div>
+          </motion.div>
         )}
 
-        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={{
+            hidden: { opacity: 0 },
+            show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.12 } },
+          }}
+          className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
+        >
           {displayActivities.map((a) => {
             const isRec = recommendedKeys.has(a.key);
 
             return (
-              <Link
+              <motion.div
                 key={a.key}
-                to={a.to}
-                className="group rounded-2xl border bg-white p-5 shadow-sm hover:shadow-md transition"
-                style={{ textDecoration: "none" }}
+                variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}
+                whileHover={{ y: -5 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="text-xl text-[#4a6cf7]">
-                      {a.icon}
+                <Link
+                  to={a.to}
+                  className="group block rounded-2xl border border-white/70 bg-white/90 p-5 shadow-[0_8px_26px_rgba(15,23,42,0.06)] transition hover:shadow-[0_12px_32px_rgba(15,23,42,0.1)]"
+                  style={{ textDecoration: "none" }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-xl text-[#4a6cf7]">
+                        {a.icon}
+                      </div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        {a.title}
+                      </div>
                     </div>
-                    <div className="text-lg font-semibold text-gray-900">
-                      {a.title}
-                    </div>
+
+                    {isRec && (
+                      <FaStar className="text-yellow-500" />
+                    )}
                   </div>
 
-                  {isRec && (
-                    <FaStar className="text-yellow-500" />
-                  )}
-                </div>
+                  <div className="mt-3 text-sm text-gray-600">{a.desc}</div>
 
-                <div className="mt-3 text-sm text-gray-600">{a.desc}</div>
-
-                <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-[#4a6cf7] group-hover:translate-x-1 transition">
-                  Open
-                  <FaArrowRight className="text-xs" />
-                </div>
-              </Link>
+                  <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-[#4a6cf7] transition group-hover:translate-x-1">
+                    Open
+                    <FaArrowRight className="text-xs" />
+                  </div>
+                </Link>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       </main>
     </div>
   );

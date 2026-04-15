@@ -115,11 +115,11 @@ export default function ResourceHub() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_30%,_#ffffff)]">
       <Navbar />
 
       <main className="mx-auto max-w-6xl px-6 py-10">
-        <div className="rounded-3xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white p-6 shadow-sm">
+        <div className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
           <div className="flex items-center gap-2">
             <FaBookOpen className="text-[#4a6cf7]" />
             <h1 className="text-3xl font-semibold text-gray-900">Resource Hub</h1>
@@ -129,41 +129,43 @@ export default function ResourceHub() {
             Explore supportive tutorials, articles, and guidance materials to help parents better support children with ASD at home.
           </p>
 
-          <div className="mt-5 relative">
-            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-              <FaMagnifyingGlass />
-            </span>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search resources..."
-              className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-11 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
+          <div className="mt-5 rounded-2xl border border-white/70 bg-white/90 p-4 shadow-[0_8px_26px_rgba(15,23,42,0.06)]">
+            <div className="relative">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <FaMagnifyingGlass />
+              </span>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search resources..."
+                className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-11 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {CATEGORY_OPTIONS.map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => handleCategory(opt)}
-                className={`rounded-full border px-4 py-2 text-xs font-semibold ${
-                  category === opt
-                    ? "border-blue-600 bg-blue-600 text-white"
-                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                {prettyLabel(opt)}
-              </button>
-            ))}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {CATEGORY_OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => handleCategory(opt)}
+                  className={`rounded-full border px-4 py-2 text-xs font-semibold ${
+                    category === opt
+                      ? "border-blue-600 bg-blue-600 text-white"
+                      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {prettyLabel(opt)}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {loading ? (
-          <div className="mt-8 text-sm text-gray-600">Loading resources...</div>
+          <div className="mt-8 rounded-2xl border border-white/70 bg-white/90 p-6 text-sm text-gray-600 shadow-sm">Loading resources...</div>
         ) : filtered.length === 0 ? (
-          <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
+          <div className="mt-8 rounded-2xl border border-white/70 bg-white/90 p-6 text-sm text-gray-600 shadow-sm">
             No resources found for the selected filter.
           </div>
         ) : (
@@ -172,7 +174,7 @@ export default function ResourceHub() {
               <Link
                 key={item.id}
                 to={`/resources/${item.id}`}
-                className="group overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                className="group overflow-hidden rounded-3xl border border-white/70 bg-white/90 shadow-[0_8px_26px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(15,23,42,0.12)]"
               >
                 <div className="aspect-[16/9] w-full bg-gray-100">
                   {item.thumbnailUrl ? (

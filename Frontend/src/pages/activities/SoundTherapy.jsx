@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import ActivityShell from "./ActivityShell";
 import { getMyActivityResults, saveActivityResult } from "../../api/activityApi";
+import { FaCheck, FaPlay, FaRegClock, FaVolumeHigh, FaXmark } from "react-icons/fa6";
 
 /**
  * Sound Therapy (Parent-guided)
@@ -61,7 +62,7 @@ export default function SoundTherapy() {
   const [phase, setPhase] = useState("idle");
 
   const [lowSensory, setLowSensory] = useState(true);
-  const [autoNextDelayMs, setAutoNextDelayMs] = useState(450); // after ✅
+  const [autoNextDelayMs, setAutoNextDelayMs] = useState(450); // delay after correct answer
 
   const [level, setLevel] = useState(1);
   const [soundIndex, setSoundIndex] = useState(0);
@@ -232,6 +233,7 @@ export default function SoundTherapy() {
     <ActivityShell
       title="Sound Therapy"
       subtitle="Parent-guided listening exercise: play a sound, child answers, parent confirms."
+      headerIcon={FaVolumeHigh}
       footer={
         <div>
           <strong>Therapy note:</strong> Supports auditory discrimination, vocabulary building, and attention. Parent confirmation keeps it low-pressure.
@@ -239,7 +241,7 @@ export default function SoundTherapy() {
       }
     >
       {/* Controls */}
-      <div className="p-4 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-b border-blue-100 bg-blue-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
         <label className="flex items-center gap-3 text-sm text-gray-700">
           <input
             type="checkbox"
@@ -272,7 +274,7 @@ export default function SoundTherapy() {
       {/* Main */}
       <div className="p-6">
         {phase === "idle" ? (
-          <div className="rounded-2xl border border-gray-100 bg-gray-50 p-6 text-center">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-6 text-center">
             <div className="text-sm text-gray-600">
               Press Start. Then play a sound and let the child answer verbally.
             </div>
@@ -290,7 +292,7 @@ export default function SoundTherapy() {
             </div>
           </div>
         ) : phase === "ended" ? (
-          <div className="rounded-2xl border border-gray-100 bg-gray-50 p-6 text-center">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-6 text-center">
             <div className="text-lg font-semibold text-gray-900">
               Session ended
             </div>
@@ -310,7 +312,7 @@ export default function SoundTherapy() {
             </button>
           </div>
         ) : (
-          <div className="rounded-2xl border border-gray-100 bg-gray-50 p-6">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm font-semibold text-gray-900">
                 Level: {level}
@@ -325,11 +327,12 @@ export default function SoundTherapy() {
                 type="button"
                 onClick={playSound}
                 disabled={playing}
-                className={`rounded-xl px-6 py-3 text-sm font-semibold text-white ${
+                className={`inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-white ${
                   playing ? "bg-blue-300 cursor-not-allowed" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
                 }`}
               >
-                {playing ? "Playing..." : "▶ Play Sound"}
+                <FaPlay />
+                {playing ? "Playing..." : "Play Sound"}
               </button>
 
               {/* Hidden answer (parent shouldn’t show it to child) */}
@@ -341,22 +344,24 @@ export default function SoundTherapy() {
                 <button
                   type="button"
                   onClick={markCorrect}
-                  className="rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700"
                 >
-                  ✅ Correct
+                  <FaCheck />
+                  Correct
                 </button>
 
                 <button
                   type="button"
                   onClick={markWrong}
-                  className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700"
                 >
-                  ❌ Wrong
+                  <FaXmark />
+                  Wrong
                 </button>
               </div>
 
               <div className="mt-2 text-xs text-gray-500">
-                Tip: Use ✅ even if the child is close (positive reinforcement), and increase difficulty slowly.
+                Tip: Use the correct option even if the child is close (positive reinforcement), and increase difficulty slowly.
               </div>
             </div>
 
@@ -372,8 +377,11 @@ export default function SoundTherapy() {
       </div>
 
       {/* History */}
-      <div className="p-4 border-t border-gray-100">
-        <h3 className="text-base font-semibold text-gray-900 mb-3">Recent sessions</h3>
+      <div className="border-t border-blue-100 p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900">
+          <FaRegClock className="text-[#4a6cf7]" />
+          Recent sessions
+        </h3>
 
         {historyLoading ? (
           <div className="text-sm text-gray-600">Loading...</div>

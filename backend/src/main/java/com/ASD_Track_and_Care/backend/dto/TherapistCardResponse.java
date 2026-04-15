@@ -11,6 +11,8 @@ public class TherapistCardResponse {
     private Double averageReview;
     private Integer reviewCount;
     private String address;
+    private Double workplaceLatitude;
+    private Double workplaceLongitude;
     private BigDecimal pricePerSession;
     private String profilePictureUrl;
 
@@ -28,6 +30,8 @@ public class TherapistCardResponse {
             Double averageReview,
             Integer reviewCount,
             String address,
+            Double workplaceLatitude,
+            Double workplaceLongitude,
             BigDecimal pricePerSession,
             String profilePictureUrl,
             long slotCount,
@@ -40,6 +44,8 @@ public class TherapistCardResponse {
         this.averageReview = averageReview;
         this.reviewCount = reviewCount;
         this.address = address;
+        this.workplaceLatitude = workplaceLatitude;
+        this.workplaceLongitude = workplaceLongitude;
         this.pricePerSession = pricePerSession;
         this.profilePictureUrl = profilePictureUrl;
         this.slotCount = slotCount;
@@ -66,6 +72,12 @@ public class TherapistCardResponse {
 
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
+
+    public Double getWorkplaceLatitude() { return workplaceLatitude; }
+    public void setWorkplaceLatitude(Double workplaceLatitude) { this.workplaceLatitude = workplaceLatitude; }
+
+    public Double getWorkplaceLongitude() { return workplaceLongitude; }
+    public void setWorkplaceLongitude(Double workplaceLongitude) { this.workplaceLongitude = workplaceLongitude; }
 
     public BigDecimal getPricePerSession() { return pricePerSession; }
     public void setPricePerSession(BigDecimal pricePerSession) { this.pricePerSession = pricePerSession; }

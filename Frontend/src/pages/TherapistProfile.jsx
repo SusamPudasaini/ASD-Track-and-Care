@@ -17,33 +17,9 @@ import {
   FaUserDoctor,
   FaGraduationCap,
 } from "react-icons/fa6";
-import { MapContainer, Marker, TileLayer } from "react-leaflet";
-import L from "leaflet";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import AppModal from "../components/ui/AppModal";
 
 const CREATE_BOOKING_ENDPOINT = "/api/bookings"; // POST { therapistId, date, time }
-
-const MAP_ICON = new L.Icon({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-if (!L.Icon.Default.prototype._asdTrackPatched) {
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: markerIcon2x,
-    iconUrl: markerIcon,
-    shadowUrl: markerShadow,
-  });
-  L.Icon.Default.prototype._asdTrackPatched = true;
-}
 
 function backendBase() {
   return (import.meta.env.VITE_API_BASE_URL || "http://localhost:8081").replace(/\/api\/?$/, "");
@@ -117,6 +93,14 @@ function toNumberOrNull(value) {
   if (typeof value === "string" && value.trim() !== "") {
     const n = Number(value);
     return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function pickCoordinate(...values) {
+  for (const value of values) {
+    const parsed = toNumberOrNull(value);
+    if (parsed !== null) return parsed;
   }
   return null;
 }
@@ -229,18 +213,41 @@ export default function TherapistProfile() {
   }, [therapist]);
 
   const workplaceLatitude = useMemo(() => {
-    return toNumberOrNull(
-      therapist?.workplaceLatitude ?? therapist?.latitude ?? therapist?.workplaceLat ?? therapist?.lat
+    return pickCoordinate(
+      therapist?.workplaceLatitude,
+      therapist?.workplaceLat,
+      therapist?.workplace_latitude,
+      therapist?.location?.workplaceLatitude,
+      therapist?.location?.latitude,
+      therapist?.coordinates?.workplaceLatitude,
+      therapist?.coordinates?.latitude,
+      therapist?.approvedApplication?.workplaceLatitude,
+      therapist?.approvedApplication?.workplaceLat,
+      therapist?.latitude,
+      therapist?.lat
     );
   }, [therapist]);
 
   const workplaceLongitude = useMemo(() => {
-    return toNumberOrNull(
-      therapist?.workplaceLongitude ?? therapist?.longitude ?? therapist?.workplaceLng ?? therapist?.lng
+    return pickCoordinate(
+      therapist?.workplaceLongitude,
+      therapist?.workplaceLng,
+      therapist?.workplace_longitude,
+      therapist?.location?.workplaceLongitude,
+      therapist?.location?.longitude,
+      therapist?.coordinates?.workplaceLongitude,
+      therapist?.coordinates?.longitude,
+      therapist?.approvedApplication?.workplaceLongitude,
+      therapist?.approvedApplication?.workplaceLng,
+      therapist?.longitude,
+      therapist?.lng
     );
   }, [therapist]);
 
   const canShowWorkplaceMap = workplaceLatitude !== null && workplaceLongitude !== null;
+  const workplaceGoogleMapsUrl = canShowWorkplaceMap
+    ? `https://www.google.com/maps?q=${workplaceLatitude},${workplaceLongitude}`
+    : null;
 
   const rating = therapist?.averageReview ?? therapist?.rating ?? therapist?.avgRating ?? therapist?.stars;
   const reviews = therapist?.reviewCount ?? therapist?.reviewsCount ?? therapist?.reviews;
@@ -541,21 +548,25 @@ export default function TherapistProfile() {
                     <p className="mt-2 text-sm text-slate-600">{workplaceAddress}</p>
 
                     {canShowWorkplaceMap ? (
-                      <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
-                        <div className="h-56 w-full">
-                          <MapContainer
-                            center={[workplaceLatitude, workplaceLongitude]}
-                            zoom={14}
-                            scrollWheelZoom={false}
-                            className="h-full w-full"
-                          >
-                            <TileLayer
-                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            />
-                            <Marker position={[workplaceLatitude, workplaceLongitude]} icon={MAP_ICON} />
-                          </MapContainer>
-                        </div>
+                      <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <iframe
+                          title="Therapist Workplace Map"
+                          className="h-56 w-full"
+                          src={`https://maps.google.com/maps?q=${workplaceLatitude},${workplaceLongitude}&z=15&output=embed`}
+                        />
+
+                        {workplaceGoogleMapsUrl ? (
+                          <div className="border-t border-slate-200 p-2">
+                            <a
+                              href={workplaceGoogleMapsUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-2 rounded-lg bg-[#4a6cf7] px-3 py-2 text-xs font-semibold text-white hover:bg-[#3f5ee0]"
+                            >
+                              Open in Google Maps
+                            </a>
+                          </div>
+                        ) : null}
                       </div>
                     ) : (
                       <p className="mt-3 text-xs text-slate-500">Workplace map location is not available.</p>

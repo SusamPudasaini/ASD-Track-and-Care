@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
@@ -101,16 +102,20 @@ function ImageCard({
   disabled = false,
   correct = false,
   wrong = false,
+  hideLabel = false,
   draggable = false,
   onDragStart,
+  onDragEnd,
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-label={item?.label || "Activity image"}
       draggable={draggable}
       onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       className={`group overflow-hidden rounded-3xl border bg-white shadow-sm transition ${
         disabled ? "cursor-not-allowed opacity-80" : "hover:-translate-y-1 hover:shadow-md"
       } ${
@@ -140,11 +145,13 @@ function ImageCard({
         )}
       </div>
 
-      <div className="p-4 text-center">
-        <div className="text-base font-semibold text-gray-900 group-hover:text-blue-600">
-          {item?.label || "Untitled"}
+      {!hideLabel ? (
+        <div className="p-4 text-center">
+          <div className="text-base font-semibold text-gray-900 group-hover:text-blue-600">
+            {item?.label || "Untitled"}
+          </div>
         </div>
-      </div>
+      ) : null}
     </button>
   );
 }
@@ -235,16 +242,20 @@ function ScreenCard({ title, description, children }) {
   );
 }
 
-function BucketDropZone({ bucket, onDropItem, isActive }) {
+function CategoryDropZone({ zoneKey, onPlaceItem, isActive, selectedItemId }) {
   return (
-    <div
+    <button
+      type="button"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
         const itemId = e.dataTransfer.getData("text/plain");
-        if (itemId) onDropItem(itemId, bucket);
+        if (itemId) onPlaceItem(itemId, zoneKey);
       }}
-      className={`rounded-[2rem] border-2 border-dashed p-6 text-center transition ${
+      onClick={() => {
+        if (selectedItemId) onPlaceItem(selectedItemId, zoneKey);
+      }}
+      className={`min-h-[220px] w-full rounded-[2rem] border-2 border-dashed p-8 text-center transition ${
         isActive
           ? "border-blue-500 bg-blue-100"
           : "border-blue-200 bg-blue-50 hover:border-blue-400 hover:bg-blue-100"
@@ -253,10 +264,12 @@ function BucketDropZone({ bucket, onDropItem, isActive }) {
       <div className="mb-3 flex justify-center text-3xl text-blue-600">
         <FaLayerGroup />
       </div>
-      <div className="text-xs font-bold uppercase tracking-wider text-blue-600">Bucket</div>
-      <div className="mt-2 text-lg font-bold text-blue-900">{prettyLabel(bucket)}</div>
-      <div className="mt-2 text-sm text-blue-700">Drag item here</div>
-    </div>
+      <div className="text-xs font-bold uppercase tracking-wider text-blue-600">Category Zone</div>
+      <div className="mt-2 text-xl font-bold text-blue-900">{prettyLabel(zoneKey)}</div>
+      <div className="mt-3 text-sm text-blue-700">
+        {selectedItemId ? "Tap to place selected card" : "Drop card here or tap after selecting"}
+      </div>
+    </button>
   );
 }
 
@@ -308,6 +321,7 @@ export default function MatchingSortingActivity() {
   const [sortingItems, setSortingItems] = useState([]);
   const [sortingFeedback, setSortingFeedback] = useState(null);
   const [draggingItemId, setDraggingItemId] = useState(null);
+  const [selectedSortingItemId, setSelectedSortingItemId] = useState(null);
 
   useEffect(() => {
     loadActivities("ALL");
@@ -355,6 +369,7 @@ export default function MatchingSortingActivity() {
     setResultSaved(false);
     setSortingFeedback(null);
     setDraggingItemId(null);
+    setSelectedSortingItemId(null);
 
     if (selectedActivity.type === "MATCHING") {
       initializeMatching(selectedActivity);
@@ -410,6 +425,7 @@ export default function MatchingSortingActivity() {
     setSortingItems(normalized);
     setSortingFeedback(null);
     setDraggingItemId(null);
+    setSelectedSortingItemId(null);
     setResultSaved(false);
   }
 
@@ -477,6 +493,7 @@ export default function MatchingSortingActivity() {
     setScore(0);
     setSavingResult(false);
     setResultSaved(false);
+    setSelectedSortingItemId(null);
 
     if (selectedActivity.type === "MATCHING") {
       initializeMatching(selectedActivity);
@@ -561,11 +578,11 @@ export default function MatchingSortingActivity() {
     sortingItems.length > 0 &&
     sortingItems.every((x) => x.placed);
 
-  function handleDropToBucket(itemId, bucket) {
+  function handlePlaceToZone(itemId, zoneKey) {
     const chosenItem = sortingItems.find((item) => String(item.id) === String(itemId));
     if (!chosenItem) return;
 
-    const isCorrect = (chosenItem.categoryKey || "") === bucket;
+    const isCorrect = (chosenItem.categoryKey || "") === zoneKey;
 
     if (isCorrect) {
       const nextScore = score + 1;
@@ -579,7 +596,7 @@ export default function MatchingSortingActivity() {
       );
       setSortingFeedback({
         type: "success",
-        text: `"${chosenItem.label}" was placed in the correct bucket.`,
+        text: `"${chosenItem.label}" was placed in the correct zone.`,
       });
       setScore(nextScore);
       toast.success("Correct category!");
@@ -587,28 +604,34 @@ export default function MatchingSortingActivity() {
       if (willComplete) {
         toast.success("Sorting activity completed!");
         void saveCompletedActivityResult(nextScore, {
-          bucketsUsed: sortingCategories.length,
+          zonesUsed: sortingCategories.length,
         });
       }
     } else {
       setSortingFeedback({
         type: "error",
-        text: `"${chosenItem.label}" does not belong in ${prettyLabel(bucket)}.`,
+        text: `"${chosenItem.label}" does not belong in ${prettyLabel(zoneKey)}.`,
       });
-      toast.error("Wrong bucket.");
+      toast.error("Wrong zone.");
     }
 
     setDraggingItemId(null);
+    setSelectedSortingItemId(null);
   }
 
   const titleCount = filteredActivities.length;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_30%,_#ffffff)]">
       <Navbar />
 
       <main className="mx-auto max-w-7xl px-6 py-10">
-        <div className="rounded-3xl border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-indigo-50 p-6 shadow-sm">
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur"
+        >
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
               <div className="rounded-2xl bg-blue-100 p-4 text-2xl text-blue-600">
@@ -647,13 +670,23 @@ export default function MatchingSortingActivity() {
               </button>
             ) : null}
           </div>
-        </div>
+        </motion.div>
 
-        <div className="mt-8">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.08, ease: "easeOut" }}
+          className="mt-8"
+        >
           <StepProgress currentStep={currentStep} />
-        </div>
+        </motion.div>
 
-        <div className="mt-8">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.12, ease: "easeOut" }}
+          className="mt-8"
+        >
           {currentStep === 1 && (
             <ScreenCard
               title="Step 1: Choose Activity Type"
@@ -766,7 +799,7 @@ export default function MatchingSortingActivity() {
                               </div>
 
                               <div className="mx-auto max-w-sm">
-                                <ImageCard item={currentMatchingRound.prompt} disabled />
+                                <ImageCard item={currentMatchingRound.prompt} disabled hideLabel />
                               </div>
 
                               <div className="mt-6 flex justify-center">
@@ -802,6 +835,7 @@ export default function MatchingSortingActivity() {
                                         key={`${option.id}-${index}`}
                                         item={option}
                                         disabled={matchingAnswered}
+                                        hideLabel
                                         selected={isSelected}
                                         correct={false}
                                         wrong={matchingAnswered && isSelected && !matchingWasCorrect}
@@ -859,7 +893,7 @@ export default function MatchingSortingActivity() {
                         <div>
                           <h3 className="text-lg font-semibold text-gray-900">Sorting Activity</h3>
                           <p className="mt-1 text-sm text-gray-500">
-                            Drag an item card and drop it into the correct bucket.
+                            Drag an item card into the right category zone, or tap a card then tap a zone on mobile.
                           </p>
                         </div>
 
@@ -886,11 +920,16 @@ export default function MatchingSortingActivity() {
                               <ImageCard
                                 key={item.id}
                                 item={item}
+                                hideLabel
+                                selected={String(selectedSortingItemId) === String(item.id)}
+                                onClick={() => setSelectedSortingItemId(String(item.id))}
                                 draggable
                                 onDragStart={(e) => {
                                   e.dataTransfer.setData("text/plain", String(item.id));
                                   setDraggingItemId(String(item.id));
+                                  setSelectedSortingItemId(String(item.id));
                                 }}
+                                onDragEnd={() => setDraggingItemId(null)}
                               />
                             ))}
                           </div>
@@ -899,16 +938,17 @@ export default function MatchingSortingActivity() {
 
                       <div className="rounded-3xl border border-blue-100 bg-blue-50 p-5">
                         <div className="mb-4 text-sm font-semibold text-blue-700">
-                          Drag Into a Bucket
+                          Place Into a Category Zone
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                          {sortingCategories.map((bucket) => (
-                            <BucketDropZone
-                              key={bucket}
-                              bucket={bucket}
-                              isActive={Boolean(draggingItemId)}
-                              onDropItem={handleDropToBucket}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {sortingCategories.map((zoneKey) => (
+                            <CategoryDropZone
+                              key={zoneKey}
+                              zoneKey={zoneKey}
+                              isActive={Boolean(draggingItemId) || Boolean(selectedSortingItemId)}
+                              selectedItemId={selectedSortingItemId}
+                              onPlaceItem={handlePlaceToZone}
                             />
                           ))}
                         </div>
@@ -932,7 +972,7 @@ export default function MatchingSortingActivity() {
                           </div>
                         ) : (
                           <div className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-600">
-                            Drag a card into one of the buckets.
+                            Drag a card into a zone, or tap a card then tap a zone.
                           </div>
                         )}
                       </div>
@@ -942,7 +982,7 @@ export default function MatchingSortingActivity() {
               )}
             </ScreenCard>
           )}
-        </div>
+        </motion.div>
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
           <button

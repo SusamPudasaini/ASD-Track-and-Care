@@ -315,6 +315,9 @@ public class TherapistService {
             ? u.getAddress()
             : u.getWorkplaceAddress();
 
+        Double mapLatitude = u.getWorkplaceLatitude() != null ? u.getWorkplaceLatitude() : u.getLatitude();
+        Double mapLongitude = u.getWorkplaceLongitude() != null ? u.getWorkplaceLongitude() : u.getLongitude();
+
         return new TherapistCardResponse(
             u.getId(),
             name,
@@ -323,6 +326,8 @@ public class TherapistService {
             averageReview,
             reviewCount,
             publicAddress,
+            mapLatitude,
+            mapLongitude,
             u.getPricePerSession(),
             u.getProfilePictureUrl(),
             slotCount,

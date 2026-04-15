@@ -23,6 +23,8 @@ import {
   FaMoneyCheckDollar,
   FaComments,
   FaStar,
+  FaFaceSmileBeam,
+  FaArrowTrendUp,
 } from "react-icons/fa6";
     
 const MY_BOOKINGS_ENDPOINT = "/api/bookings/me"; // GET
@@ -420,66 +422,73 @@ export default function Bookings() {
   }, [bookings, search]);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_30%,_#ffffff)]">
       <Navbar />
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-gray-900">Booking History</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              View your bookings, payment progress, reschedule sessions, cancel, or contact your therapist.
-            </p>
-          </div>
+      <main className="mx-auto max-w-7xl px-6 py-10">
+        <div className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <FaArrowTrendUp className="text-[#4a6cf7]" />
+                <h1 className="text-3xl font-semibold text-gray-900">Booking History</h1>
+              </div>
+              <p className="mt-1 text-sm text-gray-600">
+                View your bookings, payment progress, reschedule sessions, cancel, or contact your therapist.
+              </p>
+            </div>
 
-          <button
-            onClick={() => navigate("/therapists")}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4a6cf7] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#3f5ee0]"
-          >
-            <FaUserGroup />
-            Find Therapists
-          </button>
+            <button
+              onClick={() => navigate("/therapists")}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4a6cf7] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#3f5ee0]"
+            >
+              <FaUserGroup />
+              Find Therapists
+            </button>
+          </div>
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative w-full sm:max-w-md">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              <FaMagnifyingGlass />
-            </span>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by therapist, date, time, booking status, or payment..."
-              className="w-full rounded-full border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
+        <div className="mt-6 rounded-2xl border border-white/70 bg-white/90 p-4 shadow-[0_8px_26px_rgba(15,23,42,0.06)]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:max-w-md">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <FaMagnifyingGlass />
+              </span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by therapist, date, time, booking status, or payment..."
+                className="w-full rounded-full border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
 
-          {search.trim() ? (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto"
-            >
-              <FaBroom />
-              Clear
-            </button>
-          ) : null}
+            {search.trim() ? (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto"
+              >
+                <FaBroom />
+                Clear
+              </button>
+            ) : null}
 
-          <div className="text-sm text-gray-500 sm:ml-auto">
-            Showing <span className="font-semibold text-gray-800">{filteredBookings.length}</span>{" "}
-            booking{filteredBookings.length === 1 ? "" : "s"}
+            <div className="text-sm text-gray-500 sm:ml-auto">
+              Showing <span className="font-semibold text-gray-800">{filteredBookings.length}</span>{" "}
+              booking{filteredBookings.length === 1 ? "" : "s"}
+            </div>
           </div>
         </div>
 
         <div className="mt-6">
           {loading ? (
-            <div className="text-sm text-gray-600">Loading bookings...</div>
+            <div className="rounded-2xl border border-white/70 bg-white/90 p-6 text-sm text-gray-600 shadow-sm">Loading bookings...</div>
           ) : filteredBookings.length === 0 ? (
-            <div className="rounded-xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
+            <div className="rounded-2xl border border-white/70 bg-white/90 p-6 text-sm text-gray-600 shadow-sm">
               No bookings found.
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {filteredBookings.map((b) => (
                 <BookingCard
                   key={b.id}
@@ -568,10 +577,15 @@ function BookingCard({ b, onReschedule, onCancel, onContact, onChat, onReview })
     normalizeStatus(b.status) === "CANCELLED" &&
     normalizeStatus(b.paymentStatus) === "COMPLETED";
 
+  const paymentDone = normalizeStatus(b.paymentStatus) === "COMPLETED";
+  const bookingConfirmed = bookingDisplay.label === "CONFIRMED" || bookingDisplay.label === "COMPLETED";
+  const sessionCompleted = bookingDisplay.label === "COMPLETED";
+  const isCancelled = normalizeStatus(b.status) === "CANCELLED";
+
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-gray-200 bg-gray-100">
+    <div className="rounded-2xl border border-white/70 bg-white/95 p-5 shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
+      <div className="flex items-start gap-3.5">
+        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-100">
           {therapistImage ? (
             <img src={therapistImage} alt={therapistName} className="h-full w-full object-cover" />
           ) : (
@@ -582,9 +596,9 @@ function BookingCard({ b, onReschedule, onCancel, onContact, onChat, onReview })
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-gray-900">{therapistName}</div>
-          <div className="truncate text-xs text-gray-500">{therapistRole}</div>
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+          <div className="truncate text-base font-semibold text-gray-900">{therapistName}</div>
+          <div className="truncate text-sm text-gray-500">{therapistRole}</div>
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500">
             <FaStar className="text-amber-500" />
             <span className="font-semibold text-slate-700">{Number.isFinite(therapistRating) ? therapistRating.toFixed(1) : "0.0"}</span>
             <span>
@@ -594,33 +608,33 @@ function BookingCard({ b, onReschedule, onCancel, onContact, onChat, onReview })
         </div>
       </div>
 
-      <div className="mt-3 space-y-1.5 text-xs">
+      <div className="mt-4 space-y-2 text-sm">
         <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-          <span className="text-slate-400">Qualification</span>
+          <span className="text-slate-500">Qualification</span>
           <span className="font-medium text-slate-700">{therapistQualification}</span>
         </div>
         <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-          <span className="text-slate-400">Experience</span>
+          <span className="text-slate-500">Experience</span>
           <span className="font-medium text-slate-700">
             {therapistExperience === "Not provided" ? therapistExperience : `${therapistExperience}+ Years`}
           </span>
         </div>
         <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-          <span className="text-slate-400">Price per session</span>
+          <span className="text-slate-500">Price per session</span>
           <span className="font-semibold text-[#4a6cf7]">
             {therapistPrice == null ? "—" : `Rs. ${therapistPrice}`}
           </span>
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-slate-600">
+      <div className="mt-4 grid grid-cols-2 gap-2.5 text-xs">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">
           <div className="flex items-center gap-1">
             <FaCalendarDays className="text-slate-400" />
             <span className="font-medium">{b.date || "-"}</span>
           </div>
         </div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-slate-600">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">
           <div className="flex items-center gap-1">
             <FaClock className="text-slate-400" />
             <span className="font-medium">{b.time || "-"}</span>
@@ -628,7 +642,7 @@ function BookingCard({ b, onReschedule, onCancel, onContact, onChat, onReview })
         </div>
       </div>
 
-      <div className="mt-2 space-y-1.5 text-xs text-gray-600">
+      <div className="mt-4 space-y-2 text-sm text-gray-600">
         <div className="flex items-center justify-between gap-4">
           <span>Booking</span>
           <span className={`inline-flex items-center gap-1.5 text-right font-semibold ${bookingDisplay.className}`}>
@@ -648,6 +662,13 @@ function BookingCard({ b, onReschedule, onCancel, onContact, onChat, onReview })
           </span>
         </div>
       </div>
+
+      <BookingProgressTimeline
+        paymentDone={paymentDone}
+        bookingConfirmed={bookingConfirmed}
+        sessionCompleted={sessionCompleted}
+        isCancelled={isCancelled}
+      />
 
       {b?.therapistMessage ? (
         <div className="mt-3 rounded-md border border-yellow-200 bg-yellow-50 p-2.5 text-xs text-yellow-800">
@@ -732,6 +753,86 @@ function BookingCard({ b, onReschedule, onCancel, onContact, onChat, onReview })
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function BookingProgressTimeline({ paymentDone, bookingConfirmed, sessionCompleted, isCancelled }) {
+  const steps = [
+    {
+      key: "payment",
+      label: "Payment",
+      done: paymentDone,
+      Icon: FaMoneyCheckDollar,
+    },
+    {
+      key: "confirm",
+      label: "Booking Status",
+      done: bookingConfirmed,
+      Icon: FaCircleCheck,
+    },
+    {
+      key: "complete",
+      label: "Session",
+      done: sessionCompleted,
+      Icon: FaFaceSmileBeam,
+    },
+  ];
+
+  const completedCount = steps.filter((step) => step.done).length;
+  const progressPercent = completedCount === 0 ? 0 : completedCount === 1 ? 34 : completedCount === 2 ? 68 : 100;
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/90 p-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+        <FaFaceSmileBeam />
+          Session Timeline
+        </div>
+        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600">
+          {progressPercent}% complete
+        </span>
+      </div>
+
+      <div className="relative mt-4">
+        <div className="pointer-events-none absolute left-0 right-0 top-5 h-1 rounded-full bg-slate-200" />
+        <div
+          className="pointer-events-none absolute left-0 top-5 h-1 rounded-full bg-gradient-to-r from-amber-400 via-emerald-500 to-cyan-500 transition-all duration-500"
+          style={{ width: `${progressPercent}%` }}
+        />
+
+        <div className="relative grid grid-cols-3 gap-2">
+          {steps.map((step) => (
+            <div key={step.key} className="flex min-w-0 flex-col items-center text-center">
+              <div
+                className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm shadow-sm transition-colors ${
+                  step.done
+                    ? "border-emerald-500 bg-emerald-500 text-white"
+                    : "border-slate-300 bg-white text-slate-500"
+                }`}
+              >
+                <step.Icon />
+              </div>
+              <span className="mt-2 text-[11px] font-semibold leading-tight text-slate-700">
+                {step.label}
+              </span>
+              <span
+                className={`mt-1 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ${
+                  step.done ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+                }`}
+              >
+                {step.done ? "DONE" : "PENDING"}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {isCancelled ? (
+        <div className="mt-2 text-[11px] text-red-600">
+          This booking was cancelled before completion.
+        </div>
+      ) : null}
     </div>
   );
 }

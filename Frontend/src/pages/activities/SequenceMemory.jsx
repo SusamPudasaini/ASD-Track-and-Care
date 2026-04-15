@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import ActivityShell from "./ActivityShell";
 import { getMyActivityResults, saveActivityResult } from "../../api/activityApi";
+import { FaPuzzlePiece, FaRegClock } from "react-icons/fa6";
 
 const GRID = 9; // 3x3
 const DEFAULT_SPEED = "NORMAL"; // SLOW | NORMAL | FAST
@@ -258,6 +259,7 @@ export default function SequenceMemory() {
     <ActivityShell
       title="Sequence Memory"
       subtitle="Watch a sequence of tiles, then repeat it. Each level adds one tile."
+      headerIcon={FaPuzzlePiece}
       footer={
         <div>
           <strong>Therapy note:</strong> Supports working memory, attention, and sequencing. Low Sensory mode slows transitions.
@@ -265,7 +267,7 @@ export default function SequenceMemory() {
       }
     >
       {/* Controls */}
-      <div className="p-4 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-b border-blue-100 bg-blue-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
         <label className="flex items-center gap-3 text-sm text-gray-700">
           <input
             type="checkbox"
@@ -322,7 +324,7 @@ export default function SequenceMemory() {
                 onClick={() => onTileClick(idx)}
                 disabled={phase === "showing"}
                 style={{
-                  height: 92,
+                  height: "clamp(96px, 13vw, 132px)",
                   borderRadius: 16,
                   border: `1px solid ${COLORS.tileBorder}`,
                   background: bg,
@@ -342,8 +344,11 @@ export default function SequenceMemory() {
       </div>
 
       {/* History */}
-      <div className="p-4 border-t border-gray-100">
-        <h3 className="text-base font-semibold text-gray-900 mb-3">Recent results</h3>
+      <div className="border-t border-blue-100 p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900">
+          <FaRegClock className="text-[#4a6cf7]" />
+          Recent results
+        </h3>
 
         {historyLoading ? (
           <div className="text-sm text-gray-600">Loading...</div>

@@ -78,6 +78,75 @@ function prettyText(v) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function parseISO(iso) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function parseLocalDateTime(dateStr, timeStr) {
+  try {
+    if (!dateStr || !timeStr) return null;
+    const [y, m, d] = String(dateStr).split("-").map(Number);
+    const [hh, mm] = String(timeStr).split(":").map(Number);
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+    return new Date(y, m - 1, d, hh, mm, 0, 0);
+  } catch {
+    return null;
+  }
+}
+
+function dateKeyLocal(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function clamp01(x) {
+  return Math.max(0, Math.min(1, x));
+}
+
+const ACTIVITY_DIRECTIONS = {
+  REACTION_TIME: "LOWER_BETTER",
+  SEQUENCE_MEMORY: "HIGHER_BETTER",
+  NUMBER_MEMORY: "HIGHER_BETTER",
+  VISUAL_MEMORY: "HIGHER_BETTER",
+  SOUND_THERAPY: "HIGHER_BETTER",
+  MATCHING: "HIGHER_BETTER",
+  SORTING: "HIGHER_BETTER",
+};
+
+function normalizeActivityPerformance(type, score, allScoresForType) {
+  if (!Number.isFinite(score)) return null;
+
+  const dir = ACTIVITY_DIRECTIONS[type] || "HIGHER_BETTER";
+  const scores = Array.isArray(allScoresForType)
+    ? allScoresForType.filter(Number.isFinite)
+    : [];
+
+  if (scores.length < 3) {
+    if (dir === "LOWER_BETTER") {
+      const p = 1 - clamp01(score / 1000);
+      return Math.round(p * 100);
+    }
+    const p = clamp01(score / 10);
+    return Math.round(p * 100);
+  }
+
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+  if (min === max) return 50;
+
+  if (dir === "HIGHER_BETTER") {
+    const p = (score - min) / (max - min);
+    return Math.round(clamp01(p) * 100);
+  }
+
+  const p = (max - score) / (max - min);
+  return Math.round(clamp01(p) * 100);
+}
+
 export default function MChatQuestionnaireAnalytics() {
   const navigate = useNavigate();
 
@@ -86,6 +155,8 @@ export default function MChatQuestionnaireAnalytics() {
   const [history, setHistory] = useState([]);
   const [recommendation, setRecommendation] = useState(null);
   const [aiStatus, setAiStatus] = useState({ completed: false, probabilityPercent: null });
+  const [activityRows, setActivityRows] = useState([]);
+  const [bookings, setBookings] = useState([]);
 
   useEffect(() => {
     let mounted = true;
@@ -94,11 +165,13 @@ export default function MChatQuestionnaireAnalytics() {
       try {
         setLoading(true);
 
-        const [analyticsRes, historyRes, planRes, aiRes] = await Promise.allSettled([
+        const [analyticsRes, historyRes, planRes, aiRes, activitiesRes, bookingsRes] = await Promise.allSettled([
           api.get("/api/analytics/mchat-questionnaire"),
           api.get("/api/mchat-questionnaire/history"),
           api.get("/api/recommendations/child-plan"),
           api.get("/api/ml/last"),
+          api.get("/api/analytics/activities", { params: { limit: 240 } }),
+          api.get("/api/bookings/me"),
         ]);
 
         if (!mounted) return;
@@ -109,10 +182,29 @@ export default function MChatQuestionnaireAnalytics() {
           : [];
         const planData = planRes.status === "fulfilled" ? planRes.value?.data : null;
         const aiData = aiRes.status === "fulfilled" ? aiRes.value?.data : null;
+        const activityData =
+          activitiesRes.status === "fulfilled" && Array.isArray(activitiesRes.value?.data)
+            ? activitiesRes.value.data
+            : [];
+        const bookingData =
+          bookingsRes.status === "fulfilled" && Array.isArray(bookingsRes.value?.data)
+            ? bookingsRes.value.data
+            : [];
 
         setAnalytics(analyticsData || null);
         setHistory(historyData);
         setRecommendation(planData || null);
+        setActivityRows(
+          activityData
+            .map((row) => ({
+              id: row?.id,
+              type: String(row?.type || ""),
+              score: typeof row?.score === "number" ? row.score : Number(row?.score),
+              createdAt: row?.createdAt || "",
+            }))
+            .filter((row) => row.type && Number.isFinite(row.score))
+        );
+          setBookings(Array.isArray(bookingData) ? bookingData : []);
 
         const aiProbability =
           typeof aiData?.probability === "number"
@@ -167,6 +259,47 @@ export default function MChatQuestionnaireAnalytics() {
   const riskSummary = recommendation?.riskSummary || null;
   const combinedRisk = riskSummary?.combinedRiskLevel || latest?.riskLevel || "UNKNOWN";
 
+  const activityInsights = useMemo(() => {
+    const hasAny = activityRows.length > 0;
+    const todayKey = dateKeyLocal(new Date());
+
+    const hasToday = activityRows.some((row) => {
+      const d = parseISO(row.createdAt);
+      return d ? dateKeyLocal(d) === todayKey : false;
+    });
+
+    const scoresByType = new Map();
+    for (const row of activityRows) {
+      if (!scoresByType.has(row.type)) scoresByType.set(row.type, []);
+      scoresByType.get(row.type).push(row.score);
+    }
+
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recentRows = activityRows.filter((row) => {
+      const d = parseISO(row.createdAt);
+      return d ? d.getTime() >= cutoff : false;
+    });
+
+    const recentPerformance = recentRows
+      .map((row) => normalizeActivityPerformance(row.type, row.score, scoresByType.get(row.type)))
+      .filter((x) => typeof x === "number");
+
+    const avgRecentPerformance = recentPerformance.length
+      ? Math.round((recentPerformance.reduce((a, b) => a + b, 0) / recentPerformance.length) * 10) / 10
+      : null;
+
+    const lowPerformance =
+      recentPerformance.length >= 3 && typeof avgRecentPerformance === "number" && avgRecentPerformance < 45;
+
+    return {
+      hasAny,
+      hasToday,
+      recentCount: recentPerformance.length,
+      avgRecentPerformance,
+      lowPerformance,
+    };
+  }, [activityRows]);
+
   const riskToneClass =
     combinedRisk === "HIGH"
       ? "border-red-200 bg-red-50 text-red-800"
@@ -187,14 +320,37 @@ export default function MChatQuestionnaireAnalytics() {
     } else if (riskSummary?.combinedRiskLevel === "MODERATE") {
       out.push("Moderate combined risk detected. Weekly guided therapy and routine follow-up are recommended.");
     }
+    if (!activityInsights.hasAny) {
+      out.push("🚨No activity conducuted today! Conducted at least one activity session today.");
+    } else if (!activityInsights.hasToday) {
+      out.push("No activity logged today. Complete at least one short activity session to maintain consistency.");
+    }
+    if (activityInsights.lowPerformance) {
+      out.push(
+        `Recent activity performance is low (${activityInsights.avgRecentPerformance}% average over ${activityInsights.recentCount} recent attempts). Use guided easier modules and retry today.`
+      );
+    }
     if (out.length === 0) {
       out.push("No urgent alerts right now. Continue with your current routine and monitor trends regularly.");
     }
     return out;
-  }, [aiStatus.completed, latest, riskSummary?.combinedRiskLevel]);
+  }, [
+    aiStatus.completed,
+    latest,
+    riskSummary?.combinedRiskLevel,
+    activityInsights.hasAny,
+    activityInsights.hasToday,
+    activityInsights.lowPerformance,
+    activityInsights.avgRecentPerformance,
+    activityInsights.recentCount,
+  ]);
 
   const primaryAlert = alerts[0] || "No urgent alerts right now.";
-  const hasUrgentAlert = combinedRisk === "HIGH" || combinedRisk === "MODERATE";
+  const hasUrgentAlert =
+    combinedRisk === "HIGH" ||
+    combinedRisk === "MODERATE" ||
+    !activityInsights.hasToday ||
+    activityInsights.lowPerformance;
   const weakAreas = Array.isArray(riskSummary?.weakAreas) ? riskSummary.weakAreas : [];
 
   const recommendedTherapists = Array.isArray(recommendation?.recommendedTherapists)
@@ -209,6 +365,27 @@ export default function MChatQuestionnaireAnalytics() {
   const recommendedCenters = Array.isArray(recommendation?.recommendedDayCareCenters)
     ? recommendation.recommendedDayCareCenters
     : [];
+
+  const upcomingSessions = useMemo(() => {
+    const now = Date.now();
+
+    return bookings
+      .map((row) => {
+        const start = parseLocalDateTime(row?.date, row?.time);
+        return {
+          ...row,
+          start,
+        };
+      })
+      .filter((row) => {
+        const status = String(row?.status || "").trim().toUpperCase();
+        if (status !== "CONFIRMED") return false;
+        if (!(row.start instanceof Date) || Number.isNaN(row.start.getTime())) return false;
+        return row.start.getTime() > now;
+      })
+      .sort((a, b) => a.start.getTime() - b.start.getTime())
+      .slice(0, 6);
+  }, [bookings]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_30%,_#ffffff)]">
@@ -343,6 +520,63 @@ export default function MChatQuestionnaireAnalytics() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Upcoming Therapy Sessions</h3>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Confirmed sessions scheduled for you.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/bookings")}
+                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                >
+                  View Bookings
+                </button>
+              </div>
+
+              {upcomingSessions.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/60 px-4 py-5 text-sm text-emerald-800">
+                  No upcoming confirmed therapy sessions right now.
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {upcomingSessions.map((session) => (
+                    <article
+                      key={session.id}
+                      className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="truncate text-sm font-semibold text-gray-900">
+                          {session?.therapistName || "Therapist"}
+                        </h4>
+                        <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[10px] font-bold text-emerald-700">
+                          CONFIRMED
+                        </span>
+                      </div>
+
+                      <p className="mt-1 truncate text-xs text-gray-600">
+                        {session?.therapistSpecialization || session?.therapistRole || "Therapy Session"}
+                      </p>
+
+                      <div className="mt-3 space-y-2 text-xs text-gray-700">
+                        <div className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-2.5 py-1.5">
+                          <FaRegClock className="text-emerald-700" />
+                          <span className="font-semibold">{session?.date || "-"}</span>
+                        </div>
+                        <div className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-2.5 py-1.5">
+                          <FaRegClock className="text-emerald-700" />
+                          <span className="font-semibold">{session?.time || "-"}</span>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="mt-8 rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">
