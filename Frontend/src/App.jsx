@@ -55,6 +55,7 @@ import AacBoard from "./pages/AacBoard";
 import AdminAacCards from "./pages/AdminAacCards";
 
 import FirstThenBoard from "./pages/FirstThenBoard";
+import FirstThenBoards from "./pages/FirstThenBoards";
 
 import AdminMatchingSorting from "./pages/AdminMatchingSorting";
 import MatchingSortingActivity from "./pages/MatchingSortingActivity";
@@ -159,6 +160,7 @@ export default function App() {
 
             <Route path="/aac-board" element={<AacBoard />} />
             <Route path="/first-then" element={<FirstThenBoard />} />
+            <Route path="/first-then/boards" element={<FirstThenBoards />} />
             <Route path="/activities/matching-sorting" element={<MatchingSortingActivity />} />
 
             {/* USER routes */}

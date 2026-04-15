@@ -4,9 +4,13 @@ import com.ASD_Track_and_Care.backend.dto.CreateFirstThenBoardRequest;
 import com.ASD_Track_and_Care.backend.dto.UpdateFirstThenBoardRequest;
 import com.ASD_Track_and_Care.backend.service.FirstThenBoardService;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/first-then")
@@ -23,12 +27,30 @@ public class FirstThenBoardController {
         return ResponseEntity.ok(firstThenBoardService.listMyBoards(authentication));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getBoardById(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(firstThenBoardService.getBoardById(id, authentication));
+    }
+
     @PostMapping
     public ResponseEntity<?> createBoard(
             Authentication authentication,
             @Valid @RequestBody CreateFirstThenBoardRequest req
     ) {
         return ResponseEntity.ok(firstThenBoardService.createBoard(authentication, req));
+    }
+
+    @PostMapping(value = "/upload-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadImage(
+            Authentication authentication,
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(required = false, defaultValue = "task") String slot
+    ) {
+        String imageUrl = firstThenBoardService.uploadBoardImage(authentication, file, slot);
+        return ResponseEntity.ok(Map.of("imageUrl", imageUrl));
     }
 
     @PutMapping("/{id}")

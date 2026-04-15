@@ -9,11 +9,22 @@ import com.ASD_Track_and_Care.backend.repository.FirstThenBoardRepository;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
 @Service
 public class FirstThenBoardService {
+
+    private static final String UPLOAD_DIR = "uploads/first-then-boards";
+    private static final long MAX_IMAGE_SIZE_BYTES = 5L * 1024 * 1024;
 
     private final FirstThenBoardRepository firstThenBoardRepository;
     private final UserRepository userRepository;
@@ -32,6 +43,12 @@ public class FirstThenBoardService {
                 .stream()
                 .map(this::toDto)
                 .toList();
+    }
+
+    public FirstThenBoardResponse getBoardById(Long id, Authentication authentication) {
+        User user = requireUser(authentication);
+        FirstThenBoard board = requireOwnedBoard(id, user);
+        return toDto(board);
     }
 
     public FirstThenBoardResponse createBoard(
@@ -104,6 +121,45 @@ public class FirstThenBoardService {
         firstThenBoardRepository.delete(board);
     }
 
+    public String uploadBoardImage(Authentication authentication, MultipartFile file, String slot) {
+        User user = requireUser(authentication);
+
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Image file is required.");
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new IllegalArgumentException("Only image files are allowed.");
+        }
+
+        if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
+            throw new IllegalArgumentException("Image must be under 5MB.");
+        }
+
+        String safeSlot = sanitizeSlot(slot);
+
+        try {
+            Path userDir = Paths.get(UPLOAD_DIR, String.valueOf(user.getId())).toAbsolutePath().normalize();
+            Files.createDirectories(userDir);
+
+            String original = Objects.requireNonNullElse(file.getOriginalFilename(), "image");
+            String ext = "";
+            int dot = original.lastIndexOf('.');
+            if (dot >= 0) {
+                ext = original.substring(dot);
+            }
+
+            String filename = safeSlot + "-" + UUID.randomUUID() + ext;
+            Path target = userDir.resolve(filename);
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+            return "/uploads/first-then-boards/" + user.getId() + "/" + filename;
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to upload board image.");
+        }
+    }
+
     private FirstThenBoard requireOwnedBoard(Long id, User user) {
         FirstThenBoard board = firstThenBoardRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("First-Then board not found"));
@@ -143,5 +199,11 @@ public class FirstThenBoardService {
     private String blankToNull(String value) {
         if (value == null || value.trim().isEmpty()) return null;
         return value.trim();
+    }
+
+    private String sanitizeSlot(String slot) {
+        String normalized = slot == null ? "task" : slot.trim().toLowerCase();
+        if (normalized.isEmpty()) return "task";
+        return normalized.replaceAll("[^a-z0-9_-]", "");
     }
 }

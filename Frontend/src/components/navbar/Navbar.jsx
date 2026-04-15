@@ -193,7 +193,8 @@ export default function Navbar() {
       type: "group",
       items: [
         { label: "AAC Board", path: "/aac-board" },
-        { label: "First-Then Board", path: "/first-then" },
+        { label: "Create First-Then Board", path: "/first-then" },
+        { label: "My First-Then Boards", path: "/first-then/boards" },
       ],
     },
   ];

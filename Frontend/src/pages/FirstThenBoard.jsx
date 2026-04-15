@@ -1,19 +1,35 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
+import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
 import {
   FaArrowRight,
   FaCheck,
-  FaEye,
-  FaEyeSlash,
-  FaTrash,
-  FaPenToSquare,
-  FaPlus,
+  FaChevronLeft,
+  FaChevronRight,
+  FaCloudArrowUp,
+  FaFileArrowDown,
   FaImage,
-  FaRepeat,
-  FaStar,
+  FaListUl,
+  FaRotateLeft,
 } from "react-icons/fa6";
+
+function backendBase() {
+  return (import.meta.env.VITE_API_BASE_URL || "http://localhost:8081").replace(/\/api\/?$/, "");
+}
+
+function resolveAssetUrl(raw) {
+  if (!raw) return "";
+  const value = String(raw);
+  if (value.startsWith("blob:")) return value;
+  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  if (value.startsWith("/")) return `${backendBase()}${value}`;
+  return `${backendBase()}/${value}`;
+}
 
 function getErrorMessage(err) {
   const data = err?.response?.data;
@@ -37,100 +53,182 @@ function emptyForm() {
     firstImageUrl: "",
     thenTitle: "",
     thenImageUrl: "",
-    active: true,
   };
 }
 
-function StatBadge({ children, color = "gray" }) {
-  const styles = {
-    green: "bg-green-100 text-green-700",
-    red: "bg-red-100 text-red-700",
-    blue: "bg-blue-100 text-blue-700",
-    yellow: "bg-yellow-100 text-yellow-700",
-    gray: "bg-gray-100 text-gray-700",
-    purple: "bg-purple-100 text-purple-700",
-  };
-
+function UploadTile({ label, imageUrl, uploading, onPick }) {
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${styles[color]}`}>
-      {children}
-    </span>
+    <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/60 p-4">
+      <div className="text-sm font-semibold text-slate-800">{label}</div>
+
+      <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+        <FaCloudArrowUp />
+        {uploading ? "Uploading..." : "Upload Image"}
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => onPick(e.target.files?.[0] || null)}
+        />
+      </label>
+
+      <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="aspect-[4/3] w-full bg-slate-100">
+          {imageUrl ? (
+            <img src={resolveAssetUrl(imageUrl)} alt={label} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-slate-300">
+              <FaImage className="text-3xl" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
-function Input({ className = "", ...props }) {
-  return (
-    <input
-      {...props}
-      className={`w-full rounded-xl border bg-white px-4 py-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 ${className}`}
-    />
-  );
-}
+function BoardPanel({ title, imageUrl, tag, tone = "blue" }) {
+  const toneClass =
+    tone === "blue" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700";
 
-function FirstThenVisualCard({ title, imageUrl, type }) {
   return (
-    <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-      <div className="aspect-[4/3] w-full bg-gray-100">
+    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <div className="aspect-[4/3] w-full bg-slate-100">
         {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={title}
-            className="h-full w-full object-cover"
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
+          <img src={resolveAssetUrl(imageUrl)} alt={title} className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-4xl text-gray-300">
-            <FaImage />
+          <div className="flex h-full w-full items-center justify-center text-slate-300">
+            <FaImage className="text-4xl" />
           </div>
         )}
       </div>
 
       <div className="p-5">
-        <div
-          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-            type === "FIRST" ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"
-          }`}
-        >
-          {type}
-        </div>
-
-        <div className="mt-3 text-xl font-bold text-gray-900">{title || "—"}</div>
+        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}>{tag}</span>
+        <div className="mt-3 text-xl font-bold text-slate-900">{title || "Untitled task"}</div>
       </div>
     </div>
   );
 }
 
 export default function FirstThenBoard() {
-  const [items, setItems] = useState([]);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const previewRef = useRef(null);
+
+  const editIdRaw = searchParams.get("edit") || "";
+  const parsedEditId = Number(editIdRaw);
+  const editId = Number.isFinite(parsedEditId) && parsedEditId > 0 ? parsedEditId : null;
+
+  const [step, setStep] = useState(1);
+  const [direction, setDirection] = useState(1);
   const [form, setForm] = useState(emptyForm());
-  const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingFirst, setUploadingFirst] = useState(false);
+  const [uploadingThen, setUploadingThen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [savedBoard, setSavedBoard] = useState(null);
+  const [editingBoard, setEditingBoard] = useState(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
+
+  const isEditing = !!editingBoard?.id;
+  const totalSteps = 4;
+  const progressPercent = useMemo(() => Math.round((step / totalSteps) * 100), [step]);
 
   useEffect(() => {
-    load();
-  }, []);
+    let cancelled = false;
 
-  async function load() {
-    try {
-      const res = await api.get("/api/first-then");
-      setItems(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      toast.error(getErrorMessage(err));
+    async function loadBoardForEdit() {
+      if (!editId) {
+        setEditingBoard(null);
+        return;
+      }
+
+      try {
+        setLoadingEdit(true);
+        const res = await api.get(`/api/first-then/${editId}`);
+        const board = res?.data;
+        if (!board || cancelled) return;
+
+        setEditingBoard(board);
+        setForm({
+          firstTitle: board.firstTitle || "",
+          firstImageUrl: board.firstImageUrl || "",
+          thenTitle: board.thenTitle || "",
+          thenImageUrl: board.thenImageUrl || "",
+        });
+      } catch (err) {
+        if (cancelled) return;
+        toast.error(getErrorMessage(err) || "Could not load board for edit.");
+        navigate("/first-then/boards", { replace: true });
+      } finally {
+        if (!cancelled) setLoadingEdit(false);
+      }
     }
+
+    loadBoardForEdit();
+    return () => {
+      cancelled = true;
+    };
+  }, [editId, navigate]);
+
+  const canGoStep2 = useMemo(
+    () => form.firstTitle.trim().length > 0 && form.firstImageUrl,
+    [form.firstTitle, form.firstImageUrl]
+  );
+
+  const canGoStep3 = useMemo(
+    () => form.thenTitle.trim().length > 0 && form.thenImageUrl,
+    [form.thenTitle, form.thenImageUrl]
+  );
+
+  function goToStep(nextStep) {
+    const clamped = Math.min(totalSteps, Math.max(1, nextStep));
+    setDirection(clamped >= step ? 1 : -1);
+    setStep(clamped);
   }
 
-  async function submit(e) {
-    e.preventDefault();
+  async function uploadImage(slot, file) {
+    if (!file) return;
 
-    if (!form.firstTitle.trim()) {
-      toast.error("First task is required.");
+    if (!String(file.type || "").startsWith("image/")) {
+      toast.error("Please upload a valid image file.");
       return;
     }
 
-    if (!form.thenTitle.trim()) {
-      toast.error("Then task is required.");
+    try {
+      if (slot === "first") setUploadingFirst(true);
+      if (slot === "then") setUploadingThen(true);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await api.post(`/api/first-then/upload-image?slot=${slot}`, formData);
+      const uploadedUrl = res?.data?.imageUrl || "";
+
+      if (!uploadedUrl) {
+        throw new Error("Image upload did not return a URL.");
+      }
+
+      if (slot === "first") {
+        setForm((prev) => ({ ...prev, firstImageUrl: uploadedUrl }));
+      } else {
+        setForm((prev) => ({ ...prev, thenImageUrl: uploadedUrl }));
+      }
+
+      toast.success("Image uploaded.");
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      if (slot === "first") setUploadingFirst(false);
+      if (slot === "then") setUploadingThen(false);
+    }
+  }
+
+  async function confirmAndSave() {
+    if (!canGoStep2 || !canGoStep3) {
+      toast.error("Please complete all steps before confirming.");
       return;
     }
 
@@ -139,24 +237,21 @@ export default function FirstThenBoard() {
 
       const payload = {
         firstTitle: form.firstTitle.trim(),
-        firstImageUrl: form.firstImageUrl.trim() || null,
+        firstImageUrl: form.firstImageUrl,
         thenTitle: form.thenTitle.trim(),
-        thenImageUrl: form.thenImageUrl.trim() || null,
-        active: !!form.active,
-        completed: false,
+        thenImageUrl: form.thenImageUrl,
+        active: editingBoard?.active ?? true,
+        completed: editingBoard?.completed ?? false,
       };
 
-      if (editingId) {
-        await api.put(`/api/first-then/${editingId}`, payload);
-        toast.success("First-Then board updated");
-      } else {
-        await api.post("/api/first-then", payload);
-        toast.success("First-Then board created");
-      }
-
-      setForm(emptyForm());
-      setEditingId(null);
-      await load();
+      const res = isEditing
+        ? await api.put(`/api/first-then/${editingBoard.id}`, payload)
+        : await api.post("/api/first-then", payload);
+      setSavedBoard(res.data || payload);
+      setDirection(1);
+      setStep(4);
+      toast.success(isEditing ? "First-Then board updated." : "First-Then board created.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -164,337 +259,325 @@ export default function FirstThenBoard() {
     }
   }
 
-  function edit(row) {
-    setEditingId(row.id);
-    setForm({
-      firstTitle: row.firstTitle || "",
-      firstImageUrl: row.firstImageUrl || "",
-      thenTitle: row.thenTitle || "",
-      thenImageUrl: row.thenImageUrl || "",
-      active: !!row.active,
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
+  async function downloadPdf() {
+    if (!previewRef.current) return;
 
-  async function toggleCompleted(row) {
     try {
-      await api.put(`/api/first-then/${row.id}/completed`, null, {
-        params: { completed: !row.completed },
+      setDownloading(true);
+
+      const canvas = await html2canvas(previewRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
       });
-      toast.success(row.completed ? "Marked as incomplete" : "Marked as completed");
-      await load();
-    } catch (err) {
-      toast.error(getErrorMessage(err));
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      const targetW = pageWidth - margin * 2;
+      const targetH = (canvas.height * targetW) / canvas.width;
+      const finalH = Math.min(targetH, pageHeight - margin * 2);
+
+      pdf.setFontSize(16);
+      pdf.text("First-Then Board", margin, 10);
+      pdf.addImage(imgData, "PNG", margin, 14, targetW, finalH);
+
+      const fileName = `${(form.firstTitle || "first").replace(/[^a-z0-9]+/gi, "_")}_then_board.pdf`;
+      pdf.save(fileName.toLowerCase());
+      toast.success("PDF downloaded.");
+    } catch {
+      toast.error("Could not generate PDF. Please try again.");
+    } finally {
+      setDownloading(false);
     }
   }
 
-  async function toggleActive(row) {
-    try {
-      await api.put(`/api/first-then/${row.id}/active`, null, {
-        params: { active: !row.active },
-      });
-      toast.success(row.active ? "Board hidden" : "Board activated");
-      await load();
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    }
-  }
-
-  async function removeBoard(row) {
-    try {
-      await api.delete(`/api/first-then/${row.id}`);
-      toast.success("Board deleted");
-      await load();
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    }
-  }
-
-  function resetForm() {
-    setEditingId(null);
+  function resetWizard() {
+    setDirection(-1);
+    setStep(1);
+    setSavedBoard(null);
+    setEditingBoard(null);
     setForm(emptyForm());
+    navigate("/first-then", { replace: true });
   }
 
-  const activeBoards = useMemo(() => items.filter((x) => x.active), [items]);
-  const latestActiveBoard = activeBoards.length > 0 ? activeBoards[0] : null;
-  const completedCount = items.filter((x) => x.completed).length;
+  if (loadingEdit) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Navbar />
+        <main className="mx-auto max-w-6xl px-5 py-10 sm:px-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+            Loading board for editing...
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
 
-      <main className="mx-auto max-w-7xl px-6 py-10">
-        <div className="mb-8 rounded-3xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white p-6 shadow-sm">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">First-Then Board</h1>
-          <p className="mt-2 max-w-3xl text-sm text-gray-600">
-            Create a simple visual support board to guide the child through one required task
-            followed by a preferred reward or activity.
+      <main className="mx-auto max-w-6xl px-5 py-10 sm:px-6">
+        <section className="rounded-3xl border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-cyan-50 p-6 shadow-sm">
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">First-Then Board Wizard</h1>
+          <p className="mt-2 max-w-3xl text-sm text-slate-600">
+            Build a visual routine step by step: first task title and image, then activity title and
+            image, preview, confirm, and download as PDF.
           </p>
 
-          <div className="mt-4 flex flex-wrap gap-3">
-            <StatBadge color="blue">{items.length} Total Boards</StatBadge>
-            <StatBadge color="green">{activeBoards.length} Active</StatBadge>
-            <StatBadge color="yellow">{completedCount} Completed</StatBadge>
+          {isEditing ? (
+            <div className="mt-3 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+              Editing board #{editingBoard.id}
+            </div>
+          ) : null}
+
+          <div className="mt-6">
+            <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-500">
+              <span>{step === 4 ? "Complete" : `Step ${step} of ${totalSteps}`}</span>
+              <span>{progressPercent}%</span>
+            </div>
+
+            <div className="h-3 w-full overflow-hidden rounded-full bg-blue-100">
+              <div
+                className="h-full rounded-full bg-[#4a6cf7] transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
           </div>
-        </div>
 
-        <div className="grid gap-8 xl:grid-cols-[420px_1fr]">
-          <form
-            onSubmit={submit}
-            className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100"
-          >
-            <div className="mb-5">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {editingId ? "Edit First-Then Board" : "Create First-Then Board"}
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Example: First brush teeth, then play.
-              </p>
-            </div>
+          <div className="mt-5 flex items-center gap-2 overflow-x-auto pb-1">
+            {Array.from({ length: totalSteps }).map((_, i) => {
+              const idx = i + 1;
+              const active = idx === step;
+              const done = idx < step;
 
-            <div className="space-y-4">
-              <Input
-                placeholder="First task title"
-                value={form.firstTitle}
-                onChange={(e) => setForm({ ...form, firstTitle: e.target.value })}
-              />
-
-              <Input
-                placeholder="First image URL (optional)"
-                value={form.firstImageUrl}
-                onChange={(e) => setForm({ ...form, firstImageUrl: e.target.value })}
-              />
-
-              <Input
-                placeholder="Then reward/activity title"
-                value={form.thenTitle}
-                onChange={(e) => setForm({ ...form, thenTitle: e.target.value })}
-              />
-
-              <Input
-                placeholder="Then image URL (optional)"
-                value={form.thenImageUrl}
-                onChange={(e) => setForm({ ...form, thenImageUrl: e.target.value })}
-              />
-
-              <label className="inline-flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
-                />
-                Active
-              </label>
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                disabled={saving}
-                className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 font-semibold text-white transition ${
-                  saving ? "cursor-not-allowed bg-blue-300" : "bg-blue-600 hover:bg-blue-700"
-                }`}
-              >
-                <FaPlus />
-                {saving ? "Saving..." : editingId ? "Update Board" : "Create Board"}
-              </button>
-
-              {editingId ? (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="inline-flex items-center gap-2 rounded-xl border px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50"
+              return (
+                <div
+                  key={idx}
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                    active
+                      ? "bg-[#4a6cf7] text-white"
+                      : done
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
                 >
-                  <FaRepeat />
-                  Cancel Edit
-                </button>
-              ) : null}
-            </div>
-          </form>
+                  {idx}
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
-          <div className="space-y-8">
-            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-              <div className="mb-5">
-                <h2 className="text-lg font-semibold text-gray-900">Live Visual Preview</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  This is how the board looks for the child.
-                </p>
-              </div>
+        <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <AnimatePresence mode="wait" custom={direction}>
+            <motion.div
+              key={`wizard-step-${step}`}
+              custom={direction}
+              initial={{ opacity: 0, x: direction > 0 ? 40 : -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: direction > 0 ? -40 : 40 }}
+              transition={{ duration: 0.28, ease: "easeOut" }}
+            >
+              {step === 1 ? (
+                <div className="space-y-5">
+                  <h2 className="text-xl font-bold text-slate-900">Step 1: Add First task</h2>
+                  <p className="text-sm text-slate-600">
+                    Write what the child should do first, then upload a supporting image.
+                  </p>
 
-              <div className="grid gap-6 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                <FirstThenVisualCard
-                  title={form.firstTitle || "First Task"}
-                  imageUrl={form.firstImageUrl}
-                  type="FIRST"
-                />
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700">First task title</label>
+                      <input
+                        value={form.firstTitle}
+                        onChange={(e) => setForm((prev) => ({ ...prev, firstTitle: e.target.value }))}
+                        placeholder="Example: Brush your teeth"
+                        className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                      />
+                    </div>
 
-                <div className="flex justify-center">
-                  <div className="rounded-full bg-blue-100 p-4 text-blue-600">
-                    <FaArrowRight className="text-xl" />
+                    <UploadTile
+                      label="First task image"
+                      imageUrl={form.firstImageUrl}
+                      uploading={uploadingFirst}
+                      onPick={(file) => uploadImage("first", file)}
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!canGoStep2) {
+                          toast.error("Add first task title and image before continuing.");
+                          return;
+                        }
+                        goToStep(2);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#4a6cf7] px-5 py-3 font-semibold text-white hover:bg-[#3f5ee0]"
+                    >
+                      Next
+                      <FaChevronRight />
+                    </button>
                   </div>
                 </div>
+              ) : null}
 
-                <FirstThenVisualCard
-                  title={form.thenTitle || "Then Reward"}
-                  imageUrl={form.thenImageUrl}
-                  type="THEN"
-                />
-              </div>
-            </div>
+              {step === 2 ? (
+                <div className="space-y-5">
+                  <h2 className="text-xl font-bold text-slate-900">Step 2: Add Then task</h2>
+                  <p className="text-sm text-slate-600">
+                    Write the reward or follow-up activity, then upload an image for it.
+                  </p>
 
-            {latestActiveBoard ? (
-              <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700">Then task title</label>
+                      <input
+                        value={form.thenTitle}
+                        onChange={(e) => setForm((prev) => ({ ...prev, thenTitle: e.target.value }))}
+                        placeholder="Example: Play with toy"
+                        className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <UploadTile
+                      label="Then task image"
+                      imageUrl={form.thenImageUrl}
+                      uploading={uploadingThen}
+                      onPick={(file) => uploadImage("then", file)}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => goToStep(1)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <FaChevronLeft />
+                      Back
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!canGoStep3) {
+                          toast.error("Add then task title and image before continuing.");
+                          return;
+                        }
+                        goToStep(3);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#4a6cf7] px-5 py-3 font-semibold text-white hover:bg-[#3f5ee0]"
+                    >
+                      Next
+                      <FaChevronRight />
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {(step === 3 || step === 4) ? (
+                <div className="space-y-6">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900">Current Active Board</h2>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Use this as the main visible board for the child.
+                    <h2 className="text-xl font-bold text-slate-900">
+                      {step === 3 ? "Step 3: Preview and confirm" : "Board preview"}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {step === 3
+                        ? "Check your board, then confirm to save it."
+                        : "Your board is ready. Download a PDF or create another."}
                     </p>
                   </div>
 
-                  {latestActiveBoard.completed ? (
-                    <StatBadge color="green">Completed</StatBadge>
-                  ) : (
-                    <StatBadge color="blue">In Progress</StatBadge>
-                  )}
-                </div>
+                  <div ref={previewRef} className="rounded-3xl border border-slate-200 bg-white p-5">
+                    <div className="mb-4 text-center text-xl font-extrabold text-slate-900">FIRST THEN</div>
 
-                <div className="grid gap-6 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                  <FirstThenVisualCard
-                    title={latestActiveBoard.firstTitle}
-                    imageUrl={latestActiveBoard.firstImageUrl}
-                    type="FIRST"
-                  />
+                    <div className="grid gap-6 md:grid-cols-[1fr_auto_1fr] md:items-center">
+                      <BoardPanel title={form.firstTitle} imageUrl={form.firstImageUrl} tag="FIRST" tone="blue" />
 
-                  <div className="flex justify-center">
-                    <div className="rounded-full bg-pink-100 p-4 text-pink-600">
-                      <FaStar className="text-xl" />
+                      <div className="flex justify-center">
+                        <div className="rounded-full bg-blue-100 p-4 text-blue-600">
+                          <FaArrowRight className="text-xl" />
+                        </div>
+                      </div>
+
+                      <BoardPanel title={form.thenTitle} imageUrl={form.thenImageUrl} tag="THEN" tone="amber" />
                     </div>
                   </div>
 
-                  <FirstThenVisualCard
-                    title={latestActiveBoard.thenTitle}
-                    imageUrl={latestActiveBoard.thenImageUrl}
-                    type="THEN"
-                  />
-                </div>
+                  {step === 3 ? (
+                    <div className="flex flex-wrap justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => goToStep(2)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <FaChevronLeft />
+                        Back
+                      </button>
 
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleCompleted(latestActiveBoard)}
-                    className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 font-semibold text-white transition ${
-                      latestActiveBoard.completed
-                        ? "bg-yellow-500 hover:bg-yellow-600"
-                        : "bg-green-600 hover:bg-green-700"
-                    }`}
-                  >
-                    <FaCheck />
-                    {latestActiveBoard.completed ? "Mark Incomplete" : "Mark Completed"}
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-              <div className="mb-5">
-                <h2 className="text-lg font-semibold text-gray-900">My Boards</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Manage all created First-Then boards.
-                </p>
-              </div>
-
-              {items.length === 0 ? (
-                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-6 text-sm text-gray-600">
-                  No First-Then boards created yet.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {items.map((row) => (
-                    <div
-                      key={row.id}
-                      className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"
-                    >
-                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <StatBadge color="blue">First</StatBadge>
-                            <span className="font-semibold text-gray-900">{row.firstTitle}</span>
-                          </div>
-
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <StatBadge color="purple">Then</StatBadge>
-                            <span className="font-semibold text-gray-900">{row.thenTitle}</span>
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {row.active ? (
-                              <StatBadge color="green">Active</StatBadge>
-                            ) : (
-                              <StatBadge color="red">Hidden</StatBadge>
-                            )}
-
-                            {row.completed ? (
-                              <StatBadge color="yellow">Completed</StatBadge>
-                            ) : (
-                              <StatBadge color="gray">Not Completed</StatBadge>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => edit(row)}
-                            className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
-                          >
-                            <FaPenToSquare />
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => toggleCompleted(row)}
-                            className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
-                          >
-                            <FaCheck />
-                            {row.completed ? "Undo" : "Complete"}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => toggleActive(row)}
-                            className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
-                          >
-                            {row.active ? (
-                              <>
-                                <FaEyeSlash />
-                                Hide
-                              </>
-                            ) : (
-                              <>
-                                <FaEye />
-                                Show
-                              </>
-                            )}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => removeBoard(row)}
-                            className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 font-medium text-red-600 hover:bg-red-50"
-                          >
-                            <FaTrash />
-                            Delete
-                          </button>
-                        </div>
-                      </div>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={confirmAndSave}
+                        className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 font-semibold text-white ${
+                          saving ? "cursor-not-allowed bg-blue-300" : "bg-emerald-600 hover:bg-emerald-700"
+                        }`}
+                      >
+                        <FaCheck />
+                        {saving ? "Saving..." : isEditing ? "Save Changes" : "Confirm and Save"}
+                      </button>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        disabled={downloading}
+                        onClick={downloadPdf}
+                        className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 font-semibold text-white ${
+                          downloading ? "cursor-not-allowed bg-blue-300" : "bg-[#4a6cf7] hover:bg-[#3f5ee0]"
+                        }`}
+                      >
+                        <FaFileArrowDown />
+                        {downloading ? "Preparing PDF..." : "Download PDF"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate("/first-then/boards")}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <FaListUl />
+                        View My Boards
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={resetWizard}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <FaRotateLeft />
+                        Create Another
+                      </button>
+                    </div>
+                  )}
+
+                  {step === 4 && savedBoard ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                      Board #{savedBoard.id || "new"} has been saved successfully.
+                    </div>
+                  ) : null}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
+              ) : null}
+            </motion.div>
+          </AnimatePresence>
+        </section>
       </main>
     </div>
   );
