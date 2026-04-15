@@ -52,6 +52,7 @@ import Home from "./pages/Home";
 
 
 import AacBoard from "./pages/AacBoard";
+import AacSavedPhrases from "./pages/AacSavedPhrases";
 import AdminAacCards from "./pages/AdminAacCards";
 
 import FirstThenBoard from "./pages/FirstThenBoard";
@@ -138,7 +139,8 @@ export default function App() {
             <Route path="/bookings" element={<Bookings />} />
             <Route path="/bookings/:id/chat" element={<BookingChat />} />
             <Route path="/analytics" element={<MChatQuestionnaireAnalytics />} />
-            <Route path="/gameanalytics" element={<Analytics />} />
+            <Route path="/activity-analytics" element={<Analytics />} />
+            <Route path="/gameanalytics" element={<Navigate to="/activity-analytics" replace />} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
 
             <Route path="/mchat-questionnaire" element={<MChatQuestionnaire />} />
@@ -159,6 +161,7 @@ export default function App() {
             <Route path="/activities/sound-therapy" element={<SoundTherapy />} />
 
             <Route path="/aac-board" element={<AacBoard />} />
+            <Route path="/aac-board/saved" element={<AacSavedPhrases />} />
             <Route path="/first-then" element={<FirstThenBoard />} />
             <Route path="/first-then/boards" element={<FirstThenBoards />} />
             <Route path="/activities/matching-sorting" element={<MatchingSortingActivity />} />

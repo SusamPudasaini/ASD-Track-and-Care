@@ -5,5 +5,7 @@ public enum ActivityType {
     SEQUENCE_MEMORY,
     NUMBER_MEMORY,
     VISUAL_MEMORY,
-    SOUND_THERAPY
+    SOUND_THERAPY,
+    MATCHING,
+    SORTING
 }

@@ -193,6 +193,7 @@ export default function Navbar() {
       type: "group",
       items: [
         { label: "AAC Board", path: "/aac-board" },
+        { label: "Saved AAC Phrases", path: "/aac-board/saved" },
         { label: "Create First-Then Board", path: "/first-then" },
         { label: "My First-Then Boards", path: "/first-then/boards" },
       ],
@@ -667,8 +668,8 @@ export default function Navbar() {
 
                           {role === "USER" && (
                             <>
-                              <ProfileMenuItem onClick={() => go("/gameanalytics")}>
-                                GameAnalytics
+                              <ProfileMenuItem onClick={() => go("/activity-analytics")}>
+                                Activity Analytics
                               </ProfileMenuItem>
                             </>
                           )}
@@ -678,8 +679,8 @@ export default function Navbar() {
                               <ProfileMenuItem onClick={() => go("/therapist/dashboard")}>
                                 Therapist Dashboard
                               </ProfileMenuItem>
-                              <ProfileMenuItem onClick={() => go("/gameanalytics")}>
-                                GameAnalytics
+                              <ProfileMenuItem onClick={() => go("/activity-analytics")}>
+                                Activity Analytics
                               </ProfileMenuItem>
                             </>
                           )}

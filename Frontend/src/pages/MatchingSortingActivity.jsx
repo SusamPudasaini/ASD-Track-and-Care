@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Navbar from "../components/navbar/Navbar";
 import api from "../api/axios";
+import { saveActivityResult } from "../api/activityApi";
 import {
   FaGamepad,
   FaPuzzlePiece,
@@ -292,6 +293,8 @@ export default function MatchingSortingActivity() {
   const [currentStep, setCurrentStep] = useState(1);
 
   const [score, setScore] = useState(0);
+  const [savingResult, setSavingResult] = useState(false);
+  const [resultSaved, setResultSaved] = useState(false);
 
   // matching
   const [matchingRounds, setMatchingRounds] = useState([]);
@@ -348,6 +351,8 @@ export default function MatchingSortingActivity() {
     if (!selectedActivity) return;
 
     setScore(0);
+    setSavingResult(false);
+    setResultSaved(false);
     setSortingFeedback(null);
     setDraggingItemId(null);
 
@@ -390,6 +395,7 @@ export default function MatchingSortingActivity() {
     setMatchingAnswered(false);
     setMatchingSelectedOptionId(null);
     setMatchingWasCorrect(null);
+    setResultSaved(false);
   }
 
   function initializeSorting(activity) {
@@ -404,6 +410,40 @@ export default function MatchingSortingActivity() {
     setSortingItems(normalized);
     setSortingFeedback(null);
     setDraggingItemId(null);
+    setResultSaved(false);
+  }
+
+  async function saveCompletedActivityResult(nextScore, extraDetails = {}) {
+    if (!selectedActivity || resultSaved || savingResult) return;
+
+    const safeScore = Number.isFinite(nextScore) ? nextScore : 0;
+    const totalItems = Array.isArray(selectedActivity.items) ? selectedActivity.items.length : 0;
+    const accuracyPercent = totalItems > 0 ? Math.round((safeScore / totalItems) * 100) : 0;
+
+    const payload = {
+      type: selectedActivity.type,
+      score: safeScore,
+      details: {
+        activityId: selectedActivity.id,
+        activityTitle: selectedActivity.title,
+        activityType: selectedActivity.type,
+        totalItems,
+        correctCount: safeScore,
+        accuracyPercent,
+        ...extraDetails,
+      },
+    };
+
+    try {
+      setSavingResult(true);
+      await saveActivityResult(payload);
+      setResultSaved(true);
+      toast.success("Result saved to Activity Analytics.");
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Could not save activity result.");
+    } finally {
+      setSavingResult(false);
+    }
   }
 
   async function handleTypeChange(nextType) {
@@ -435,6 +475,8 @@ export default function MatchingSortingActivity() {
   function restartCurrentActivity() {
     if (!selectedActivity) return;
     setScore(0);
+    setSavingResult(false);
+    setResultSaved(false);
 
     if (selectedActivity.type === "MATCHING") {
       initializeMatching(selectedActivity);
@@ -461,6 +503,8 @@ export default function MatchingSortingActivity() {
     if (!currentMatchingRound || matchingAnswered || matchingPhase !== "ANSWER") return;
 
     const isCorrect = (option.matchKey || "") === currentMatchingRound.correctMatchKey;
+    const isFinalRound = matchingIndex === matchingRounds.length - 1;
+    const nextScore = isCorrect ? score + 1 : score;
 
     setMatchingSelectedOptionId(option.id);
     setMatchingWasCorrect(isCorrect);
@@ -472,9 +516,16 @@ export default function MatchingSortingActivity() {
     } else {
       toast.error("Not quite right.");
     }
+
+    if (isFinalRound) {
+      toast.success("Matching activity completed!");
+      void saveCompletedActivityResult(nextScore, {
+        roundsPlayed: matchingRounds.length,
+      });
+    }
   }
 
-  function goToNextMatchingRound() {
+  async function goToNextMatchingRound() {
     if (matchingIndex < matchingRounds.length - 1) {
       setMatchingIndex((prev) => prev + 1);
       setMatchingPhase("PROMPT");
@@ -482,7 +533,9 @@ export default function MatchingSortingActivity() {
       setMatchingSelectedOptionId(null);
       setMatchingWasCorrect(null);
     } else {
-      toast.success("Matching activity completed!");
+      await saveCompletedActivityResult(score, {
+        roundsPlayed: matchingRounds.length,
+      });
     }
   }
 
@@ -515,6 +568,10 @@ export default function MatchingSortingActivity() {
     const isCorrect = (chosenItem.categoryKey || "") === bucket;
 
     if (isCorrect) {
+      const nextScore = score + 1;
+      const alreadyPlaced = sortingItems.filter((item) => item.placed).length;
+      const willComplete = alreadyPlaced + 1 === sortingItems.length;
+
       setSortingItems((prev) =>
         prev.map((item) =>
           String(item.id) === String(itemId) ? { ...item, placed: true } : item
@@ -524,8 +581,15 @@ export default function MatchingSortingActivity() {
         type: "success",
         text: `"${chosenItem.label}" was placed in the correct bucket.`,
       });
-      setScore((prev) => prev + 1);
+      setScore(nextScore);
       toast.success("Correct category!");
+
+      if (willComplete) {
+        toast.success("Sorting activity completed!");
+        void saveCompletedActivityResult(nextScore, {
+          bucketsUsed: sortingCategories.length,
+        });
+      }
     } else {
       setSortingFeedback({
         type: "error",

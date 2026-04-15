@@ -52,6 +52,7 @@ function emptyForm() {
   return {
     label: "",
     imageUrl: "",
+    spokenTextNepali: "",
     category: "PEOPLE",
     sortOrder: 0,
     active: true,
@@ -128,12 +129,13 @@ export default function AdminAacCards() {
       const payload = {
         label: form.label.trim(),
         imageUrl: form.imageUrl.trim() || null,
+          spokenTextNepali: form.spokenTextNepali.trim() || null,
         category: form.category,
         sortOrder: Number(form.sortOrder) || 0,
         active: !!form.active,
       };
 
-      if (editingId) {
+        if (editingId !== null) {
         await api.put(`/api/admin/aac-cards/${editingId}`, payload);
         toast.success("AAC card updated");
       } else {
@@ -156,6 +158,7 @@ export default function AdminAacCards() {
     setForm({
       label: row.label || "",
       imageUrl: row.imageUrl || "",
+      spokenTextNepali: row.spokenTextNepali || "",
       category: row.category || "PEOPLE",
       sortOrder: row.sortOrder ?? 0,
       active: !!row.active,
@@ -234,6 +237,13 @@ export default function AdminAacCards() {
                   onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
                 />
 
+                <InputWithIcon
+                  icon={<FaComments />}
+                  placeholder="Spoken text (optional, e.g. Nepali pronunciation)"
+                  value={form.spokenTextNepali}
+                  onChange={(e) => setForm({ ...form, spokenTextNepali: e.target.value })}
+                />
+
                 <div className="rounded-xl border bg-white px-3">
                   <select
                     value={form.category}
@@ -290,10 +300,10 @@ export default function AdminAacCards() {
                   }`}
                 >
                   <FaCheck />
-                  {saving ? "Saving..." : editingId ? "Update Card" : "Create Card"}
+                  {saving ? "Saving..." : editingId !== null ? "Update Card" : "Create Card"}
                 </button>
 
-                {editingId ? (
+                {editingId !== null ? (
                   <button
                     type="button"
                     onClick={resetForm}

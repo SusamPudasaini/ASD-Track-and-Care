@@ -36,6 +36,8 @@ const LABELS = {
   NUMBER_MEMORY: "Number Memory",
   VISUAL_MEMORY: "Visual Memory",
   SOUND_THERAPY: "Sound Therapy",
+  MATCHING: "Matching",
+  SORTING: "Sorting",
 };
 
 const DIRECTION = {
@@ -44,6 +46,8 @@ const DIRECTION = {
   NUMBER_MEMORY: "HIGHER_BETTER",
   VISUAL_MEMORY: "HIGHER_BETTER",
   SOUND_THERAPY: "HIGHER_BETTER",
+  MATCHING: "HIGHER_BETTER",
+  SORTING: "HIGHER_BETTER",
 };
 
 function parseISO(iso) {
@@ -315,40 +319,40 @@ export default function Analytics() {
   const typeLabel = type ? (LABELS[type] || type) : "All Activities";
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(to_bottom,_#f8fbff,_#f8fafc_30%,_#ffffff)]">
       <Navbar />
 
       <main className="mx-auto max-w-6xl px-6 py-10">
         {/* Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <FaArrowTrendUp className="text-[#4a6cf7]" />
-              <h1 className="text-3xl font-semibold text-gray-900">GameAnalytics</h1>
-            </div>
-            <p className="mt-1 text-sm text-gray-600">Progress tracking across activities.</p>
+        <div className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <FaArrowTrendUp className="text-[#4a6cf7]" />
+                <h1 className="text-3xl font-semibold text-gray-900">Activity Analytics</h1>
+              </div>
+              <p className="mt-1 text-sm text-gray-600">Progress tracking across therapy activities.</p>
 
-            {/* subtle chips summary */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Chip icon={<FaFilter />} text={typeLabel} />
-              <Chip icon={<FaCalendarDays />} text={rangeLabel} />
-              <Chip icon={<FaGaugeHigh />} text={modeLabel} />
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Chip icon={<FaFilter />} text={typeLabel} />
+                <Chip icon={<FaCalendarDays />} text={rangeLabel} />
+                <Chip icon={<FaGaugeHigh />} text={modeLabel} />
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDebug((s) => !s)}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              <FaBug />
+              {showDebug ? "Hide Debug" : "Show Debug"}
+            </button>
           </div>
-
-          {/* Right-side action */}
-          <button
-            type="button"
-            onClick={() => setShowDebug((s) => !s)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            <FaBug />
-            {showDebug ? "Hide Debug" : "Show Debug"}
-          </button>
         </div>
 
         {/* Filters */}
-        <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="mt-6 rounded-2xl border border-white/70 bg-white/90 p-4 shadow-[0_8px_26px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative">
@@ -411,7 +415,7 @@ export default function Analytics() {
 
         {/* Debug panel */}
         {showDebug && (
-          <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700">
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-900">
             <div>
               <span className="font-semibold">Debug URL:</span> {debug.lastUrl || "—"}
             </div>
@@ -434,13 +438,27 @@ export default function Analytics() {
 
         {/* KPI Cards */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard icon={<FaListCheck />} title="Total attempts" value={kpis.total} />
-          <KpiCard icon={<FaChartColumn />} title="Activities used" value={kpis.unique} />
+          <KpiCard
+            icon={<FaListCheck />}
+            title="Total attempts"
+            value={kpis.total}
+            gradientClass="from-blue-500 to-indigo-500"
+            iconBgClass="bg-blue-100 text-blue-700"
+          />
+          <KpiCard
+            icon={<FaChartColumn />}
+            title="Activities used"
+            value={kpis.unique}
+            gradientClass="from-cyan-500 to-sky-500"
+            iconBgClass="bg-cyan-100 text-cyan-700"
+          />
           <KpiCard
             icon={<FaGaugeHigh />}
             title={mode === "performance" ? "Avg performance" : "Average score"}
             value={kpis.total ? kpis.avg.toFixed(2) : "—"}
             hint={mode === "performance" ? "Higher is better" : "Depends on activity"}
+            gradientClass="from-emerald-500 to-teal-500"
+            iconBgClass="bg-emerald-100 text-emerald-700"
           />
           <KpiCard
             icon={<FaTrophy />}
@@ -453,13 +471,15 @@ export default function Analytics() {
                 : "—"
             }
             sub={kpis.best ? (LABELS[kpis.best.type] || kpis.best.type) : ""}
+            gradientClass="from-amber-500 to-orange-500"
+            iconBgClass="bg-amber-100 text-amber-700"
           />
         </div>
 
         {loading ? (
-          <div className="mt-10 text-sm text-gray-600">Loading analytics...</div>
+          <div className="mt-10 rounded-2xl border border-white/70 bg-white/90 p-6 text-sm text-gray-600 shadow-sm">Loading analytics...</div>
         ) : ranged.length === 0 ? (
-          <div className="mt-10 rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
+          <div className="mt-10 rounded-2xl border border-white/70 bg-white/90 p-6 text-sm text-gray-600 shadow-sm">
             No activity results found yet for this account.
             <div className="mt-2 text-xs text-gray-500">
               Make sure you played an activity while logged in, and that it successfully POSTed to <b>/api/activities/results</b>.
@@ -468,7 +488,7 @@ export default function Analytics() {
         ) : (
           <div className="mt-10 grid gap-6 lg:grid-cols-2">
             {/* Line chart */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-white/70 bg-white/90 p-6 shadow-[0_8px_26px_rgba(15,23,42,0.06)]">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
@@ -489,14 +509,21 @@ export default function Analytics() {
                     <YAxis domain={mode === "performance" ? [0, 100] : undefined} tick={{ fontSize: 12 }} />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="value" name={mode === "performance" ? "Performance" : "Score"} dot={false} />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      name={mode === "performance" ? "Performance" : "Score"}
+                      stroke="#4a6cf7"
+                      strokeWidth={3}
+                      dot={false}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             {/* Bar chart */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-white/70 bg-white/90 p-6 shadow-[0_8px_26px_rgba(15,23,42,0.06)]">
               <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
                 <FaChartColumn className="text-[#4a6cf7]" />
                 {mode === "performance" ? "Average performance by activity" : "Average score by activity"}
@@ -510,15 +537,15 @@ export default function Analytics() {
                     <YAxis domain={mode === "performance" ? [0, 100] : undefined} tick={{ fontSize: 12 }} />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="value" name={mode === "performance" ? "Avg performance" : "Avg score"} />
-                    <Bar dataKey="attempts" name="Attempts" />
+                    <Bar dataKey="value" name={mode === "performance" ? "Avg performance" : "Avg score"} fill="#4a6cf7" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="attempts" name="Attempts" fill="#22c55e" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             {/* Recent results table */}
-            <div className="lg:col-span-2 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="lg:col-span-2 rounded-2xl border border-white/70 bg-white/90 p-6 shadow-[0_8px_26px_rgba(15,23,42,0.06)]">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
                   <FaRegClock className="text-[#4a6cf7]" />
@@ -529,7 +556,7 @@ export default function Analytics() {
 
               <div className="mt-4 overflow-hidden rounded-xl border border-gray-100">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-700">
+                  <thead className="bg-blue-50/70 text-gray-700">
                     <tr>
                       <th className="px-4 py-3 text-left">
                         <span className="inline-flex items-center gap-2">
@@ -595,19 +622,20 @@ export default function Analytics() {
 
 function Chip({ icon, text }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-700">
-      <span className="text-gray-400">{icon}</span>
+    <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+      <span className="text-blue-500">{icon}</span>
       {text}
     </span>
   );
 }
 
-function KpiCard({ icon, title, value, sub, hint }) {
+function KpiCard({ icon, title, value, sub, hint, gradientClass = "from-blue-500 to-indigo-500", iconBgClass = "bg-blue-100 text-blue-700" }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600">{title}</div>
-        <div className="text-[#4a6cf7]">{icon}</div>
+    <div className="rounded-2xl border border-white/70 bg-white/90 p-5 shadow-[0_8px_26px_rgba(15,23,42,0.06)]">
+      <div className={`mb-3 h-1.5 w-16 rounded-full bg-gradient-to-r ${gradientClass}`} />
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-medium text-gray-600">{title}</div>
+        <div className={`rounded-full p-2 ${iconBgClass}`}>{icon}</div>
       </div>
       <div className="mt-2 text-2xl font-bold text-gray-900">{value}</div>
       {sub ? <div className="mt-1 text-sm text-gray-600">{sub}</div> : null}
