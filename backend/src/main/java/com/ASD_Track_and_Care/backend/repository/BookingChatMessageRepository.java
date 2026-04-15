@@ -8,4 +8,6 @@ import java.util.List;
 public interface BookingChatMessageRepository extends JpaRepository<BookingChatMessage, Long> {
 
     List<BookingChatMessage> findAllByBookingIdOrderBySentAtAsc(Long bookingId);
+
+    void deleteAllByBookingIdIn(List<Long> bookingIds);
 }

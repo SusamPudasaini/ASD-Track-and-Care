@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface MChatQuestionnaireAnswerRepository extends JpaRepository<MChatQuestionnaireAnswer, Long> {
     List<MChatQuestionnaireAnswer> findAllBySubmission(MChatQuestionnaireSubmission submission);
+
+    void deleteAllBySubmission_User_Id(Long userId);
 }

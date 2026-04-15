@@ -12,4 +12,6 @@ public interface DayCareUserReviewRepository extends JpaRepository<DayCareUserRe
     List<DayCareUserReview> findAllByDayCareCenterOrderByCreatedAtDesc(DayCareCenter dayCareCenter);
     Optional<DayCareUserReview> findByDayCareCenterAndUser(DayCareCenter dayCareCenter, User user);
     long countByDayCareCenter(DayCareCenter dayCareCenter);
+
+    void deleteAllByUser_Id(Long userId);
 }

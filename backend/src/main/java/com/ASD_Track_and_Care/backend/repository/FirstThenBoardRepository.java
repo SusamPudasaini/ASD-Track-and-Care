@@ -11,4 +11,6 @@ public interface FirstThenBoardRepository extends JpaRepository<FirstThenBoard, 
     List<FirstThenBoard> findAllByUserOrderByCreatedAtDesc(User user);
 
     List<FirstThenBoard> findAllByUserAndActiveTrueOrderByCreatedAtDesc(User user);
+
+    void deleteAllByUser_Id(Long userId);
 }

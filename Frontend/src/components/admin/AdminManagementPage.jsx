@@ -17,6 +17,11 @@ import AppModal from "../ui/AppModal";
 
 const ROLE_OPTIONS = ["USER", "THERAPIST", "ADMIN"];
 const BOOKING_STATUS_OPTIONS = ["PENDING", "CONFIRMED", "CANCELLED"];
+const EMAIL_VERIFIED_FILTER_OPTIONS = [
+  { value: "ALL", label: "All email states" },
+  { value: "VERIFIED", label: "Email verified" },
+  { value: "NOT_VERIFIED", label: "Email not verified" },
+];
 const PAGE_SIZE = 10;
 
 const TOAST_OPTIONS = {
@@ -63,6 +68,11 @@ function statusPillClass(status) {
   return "border-rose-200 bg-rose-50 text-rose-700";
 }
 
+function emailVerifiedPillClass(emailVerified) {
+  if (emailVerified) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  return "border-amber-200 bg-amber-50 text-amber-700";
+}
+
 function getErrorMessage(err) {
   const data = err?.response?.data;
   if (!data) return "Something went wrong.";
@@ -95,6 +105,7 @@ export default function AdminManagementPage({ sectionKey }) {
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
+  const [emailVerifiedFilter, setEmailVerifiedFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [showFilters, setShowFilters] = useState(false);
 
@@ -132,6 +143,9 @@ export default function AdminManagementPage({ sectionKey }) {
       const params = {};
       if (query.trim()) params.q = query.trim();
       if (sectionKey === "users" && roleFilter !== "ALL") params.role = roleFilter;
+      if (sectionKey === "users" && emailVerifiedFilter !== "ALL") {
+        params.emailVerified = emailVerifiedFilter === "VERIFIED" ? "true" : "false";
+      }
       if (sectionKey === "bookings" && statusFilter !== "ALL") params.status = statusFilter;
 
       const res = await api.get(endpoint, { params });
@@ -148,6 +162,7 @@ export default function AdminManagementPage({ sectionKey }) {
   useEffect(() => {
     setQuery("");
     setRoleFilter("ALL");
+    setEmailVerifiedFilter("ALL");
     setStatusFilter("ALL");
     setShowFilters(false);
     setCurrentPage(1);
@@ -156,7 +171,7 @@ export default function AdminManagementPage({ sectionKey }) {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectionKey, roleFilter, statusFilter]);
+  }, [sectionKey, roleFilter, emailVerifiedFilter, statusFilter]);
 
   const applySearch = async (e) => {
     e?.preventDefault?.();
@@ -181,6 +196,19 @@ export default function AdminManagementPage({ sectionKey }) {
       setSavingId(`booking-status-${id}`);
       await api.put(`/api/admin/database/bookings/${id}/status`, { status });
       toast.success("Booking status updated.", TOAST_OPTIONS);
+      await loadData();
+    } catch (err) {
+      toast.error(getErrorMessage(err), TOAST_OPTIONS);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const updateUserEmailVerified = async (id, emailVerified) => {
+    try {
+      setSavingId(`user-email-verified-${id}`);
+      await api.put(`/api/admin/database/users/${id}/email-verified`, { emailVerified });
+      toast.success("Email verification status updated.", TOAST_OPTIONS);
       await loadData();
     } catch (err) {
       toast.error(getErrorMessage(err), TOAST_OPTIONS);
@@ -271,6 +299,7 @@ export default function AdminManagementPage({ sectionKey }) {
         lastName: row.lastName || "",
         username: row.username || "",
         email: row.email || "",
+        emailVerified: Boolean(row.emailVerified),
         phone: row.phone || "",
         address: row.address || "",
         workplaceAddress: row.workplaceAddress || "",
@@ -324,6 +353,7 @@ export default function AdminManagementPage({ sectionKey }) {
       if (editMeta.type === "user") {
         await api.put(`/api/admin/database/users/${editMeta.id}`, {
           ...editForm,
+          emailVerified: Boolean(editForm.emailVerified),
           experienceYears: editForm.experienceYears === "" ? null : Number(editForm.experienceYears),
         });
       }
@@ -374,6 +404,7 @@ export default function AdminManagementPage({ sectionKey }) {
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-3 py-3">User</th>
                 <th className="px-3 py-3">Access</th>
+                <th className="px-3 py-3">Email status</th>
                 <th className="px-3 py-3">Phone</th>
                 <th className="px-3 py-3">Reviews</th>
                 <th className="px-3 py-3 text-right">Actions</th>
@@ -402,6 +433,24 @@ export default function AdminManagementPage({ sectionKey }) {
                           {ROLE_OPTIONS.map((opt) => (
                             <option key={opt} value={opt}>{opt}</option>
                           ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${emailVerifiedPillClass(Boolean(row.emailVerified))}`}
+                        >
+                          {row.emailVerified ? "Verified" : "Not verified"}
+                        </span>
+                        <select
+                          value={row.emailVerified ? "true" : "false"}
+                          disabled={savingId === `user-email-verified-${row.id}`}
+                          onChange={(e) => updateUserEmailVerified(row.id, e.target.value === "true")}
+                          className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
+                        >
+                          <option value="true">Verified</option>
+                          <option value="false">Not verified</option>
                         </select>
                       </div>
                     </td>
@@ -659,6 +708,16 @@ export default function AdminManagementPage({ sectionKey }) {
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
+
+                  <select
+                    value={emailVerifiedFilter}
+                    onChange={(e) => setEmailVerifiedFilter(e.target.value)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                  >
+                    {EMAIL_VERIFIED_FILTER_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                 </div>
               ) : null}
 
@@ -859,6 +918,19 @@ export default function AdminManagementPage({ sectionKey }) {
             <InputField label="Username" value={editForm.username || ""} onChange={(v) => setEditForm((p) => ({ ...p, username: v }))} />
             <InputField label="Email" type="email" value={editForm.email || ""} onChange={(v) => setEditForm((p) => ({ ...p, email: v }))} />
             <InputField label="Phone" value={editForm.phone || ""} onChange={(v) => setEditForm((p) => ({ ...p, phone: v }))} />
+
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">Email Verification</label>
+              <select
+                value={editForm.emailVerified ? "true" : "false"}
+                onChange={(e) => setEditForm((p) => ({ ...p, emailVerified: e.target.value === "true" }))}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="true">Verified</option>
+                <option value="false">Not verified</option>
+              </select>
+            </div>
+
             <InputField label="Qualification" value={editForm.qualification || ""} onChange={(v) => setEditForm((p) => ({ ...p, qualification: v }))} />
             <InputField label="Experience Years" type="number" value={editForm.experienceYears ?? ""} onChange={(v) => setEditForm((p) => ({ ...p, experienceYears: v }))} />
             <InputField label="Address" value={editForm.address || ""} onChange={(v) => setEditForm((p) => ({ ...p, address: v }))} />

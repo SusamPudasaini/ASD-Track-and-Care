@@ -5,12 +5,21 @@ import com.ASD_Track_and_Care.backend.model.BookingStatus;
 import com.ASD_Track_and_Care.backend.model.Role;
 import com.ASD_Track_and_Care.backend.model.TherapistReview;
 import com.ASD_Track_and_Care.backend.model.User;
+import com.ASD_Track_and_Care.backend.repository.AacFavoritePhraseRepository;
 import com.ASD_Track_and_Care.backend.repository.BookingRepository;
+import com.ASD_Track_and_Care.backend.repository.BookingChatMessageRepository;
+import com.ASD_Track_and_Care.backend.repository.DayCareUserReviewRepository;
+import com.ASD_Track_and_Care.backend.repository.FirstThenBoardRepository;
+import com.ASD_Track_and_Care.backend.repository.MChatQuestionnaireAnswerRepository;
+import com.ASD_Track_and_Care.backend.repository.MChatQuestionnaireSubmissionRepository;
+import com.ASD_Track_and_Care.backend.repository.QuestionnaireRecordRepository;
 import com.ASD_Track_and_Care.backend.repository.TherapistReviewRepository;
+import com.ASD_Track_and_Care.backend.repository.TherapistTimeSlotRepository;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -31,30 +40,57 @@ public class AdminDatabaseController {
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
     private final TherapistReviewRepository therapistReviewRepository;
+    private final QuestionnaireRecordRepository questionnaireRecordRepository;
+    private final MChatQuestionnaireSubmissionRepository mChatQuestionnaireSubmissionRepository;
+    private final MChatQuestionnaireAnswerRepository mChatQuestionnaireAnswerRepository;
+    private final AacFavoritePhraseRepository aacFavoritePhraseRepository;
+    private final FirstThenBoardRepository firstThenBoardRepository;
+    private final DayCareUserReviewRepository dayCareUserReviewRepository;
+    private final BookingChatMessageRepository bookingChatMessageRepository;
+    private final TherapistTimeSlotRepository therapistTimeSlotRepository;
     private final PasswordEncoder passwordEncoder;
 
     public AdminDatabaseController(
             UserRepository userRepository,
             BookingRepository bookingRepository,
             TherapistReviewRepository therapistReviewRepository,
+            QuestionnaireRecordRepository questionnaireRecordRepository,
+            MChatQuestionnaireSubmissionRepository mChatQuestionnaireSubmissionRepository,
+            MChatQuestionnaireAnswerRepository mChatQuestionnaireAnswerRepository,
+            AacFavoritePhraseRepository aacFavoritePhraseRepository,
+            FirstThenBoardRepository firstThenBoardRepository,
+            DayCareUserReviewRepository dayCareUserReviewRepository,
+            BookingChatMessageRepository bookingChatMessageRepository,
+            TherapistTimeSlotRepository therapistTimeSlotRepository,
             PasswordEncoder passwordEncoder
     ) {
         this.userRepository = userRepository;
         this.bookingRepository = bookingRepository;
         this.therapistReviewRepository = therapistReviewRepository;
+        this.questionnaireRecordRepository = questionnaireRecordRepository;
+        this.mChatQuestionnaireSubmissionRepository = mChatQuestionnaireSubmissionRepository;
+        this.mChatQuestionnaireAnswerRepository = mChatQuestionnaireAnswerRepository;
+        this.aacFavoritePhraseRepository = aacFavoritePhraseRepository;
+        this.firstThenBoardRepository = firstThenBoardRepository;
+        this.dayCareUserReviewRepository = dayCareUserReviewRepository;
+        this.bookingChatMessageRepository = bookingChatMessageRepository;
+        this.therapistTimeSlotRepository = therapistTimeSlotRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     @GetMapping("/users")
     public ResponseEntity<List<Map<String, Object>>> users(
             @RequestParam(value = "q", required = false) String q,
-            @RequestParam(value = "role", required = false) String role
+            @RequestParam(value = "role", required = false) String role,
+            @RequestParam(value = "emailVerified", required = false) String emailVerified
     ) {
         String query = safeLower(q);
         Role roleFilter = parseRole(role);
+        Boolean emailVerifiedFilter = parseBooleanFilter(emailVerified);
 
         List<Map<String, Object>> out = userRepository.findAll().stream()
                 .filter(u -> roleFilter == null || u.getRole() == roleFilter)
+            .filter(u -> emailVerifiedFilter == null || u.isEmailVerified() == emailVerifiedFilter)
                 .filter(u -> {
                     if (query.isBlank()) return true;
                     return containsAny(query,
@@ -63,6 +99,7 @@ public class AdminDatabaseController {
                             u.getFirstName(),
                             u.getLastName(),
                             u.getPhoneNumber(),
+                    u.isEmailVerified() ? "verified" : "not verified",
                             u.getRole() == null ? null : u.getRole().name());
                 })
                 .sorted(Comparator.comparing(User::getId, Comparator.nullsLast(Long::compareTo)).reversed())
@@ -140,6 +177,7 @@ public class AdminDatabaseController {
         String workplaceAddress = clean(asText(body == null ? null : body.get("workplaceAddress")));
         String qualification = clean(asText(body == null ? null : body.get("qualification")));
         Integer experienceYears = parseInteger(body == null ? null : body.get("experienceYears"));
+        Boolean emailVerified = parseBooleanBody(body == null ? null : body.get("emailVerified"));
         Role role = parseRole(asText(body == null ? null : body.get("role")));
         String password = clean(asText(body == null ? null : body.get("password")));
 
@@ -177,6 +215,12 @@ public class AdminDatabaseController {
         user.setWorkplaceAddress(workplaceAddress.isBlank() ? null : workplaceAddress);
         user.setQualification(qualification.isBlank() ? null : qualification);
         user.setExperienceYears(experienceYears);
+        if (body != null && body.containsKey("emailVerified")) {
+            if (emailVerified == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "emailVerified must be true or false"));
+            }
+            user.setEmailVerified(emailVerified);
+        }
         if (role != null) {
             user.setRole(role);
         }
@@ -219,6 +263,30 @@ public class AdminDatabaseController {
         ));
     }
 
+        @PutMapping("/users/{id}/email-verified")
+        public ResponseEntity<?> updateUserEmailVerified(
+            @PathVariable("id") Long id,
+            @RequestBody Map<String, Object> body
+        ) {
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Boolean emailVerified = parseBooleanBody(body == null ? null : body.get("emailVerified"));
+        if (emailVerified == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "emailVerified must be true or false"));
+        }
+
+        user.setEmailVerified(emailVerified);
+        User saved = userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of(
+            "id", saved.getId(),
+            "emailVerified", saved.isEmailVerified(),
+            "message", "Email verification status updated"
+        ));
+        }
+
+        @Transactional
     @DeleteMapping("/users/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable("id") Long id) {
         User user = userRepository.findById(id)
@@ -228,15 +296,26 @@ public class AdminDatabaseController {
             return ResponseEntity.badRequest().body(Map.of("message", "Admin users cannot be deleted from this panel."));
         }
 
-        if (bookingRepository.existsByUserIdOrTherapistId(id, id)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Cannot delete user with linked bookings."));
-        }
-
-        if (therapistReviewRepository.countByTherapistId(id) > 0 || therapistReviewRepository.countByUserId(id) > 0) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Cannot delete user with linked therapist reviews."));
-        }
-
         try {
+            List<Booking> linkedBookings = bookingRepository.findAllByUserIdOrTherapistId(id, id);
+            List<Long> linkedBookingIds = linkedBookings.stream().map(Booking::getId).collect(Collectors.toList());
+
+            if (!linkedBookingIds.isEmpty()) {
+                therapistReviewRepository.deleteAllByBookingIdIn(linkedBookingIds);
+                bookingChatMessageRepository.deleteAllByBookingIdIn(linkedBookingIds);
+            }
+
+            therapistReviewRepository.deleteAllByUserIdOrTherapistId(id, id);
+            bookingRepository.deleteAllByUserIdOrTherapistId(id, id);
+            therapistTimeSlotRepository.deleteAllByTherapistId(id);
+
+            mChatQuestionnaireAnswerRepository.deleteAllBySubmission_User_Id(id);
+            mChatQuestionnaireSubmissionRepository.deleteAllByUser_Id(id);
+            questionnaireRecordRepository.deleteAllByUser_Id(id);
+            dayCareUserReviewRepository.deleteAllByUser_Id(id);
+            firstThenBoardRepository.deleteAllByUser_Id(id);
+            aacFavoritePhraseRepository.deleteAllByUser_Id(id);
+
             userRepository.delete(user);
             return ResponseEntity.ok(Map.of("id", id, "message", "User deleted"));
         } catch (DataIntegrityViolationException ex) {
@@ -459,6 +538,7 @@ public class AdminDatabaseController {
         row.put("lastName", u.getLastName());
         row.put("phone", u.getPhoneNumber());
         row.put("role", u.getRole() == null ? null : u.getRole().name());
+        row.put("emailVerified", u.isEmailVerified());
         row.put("address", u.getAddress());
         row.put("workplaceAddress", u.getWorkplaceAddress());
         row.put("availableDays", u.getAvailableDays() == null
@@ -571,5 +651,24 @@ public class AdminDatabaseController {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private Boolean parseBooleanFilter(String value) {
+        if (value == null || value.isBlank()) return null;
+        String v = value.trim().toLowerCase(Locale.ROOT);
+        if ("true".equals(v) || "1".equals(v) || "verified".equals(v)) return true;
+        if ("false".equals(v) || "0".equals(v) || "not_verified".equals(v) || "not-verified".equals(v) || "unverified".equals(v)) {
+            return false;
+        }
+        return null;
+    }
+
+    private Boolean parseBooleanBody(Object value) {
+        if (value == null) return null;
+        if (value instanceof Boolean b) return b;
+        String v = String.valueOf(value).trim().toLowerCase(Locale.ROOT);
+        if ("true".equals(v) || "1".equals(v)) return true;
+        if ("false".equals(v) || "0".equals(v)) return false;
+        return null;
     }
 }

@@ -10,6 +10,8 @@ import java.util.Optional;
 
 public interface QuestionnaireRecordRepository extends JpaRepository<QuestionnaireRecord, Long> {
     List<QuestionnaireRecord> findByUserId(Long userId);
+
+    void deleteAllByUser_Id(Long userId);
     
     // ✅ latest N records (sorted newest first)
     List<QuestionnaireRecord> findByUser_IdOrderByIdDesc(Long userId, Pageable pageable);

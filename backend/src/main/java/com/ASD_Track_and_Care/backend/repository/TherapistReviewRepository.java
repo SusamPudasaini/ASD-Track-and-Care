@@ -24,4 +24,8 @@ public interface TherapistReviewRepository extends JpaRepository<TherapistReview
     long countByTherapistId(Long therapistId);
 
     long countByUserId(Long userId);
+
+    void deleteAllByBookingIdIn(List<Long> bookingIds);
+
+    void deleteAllByUserIdOrTherapistId(Long userId, Long therapistId);
 }

@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface AacFavoritePhraseRepository extends JpaRepository<AacFavoritePhrase, Long> {
     List<AacFavoritePhrase> findAllByUserOrderByCreatedAtDesc(User user);
+
+    void deleteAllByUser_Id(Long userId);
 }

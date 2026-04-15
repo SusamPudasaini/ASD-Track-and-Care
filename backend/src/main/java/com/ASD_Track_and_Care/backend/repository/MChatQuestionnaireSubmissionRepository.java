@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface MChatQuestionnaireSubmissionRepository extends JpaRepository<MChatQuestionnaireSubmission, Long> {
     List<MChatQuestionnaireSubmission> findAllByUserOrderBySubmittedAtDesc(User user);
     Optional<MChatQuestionnaireSubmission> findTopByUserOrderBySubmittedAtDesc(User user);
+    void deleteAllByUser_Id(Long userId);
 }

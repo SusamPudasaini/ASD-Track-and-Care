@@ -61,7 +61,7 @@ export default function Navbar() {
   const [me, setMe] = useState(getStoredMe);
   const [adminCollapsed, setAdminCollapsed] = useState(false);
   const [openAdminGroups, setOpenAdminGroups] = useState({
-    content: true,
+    content: false,
     database: false,
   });
 
@@ -136,28 +136,6 @@ export default function Navbar() {
     setMobileNavOpen(false);
     setOpenMobileGroup(null);
     setOpenDesktopDropdown(null);
-
-    if (role === "ADMIN") {
-      if (
-        location.pathname.startsWith("/admin/user-management") ||
-        location.pathname.startsWith("/admin/booking-management") ||
-        location.pathname.startsWith("/admin/therapist-reviews") ||
-        location.pathname.startsWith("/admin/database")
-      ) {
-        setOpenAdminGroups((prev) => ({ ...prev, database: true }));
-      }
-
-      if (
-        location.pathname.startsWith("/admin/request") ||
-        location.pathname.startsWith("/admin/resources") ||
-        location.pathname.startsWith("/admin/mchat-questions") ||
-        location.pathname.startsWith("/admin/daycares") ||
-        location.pathname.startsWith("/admin/aac-cards") ||
-        location.pathname.startsWith("/admin/matching-sorting")
-      ) {
-        setOpenAdminGroups((prev) => ({ ...prev, content: true }));
-      }
-    }
   }, [location.pathname]);
 
   const go = (path) => {
@@ -232,10 +210,10 @@ export default function Navbar() {
   const adminContentLinks = [
     { label: "Therapist Requests", path: "/admin/request", icon: FaFileCircleCheck },
     { label: "Manage Resources", path: "/admin/resources", icon: FaBookOpen },
-    { label: "Manage M-CHAT Questions", path: "/admin/mchat-questions", icon: FaCircleQuestion },
+    { label: "Manage M-CHAT", path: "/admin/mchat-questions", icon: FaCircleQuestion },
     { label: "Manage Day Cares", path: "/admin/daycares", icon: FaSchool },
     { label: "Manage AAC Cards", path: "/admin/aac-cards", icon: FaComments },
-    { label: "Manage Matching & Sorting", path: "/admin/matching-sorting", icon: FaGamepad },
+    { label: "Manage Match & Sort", path: "/admin/matching-sorting", icon: FaGamepad },
   ];
 
   const adminDatabaseLinks = [
@@ -362,8 +340,9 @@ export default function Navbar() {
                       onClick={() => toggleAdminGroup("content")}
                       className="mb-3 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left"
                     >
-                      <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                        Section 1: Manage Content
+                      <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                        <FaClipboardList className="text-[11px]" />
+                        Content Management
                       </span>
                       <FaChevronDown
                         className={`text-xs text-slate-500 transition-transform ${
@@ -415,7 +394,7 @@ export default function Navbar() {
                     >
                       <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
                         <FaDatabase className="text-[11px]" />
-                        Section 2: Manage Database
+                        Record Management
                       </span>
                       <FaChevronDown
                         className={`text-xs text-slate-500 transition-transform ${

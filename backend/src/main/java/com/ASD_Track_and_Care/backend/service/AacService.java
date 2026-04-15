@@ -8,6 +8,7 @@ import com.ASD_Track_and_Care.backend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -43,6 +44,8 @@ public class AacService {
     }
 
     public AacCardResponse createCard(CreateAacCardRequest req) {
+        LocalDateTime now = LocalDateTime.now();
+
         AacCard card = new AacCard();
         card.setLabel(req.getLabel().trim());
         card.setImageUrl(blankToNull(req.getImageUrl()));
@@ -50,6 +53,8 @@ public class AacService {
         card.setSortOrder(req.getSortOrder() == null ? 0 : req.getSortOrder());
         card.setActive(req.getActive() == null || req.getActive());
         card.setSpokenTextNepali(blankToNull(req.getSpokenTextNepali())); // new optional field
+        card.setCreatedAt(now);
+        card.setUpdatedAt(now);
 
         aacCardRepository.save(card);
         return toCardDto(card);
