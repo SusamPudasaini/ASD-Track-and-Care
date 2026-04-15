@@ -52,6 +52,21 @@ function prettyLabel(v) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function pickBrowserFallbackVoice(voices) {
+  const safeVoices = Array.isArray(voices) ? voices : [];
+
+  const matchVoice = (matcher) => safeVoices.find((voice) => matcher(voice || {}));
+
+  return (
+    matchVoice((voice) => String(voice.lang || "").toLowerCase() === "ne-np") ||
+    matchVoice((voice) => String(voice.lang || "").toLowerCase().startsWith("ne")) ||
+    matchVoice((voice) => String(voice.lang || "").toLowerCase().startsWith("hi")) ||
+    matchVoice((voice) => String(voice.lang || "").toLowerCase().startsWith("en")) ||
+    safeVoices[0] ||
+    null
+  );
+}
+
 function SentenceChip({ word, onRemove }) {
   return (
     <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-700">
@@ -148,6 +163,71 @@ export default function AacBoard() {
   const [sentence, setSentence] = useState([]);
   const [savingFavorite, setSavingFavorite] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+
+  async function tryBrowserFallbackSpeech(text) {
+    if (
+      typeof window === "undefined" ||
+      !window.speechSynthesis ||
+      typeof window.SpeechSynthesisUtterance === "undefined"
+    ) {
+      return false;
+    }
+
+    const phrase = String(text || "").trim();
+    if (!phrase) return false;
+
+    const synth = window.speechSynthesis;
+
+    const voices = await new Promise((resolve) => {
+      const existing = synth.getVoices();
+      if (existing.length) {
+        resolve(existing);
+        return;
+      }
+
+      const onVoicesChanged = () => {
+        cleanup();
+        resolve(synth.getVoices());
+      };
+
+      const cleanup = () => {
+        synth.removeEventListener?.("voiceschanged", onVoicesChanged);
+        window.clearTimeout(timeoutId);
+      };
+
+      const timeoutId = window.setTimeout(() => {
+        cleanup();
+        resolve(synth.getVoices());
+      }, 1000);
+
+      synth.addEventListener?.("voiceschanged", onVoicesChanged);
+    });
+
+    const voice = pickBrowserFallbackVoice(voices);
+
+    return new Promise((resolve) => {
+      try {
+        const utterance = new window.SpeechSynthesisUtterance(phrase);
+        if (voice) {
+          utterance.voice = voice;
+          utterance.lang = voice.lang || "ne-NP";
+        } else {
+          utterance.lang = "ne-NP";
+        }
+
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+
+        utterance.onend = () => resolve(true);
+        utterance.onerror = () => resolve(false);
+
+        synth.cancel();
+        synth.speak(utterance);
+      } catch {
+        resolve(false);
+      }
+    });
+  }
 
   useEffect(() => {
     loadCards("ALL");
@@ -250,8 +330,35 @@ export default function AacBoard() {
       await audio.play();
     } catch (err) {
       console.error(err);
+
+      let message = getErrorMessage(err);
+      const blobData = err?.response?.data;
+
+      if (blobData instanceof Blob) {
+        try {
+          const textPayload = await blobData.text();
+          if (textPayload) {
+            try {
+              const parsed = JSON.parse(textPayload);
+              message = parsed?.message || parsed?.error || textPayload;
+            } catch {
+              message = textPayload;
+            }
+          }
+        } catch {
+          // Keep fallback message if blob cannot be decoded.
+        }
+      }
+
+      const usedBrowserFallback = await tryBrowserFallbackSpeech(text);
       setSpeaking(false);
-      toast.error(getErrorMessage(err) || "Could not generate Nepali voice.");
+
+      if (usedBrowserFallback) {
+        toast("ElevenLabs failed, so fallback device voice was used.");
+        return;
+      }
+
+      toast.error(message || "Could not generate Nepali voice.");
     }
   }
 
