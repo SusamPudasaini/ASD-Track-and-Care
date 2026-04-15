@@ -23,11 +23,13 @@ function getStoredRole() {
 
 export default function OnboardingGuard() {
   const location = useLocation();
-  const cached = useMemo(() => readOnboardingStatusCache(), []);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState({
-    aiCompleted: cached.aiCompleted,
-    mchatCompleted: cached.mchatCompleted,
+  const [status, setStatus] = useState(() => {
+    const cached = readOnboardingStatusCache();
+    return {
+      aiCompleted: cached.aiCompleted,
+      mchatCompleted: cached.mchatCompleted,
+    };
   });
 
   const role = useMemo(() => getStoredRole(), []);
@@ -41,6 +43,14 @@ export default function OnboardingGuard() {
         return;
       }
 
+      const cachedNow = readOnboardingStatusCache();
+      // Keep optimistic completion from local cache to avoid bouncing users back
+      // to questionnaire steps after a successful submit.
+      setStatus((prev) => ({
+        aiCompleted: !!prev?.aiCompleted || !!cachedNow.aiCompleted,
+        mchatCompleted: !!prev?.mchatCompleted || !!cachedNow.mchatCompleted,
+      }));
+
       setLoading(true);
 
       try {
@@ -52,20 +62,18 @@ export default function OnboardingGuard() {
         if (!mounted) return;
 
         const next = {
-          aiCompleted: Boolean(aiRes?.data?.hasHistory),
-          mchatCompleted: Boolean(mchatRes?.data?.hasHistory),
+          aiCompleted: Boolean(aiRes?.data?.hasHistory) || !!cachedNow.aiCompleted,
+          mchatCompleted: Boolean(mchatRes?.data?.hasHistory) || !!cachedNow.mchatCompleted,
         };
 
         setStatus(next);
         writeOnboardingStatusCache(next);
       } catch {
         if (!mounted) return;
-        // Keep last known state when status checks fail to avoid false redirects.
-        setStatus((prev) => {
-          const safe = {
-            aiCompleted: !!prev?.aiCompleted,
-            mchatCompleted: !!prev?.mchatCompleted,
-          };
+        // Re-read local cache on failures so successful submits done moments ago
+        // are respected even if backend status check is temporarily unavailable.
+        setStatus(() => {
+          const safe = readOnboardingStatusCache();
           writeOnboardingStatusCache(safe);
           return safe;
         });
@@ -94,8 +102,15 @@ export default function OnboardingGuard() {
     return <Outlet />;
   }
 
-  const pendingAi = !status.aiCompleted;
-  const pendingMchat = status.aiCompleted && !status.mchatCompleted;
+  // Read latest cache on render to prevent one-frame stale redirects after submit.
+  const cachedNow = readOnboardingStatusCache();
+  const effectiveStatus = {
+    aiCompleted: !!status.aiCompleted || !!cachedNow.aiCompleted,
+    mchatCompleted: !!status.mchatCompleted || !!cachedNow.mchatCompleted,
+  };
+
+  const pendingAi = !effectiveStatus.aiCompleted;
+  const pendingMchat = effectiveStatus.aiCompleted && !effectiveStatus.mchatCompleted;
 
   if ((pendingAi || pendingMchat) && !ALLOWED_WHEN_PENDING.includes(location.pathname)) {
     return <Navigate to={pendingAi ? "/questionnaire" : "/mchat-questionnaire"} replace />;
