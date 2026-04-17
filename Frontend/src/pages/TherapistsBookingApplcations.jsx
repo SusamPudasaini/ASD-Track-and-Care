@@ -93,6 +93,12 @@ function getErrorMessage(err) {
   return String(data);
 }
 
+function isPaymentCompleted(paymentStatus) {
+  return String(paymentStatus || "").trim().toUpperCase() === "COMPLETED";
+}
+
+const UNPAID_BOOKING_APPROVAL_MESSAGE = "Payment hasn't been made for the booking request.";
+
 function fmtDateOnly(dateStr) {
   try {
     if (!dateStr) return "-";
@@ -447,6 +453,11 @@ export default function TherapistDashboardBookings() {
   const approveBooking = async (booking) => {
     if (!booking?.id) return;
 
+    if (!isPaymentCompleted(booking?.paymentStatus)) {
+      toast.error(UNPAID_BOOKING_APPROVAL_MESSAGE);
+      return;
+    }
+
     try {
       setActionId(booking.id);
       await api.put(`/api/bookings/${booking.id}/approve`);
@@ -465,8 +476,21 @@ export default function TherapistDashboardBookings() {
         navigate("/", { replace: true });
         return;
       }
+
+      const backendMessage = getErrorMessage(err);
+      const normalizedBackendMessage = String(backendMessage || "").toLowerCase();
+      if (
+        normalizedBackendMessage.includes("payment is not completed") ||
+        normalizedBackendMessage.includes("payment hasnt been made") ||
+        normalizedBackendMessage.includes("payment hasn't been made") ||
+        (code === 500 && !isPaymentCompleted(booking?.paymentStatus))
+      ) {
+        toast.error(UNPAID_BOOKING_APPROVAL_MESSAGE);
+        return;
+      }
+
       console.error("APPROVE ERROR:", code, err?.response?.data);
-      toast.error(getErrorMessage(err));
+      toast.error(backendMessage);
     } finally {
       setActionId(null);
     }

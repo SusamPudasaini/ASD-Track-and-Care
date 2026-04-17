@@ -1,5 +1,6 @@
 package com.ASD_Track_and_Care.backend.service;
 
+import com.ASD_Track_and_Care.backend.exception.BookingPaymentNotMadeException;
 import com.ASD_Track_and_Care.backend.dto.BookingResponse;
 import com.ASD_Track_and_Care.backend.dto.BookingChatMessageRequest;
 import com.ASD_Track_and_Care.backend.dto.BookingChatMessageResponse;
@@ -328,7 +329,7 @@ public class BookingService {
         }
 
         if (!"Completed".equalsIgnoreCase(b.getPaymentStatus())) {
-            throw new RuntimeException("Payment is not completed for this booking.");
+            throw new BookingPaymentNotMadeException();
         }
 
         if (b.getStatus() != BookingStatus.PENDING && b.getStatus() != BookingStatus.CONFIRMED) {
@@ -427,7 +428,7 @@ public class BookingService {
         }
 
         if (!"Completed".equalsIgnoreCase(b.getPaymentStatus())) {
-            throw new RuntimeException("Payment is not completed for this booking.");
+            throw new BookingPaymentNotMadeException();
         }
 
         if (b.getStatus() == BookingStatus.PENDING) {
