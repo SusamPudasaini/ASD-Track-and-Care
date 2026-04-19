@@ -16,6 +16,7 @@ import com.ASD_Track_and_Care.backend.repository.QuestionnaireRecordRepository;
 import com.ASD_Track_and_Care.backend.repository.TherapistReviewRepository;
 import com.ASD_Track_and_Care.backend.repository.TherapistTimeSlotRepository;
 import com.ASD_Track_and_Care.backend.repository.UserRepository;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,7 +75,7 @@ public class BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
 
         if (!booking.getUserId().equals(me.getId())) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         if (booking.getStatus() == BookingStatus.CANCELLED) {
@@ -188,7 +189,7 @@ public class BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found for this payment."));
 
         if (!b.getUserId().equals(me.getId())) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         Map<String, Object> lookup = khaltiPaymentService.lookupPayment(pidx);
@@ -230,7 +231,7 @@ public class BookingService {
         User therapist = getUserFromAuth(auth);
 
         if (therapist.getRole() != Role.THERAPIST) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         List<Booking> list = bookingRepository.findAllByTherapistIdOrderByCreatedAtDesc(therapist.getId());
@@ -314,14 +315,14 @@ public class BookingService {
         User therapist = getUserFromAuth(auth);
 
         if (therapist.getRole() != Role.THERAPIST) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         Booking b = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
 
         if (!b.getTherapistId().equals(therapist.getId())) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         if (b.getStatus() == BookingStatus.CANCELLED) {
@@ -358,14 +359,14 @@ public class BookingService {
         User therapist = getUserFromAuth(auth);
 
         if (therapist.getRole() != Role.THERAPIST) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         Booking b = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
 
         if (!b.getTherapistId().equals(therapist.getId())) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         String msg = (therapistMessage == null || therapistMessage.trim().isEmpty())
@@ -417,14 +418,14 @@ public class BookingService {
         User therapist = getUserFromAuth(auth);
 
         if (therapist.getRole() != Role.THERAPIST) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         Booking b = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
 
         if (!b.getTherapistId().equals(therapist.getId())) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         if (!"Completed".equalsIgnoreCase(b.getPaymentStatus())) {
@@ -456,7 +457,7 @@ public class BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
 
         if (!b.getUserId().equals(me.getId())) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         if (b.getStatus() == BookingStatus.CANCELLED) {
@@ -502,7 +503,7 @@ public class BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
 
         if (!b.getUserId().equals(me.getId())) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         if (b.getStatus() == BookingStatus.CONFIRMED) {
@@ -532,7 +533,7 @@ public class BookingService {
         boolean isUser = booking.getUserId().equals(me.getId());
         boolean isTherapist = booking.getTherapistId().equals(me.getId());
         if (!isUser && !isTherapist) {
-            throw new RuntimeException("Not allowed");
+            throw new AccessDeniedException("Not allowed");
         }
 
         if (booking.getStatus() == BookingStatus.CANCELLED) {
