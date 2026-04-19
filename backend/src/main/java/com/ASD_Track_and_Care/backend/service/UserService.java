@@ -80,7 +80,7 @@ public class UserService {
 
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
-            throw new IllegalArgumentException("Only image files are allowed.");
+            throw new IllegalArgumentException("Only upload image file type.");
         }
 
         if (file.getSize() > 5 * 1024 * 1024) {

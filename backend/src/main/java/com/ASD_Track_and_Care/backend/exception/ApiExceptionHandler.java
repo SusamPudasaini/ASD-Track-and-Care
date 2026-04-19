@@ -12,6 +12,13 @@ import java.util.Map;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<?> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "message", ex.getMessage()
+        ));
+    }
+
     @ExceptionHandler(BookingPaymentNotMadeException.class)
     public ResponseEntity<?> handleBookingPaymentNotMade(BookingPaymentNotMadeException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(

@@ -65,7 +65,8 @@ Close the opened terminals to stop the services.
 
 ### 1) Database Setup
 
-Create a MySQL database named ASD.
+The backend is configured to auto-create a MySQL database named ASD on startup (if it does not already exist).
+Requirement: the MySQL user in backend config must have CREATE DATABASE permission.
 
 Update backend configuration in backend/src/main/resources/application.properties:
 - spring.datasource.url
@@ -160,7 +161,7 @@ If frontend URL changes, update:
 
 ## Troubleshooting
 
-- Backend fails on startup: verify MySQL is running and database ASD exists.
+- Backend fails on startup: verify MySQL is running and your MySQL user has permission to create database ASD automatically.
 - 401 from FastAPI /predict: check fastapi.api-key matches Ai-Model/app.py API key.
 - Frontend API errors: verify VITE_API_BASE_URL points to backend port 8081.
 - Email links incorrect: confirm app.frontend.base-url.
